@@ -1,45 +1,58 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React from 'react';
+import { StatusBar, View, StyleSheet } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { enableScreens } from 'react-native-screens';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { LightColors } from './src/theme';
+import { AppProvider, useAppContext } from './src/context/AppContext';
+import LoginScreen from './src/screens/shared/LoginScreen';
+import MemberNavigator from './src/navigation/MemberNavigator';
+import OwnerNavigator from './src/navigation/OwnerNavigator';
+import VendorNavigator from './src/navigation/VendorNavigator';
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+enableScreens();
 
-  return (
-    <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
-    </SafeAreaProvider>
-  );
-}
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
+// ── Inner component: reads context AFTER AppProvider is mounted ──
+function AppInner() {
+  const { role, isLoggedIn } = useAppContext();
 
   return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
+    <View style={styles.root}>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#0EA5E9"
       />
+      {!isLoggedIn ? (
+        <LoginScreen />
+      ) : (
+        <NavigationContainer>
+          {role === 'owner' ? (
+            <OwnerNavigator />
+          ) : role === 'vendor' ? (
+            <VendorNavigator />
+          ) : (
+            <MemberNavigator />
+          )}
+        </NavigationContainer>
+      )}
     </View>
   );
 }
 
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppProvider>
+        <AppInner />
+      </AppProvider>
+    </SafeAreaProvider>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
+    backgroundColor: LightColors.bgBase,
   },
 });
-
-export default App;

@@ -1,0 +1,187 @@
+﻿import React, { useState } from 'react';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  StatusBar,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAppContext } from '../../context/AppContext';
+import { TRAINERS, FACILITIES } from '../../data/mockData';
+
+export default function MyGymScreen() {
+  const { currentGym } = useAppContext();
+  const gym = currentGym;
+  const gymFacilityIds = gym?.facilities?.map((f: any) =>
+    typeof f === 'string' ? f : f.id,
+  ) ?? [];
+  const gymFacilities = FACILITIES.filter(f => gymFacilityIds.includes(f.id));
+
+  const [photoIdx, setPhotoIdx] = useState(0);
+  const mockPhotos = ['🏋️', '🧘', '🚴', '🥊', '💪'];
+
+  if (!gym) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>🏢</Text>
+          <Text style={styles.emptyText}>No gym found</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#0EA5E9" />
+      <View style={styles.root}>
+
+        {/* HEADER */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerSub}>Your Gym</Text>
+            <Text style={styles.headerTitle}>{gym.name}</Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: gym.isOpen ? '#ECFDF5' : '#FEE2E2' }]}>
+            <View style={[styles.statusDot, { backgroundColor: gym.isOpen ? '#10B981' : '#EF4444' }]} />
+            <Text style={[styles.statusText, { color: gym.isOpen ? '#10B981' : '#EF4444' }]}>
+              {gym.isOpen ? 'Open' : 'Closed'}
+            </Text>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+          {/* Rating & Tagline */}
+          <View style={styles.gymInfoCard}>
+            <Text style={styles.gymTagline}>"{gym.tagline}"</Text>
+            <View style={styles.ratingRow}>
+              {[1, 2, 3, 4, 5].map(i => (
+                <Text key={i} style={{ fontSize: 18, color: i <= Math.floor(gym.rating) ? '#F59E0B' : '#E2E8F0' }}>★</Text>
+              ))}
+              <Text style={styles.ratingText}>{gym.rating} · Excellent</Text>
+            </View>
+            <Text style={styles.gymHours}>⏰ {gym.openTime} – {gym.closeTime}</Text>
+          </View>
+
+          {/* Photo Gallery */}
+          <Text style={styles.sectionTitle}>Gallery 📸</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoScroll}>
+            {mockPhotos.map((emoji, i) => (
+              <View key={i} style={[styles.photoCard, i === photoIdx && styles.photoCardActive]}>
+                <Text style={{ fontSize: 56 }}>{emoji}</Text>
+                <Text style={styles.photoLabel}>Gym Area {i + 1}</Text>
+              </View>
+            ))}
+          </ScrollView>
+
+          {/* Facilities */}
+          <Text style={styles.sectionTitle}>Facilities & Amenities</Text>
+          <View style={styles.facilitiesGrid}>
+            {gymFacilities.map(f => (
+              <View key={f.id} style={styles.facilityChip}>
+                <Text style={styles.facilityIcon}>{f.icon}</Text>
+                <Text style={styles.facilityName}>{f.name}</Text>
+              </View>
+            ))}
+            {gymFacilities.length === 0 && (
+              <Text style={styles.noFacilities}>Facilities info not available</Text>
+            )}
+          </View>
+
+          {/* Trainers */}
+          <Text style={styles.sectionTitle}>Our Trainers 🏋️</Text>
+          <View style={styles.trainersRow}>
+            {TRAINERS.map(trainer => (
+              <View key={trainer.id} style={styles.trainerCard}>
+                <View style={styles.trainerAvatar}>
+                  <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
+                </View>
+                <Text style={styles.trainerName}>{trainer.name}</Text>
+                <Text style={styles.trainerSpec} numberOfLines={2}>{trainer.specialization}</Text>
+                <Text style={styles.trainerExp}>{trainer.experience}</Text>
+                <View style={[styles.availPill, { backgroundColor: trainer.available ? '#ECFDF5' : '#FEF3C7' }]}>
+                  <Text style={[styles.availText, { color: trainer.available ? '#10B981' : '#F59E0B' }]}>
+                    {trainer.available ? '● Available' : '○ Busy'}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Location & Contact */}
+          <Text style={styles.sectionTitle}>Location & Contact</Text>
+          <View style={styles.contactCard}>
+            <View style={styles.contactRow}>
+              <Text style={styles.contactIcon}>📍</Text>
+              <Text style={styles.contactText}>{gym.address}, {gym.city}</Text>
+            </View>
+            <View style={styles.contactDivider} />
+            <View style={styles.contactRow}>
+              <Text style={styles.contactIcon}>📞</Text>
+              <Text style={styles.contactText}>{gym.phone}</Text>
+            </View>
+            <View style={styles.contactDivider} />
+            <View style={styles.contactRow}>
+              <Text style={styles.contactIcon}>✉️</Text>
+              <Text style={styles.contactText}>{gym.email}</Text>
+            </View>
+          </View>
+
+          {/* Map placeholder */}
+          <View style={styles.mapPlaceholder}>
+            <Text style={styles.mapIcon}>🗺️</Text>
+            <Text style={styles.mapText}>Tap to open in Maps</Text>
+            <Text style={styles.mapAddress}>{gym.address}</Text>
+          </View>
+        </ScrollView>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: '#0EA5E9' },
+  root: { flex: 1, backgroundColor: '#F8FAFC' },
+  header: { backgroundColor: '#0EA5E9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 12, fontWeight: '700' },
+  scroll: { padding: 20, paddingBottom: 40 },
+  gymInfoCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
+  gymTagline: { fontSize: 15, fontStyle: 'italic', color: '#475569', marginBottom: 12 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 10 },
+  ratingText: { fontSize: 13, fontWeight: '700', color: '#94A3B8', marginLeft: 8 },
+  gymHours: { fontSize: 13, fontWeight: '600', color: '#0EA5E9' },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 12 },
+  photoScroll: { marginBottom: 24 },
+  photoCard: { width: 140, height: 120, backgroundColor: '#EFF6FF', borderRadius: 16, marginRight: 12, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#DBEAFE' },
+  photoCardActive: { borderColor: '#0EA5E9', borderWidth: 2 },
+  photoLabel: { fontSize: 11, fontWeight: '600', color: '#94A3B8' },
+  facilitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
+  facilityChip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0' },
+  facilityIcon: { fontSize: 18 },
+  facilityName: { fontSize: 13, fontWeight: '600', color: '#475569' },
+  noFacilities: { fontSize: 13, color: '#94A3B8' },
+  trainersRow: { flexDirection: 'row', gap: 12, marginBottom: 24 },
+  trainerCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', gap: 5 },
+  trainerAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  trainerAvatarText: { fontSize: 16, fontWeight: '800', color: '#8B5CF6' },
+  trainerName: { fontSize: 13, fontWeight: '800', color: '#0F172A', textAlign: 'center' },
+  trainerSpec: { fontSize: 11, color: '#475569', textAlign: 'center' },
+  trainerExp: { fontSize: 10, color: '#94A3B8', fontWeight: '600' },
+  availPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  availText: { fontSize: 10, fontWeight: '700' },
+  contactCard: { backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 20, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  contactRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
+  contactIcon: { fontSize: 18 },
+  contactText: { fontSize: 13, fontWeight: '500', color: '#0F172A', flex: 1 },
+  contactDivider: { height: 1, backgroundColor: '#F1F5F9' },
+  mapPlaceholder: { backgroundColor: '#EFF6FF', borderRadius: 16, height: 120, alignItems: 'center', justifyContent: 'center', gap: 6, borderWidth: 1, borderColor: '#DBEAFE' },
+  mapIcon: { fontSize: 36 },
+  mapText: { fontSize: 13, fontWeight: '700', color: '#0EA5E9' },
+  mapAddress: { fontSize: 11, color: '#94A3B8', textAlign: 'center', paddingHorizontal: 20 },
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyIcon: { fontSize: 60 },
+  emptyText: { fontSize: 16, color: '#94A3B8', marginTop: 12 },
+});
