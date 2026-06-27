@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -136,31 +136,34 @@ export default function SupplementsScreen() {
         <View style={styles.container}>
         {/* Top Navbar */}
         <View style={styles.navbar}>
-          <View>
-            <Text style={styles.navTitle}>Protein & Supplies</Text>
-            <Text style={styles.navSubtitle}>Certified products at FitCore Desk</Text>
+          <View style={styles.navbarContent}>
+            <View>
+              <Text style={styles.navTitle}>Protein & Supplies</Text>
+              <Text style={styles.navSubtitle}>Certified products at FitCore Desk</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.cartIconContainer}
+              activeOpacity={0.8}
+              onPress={handleCheckout}
+            >
+              <Text style={styles.cartEmoji}>🛒</Text>
+              {cartCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.cartIconContainer}
-            activeOpacity={0.8}
-            onPress={handleCheckout}
-          >
-            <Text style={styles.cartEmoji}>🛒</Text>
-            {cartCount > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{cartCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
 
         {/* Category Horizontal Filter */}
         <View style={styles.filterWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterScroll}
-          >
+          <View style={styles.filterContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.filterScroll}
+            >
             {categories.map(cat => (
               <TouchableOpacity
                 key={cat}
@@ -181,7 +184,8 @@ export default function SupplementsScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
-          </ScrollView>
+            </ScrollView>
+          </View>
         </View>
 
         {/* Catalog Grid Scroll */}
@@ -241,15 +245,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   navbar: {
+    backgroundColor: LightColors.bgSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: LightColors.border,
+  },
+  navbarContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.md,
-    backgroundColor: LightColors.bgSurface,
-    borderBottomWidth: 1,
-    borderBottomColor: LightColors.border,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
   },
   navTitle: {
     fontSize: Typography.fontSizeLg,
@@ -293,12 +302,17 @@ const styles = StyleSheet.create({
   },
   filterWrapper: {
     backgroundColor: LightColors.bgSurface,
-    paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: LightColors.border,
   },
+  filterContainer: {
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
+  },
   filterScroll: {
     paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
     gap: 8,
   },
   filterTab: {
@@ -324,6 +338,9 @@ const styles = StyleSheet.create({
   gridContainer: {
     padding: Spacing.xl,
     paddingBottom: 40,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
   },
   grid: {
     flexDirection: 'row',

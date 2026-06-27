@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Alert,
@@ -14,6 +14,12 @@ const CATEGORY_LABELS: Record<ProductCategory, string> = {
   mass_gainer: 'Mass Gainer',
   accessories: 'Accessories',
   apparel: 'Apparel',
+  bcaa: 'BCAA',
+  multivitamin: 'Multivitamin',
+  fish_oil: 'Fish Oil',
+  peanut_butter: 'Peanut Butter',
+  oats: 'Oats',
+  equipment: 'Equipment',
 };
 
 const CATEGORY_COLORS: Record<ProductCategory, string> = {
@@ -23,6 +29,12 @@ const CATEGORY_COLORS: Record<ProductCategory, string> = {
   mass_gainer: '#10B981',
   accessories: '#F59E0B',
   apparel: '#EC4899',
+  bcaa: '#10B981',
+  multivitamin: '#3B82F6',
+  fish_oil: '#F59E0B',
+  peanut_butter: '#EF4444',
+  oats: '#8B5CF6',
+  equipment: '#6366F1',
 };
 
 export default function ShopScreen() {
@@ -65,18 +77,20 @@ export default function ShopScreen() {
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>Supplements & More</Text>
-            <Text style={styles.headerTitle}>Shop 🛍️</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>Supplements & More</Text>
+              <Text style={styles.headerTitle}>Shop 🛍️</Text>
+            </View>
+            <TouchableOpacity style={styles.cartBtn} onPress={() => setShowCart(!showCart)} activeOpacity={0.85}>
+              <Text style={styles.cartIcon}>🛒</Text>
+              {cartCount > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.cartBtn} onPress={() => setShowCart(!showCart)} activeOpacity={0.85}>
-            <Text style={styles.cartIcon}>🛒</Text>
-            {cartCount > 0 && (
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>{cartCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
 
         {/* Cart preview */}
@@ -190,14 +204,23 @@ export default function ShopScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#EC4899' },
   root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#EC4899', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  header: { backgroundColor: '#EC4899' },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
   cartBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', position: 'relative' },
   cartIcon: { fontSize: 22 },
   cartBadge: { position: 'absolute', top: 6, right: 6, width: 16, height: 16, borderRadius: 8, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   cartBadgeText: { fontSize: 9, fontWeight: '800', color: '#EC4899' },
-  cartPreview: { backgroundColor: '#FFFFFF', margin: 16, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.card },
+  cartPreview: {
+    backgroundColor: '#FFFFFF', margin: 16, borderRadius: 16, padding: 16,
+    borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.card,
+    width: '90%', maxWidth: 600, alignSelf: 'center',
+  },
   cartTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 12 },
   cartRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
   cartEmoji: { fontSize: 24 },
@@ -207,7 +230,10 @@ const styles = StyleSheet.create({
   cartTotalText: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
   checkoutBtn: { backgroundColor: '#EC4899', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 20 },
   checkoutBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  scroll: { padding: 16, paddingBottom: 40 },
+  scroll: {
+    padding: 16, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   catScroll: { marginBottom: 14 },
   catChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#FFFFFF', marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
   catChipActive: { backgroundColor: '#EC4899', borderColor: '#EC4899' },

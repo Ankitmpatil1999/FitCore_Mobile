@@ -1,60 +1,115 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  StatusBar, Alert,
+  StatusBar, Alert, Modal, TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Shadows } from '../../theme';
-import { PAYMENTS, ANALYTICS, Payment, PaymentStatus } from '../../data/mockData';
+import { LightColors, Shadows } from '../../theme';
 
-const GYM_ID = 'gym1';
-const analytics = ANALYTICS[GYM_ID];
+interface PaymentRecord {
+  id: string;
+  name: string;      // Member or Payee Name
+  amount: number;
+  type: 'received' | 'sent'; // received = Inflow, sent = Outflow
+  method: 'upi' | 'cash' | 'online';
+  status: 'completed' | 'pending';
+  date: string;
+  description: string;
+  category: string;
+}
 
-type FilterType = 'all' | 'completed' | 'pending' | 'refunded';
-type MethodType = 'all' | 'upi' | 'cash' | 'online';
+const INITIAL_TRANSACTIONS: PaymentRecord[] = [
+  { id: 'TX-1001', name: 'Arjun Mehta', amount: 3999, type: 'received', method: 'upi', status: 'completed', date: '2026-06-15', description: '6 Month Pass', category: 'Membership' },
+  { id: 'TX-1002', name: 'Priya Sharma', amount: 2499, type: 'received', method: 'online', status: 'completed', date: '2026-06-10', description: '3 Month Pass', category: 'Membership' },
+  { id: 'TX-1003', name: 'Kunal Landlord', amount: 35000, type: 'sent', method: 'online', status: 'completed', date: '2026-06-05', description: 'Gym Facility Rent', category: 'Rent' },
+  { id: 'TX-1004', name: 'Sneha Kulkarni', amount: 2499, type: 'received', method: 'upi', status: 'pending', date: '2026-06-01', description: '3 Month Renewal', category: 'Membership' },
+  { id: 'TX-1005', name: 'Trainer Vikram', amount: 25000, type: 'sent', method: 'upi', status: 'completed', date: '2026-06-01', description: 'Monthly Salary', category: 'Salary' },
+  { id: 'TX-1006', name: 'Ananya Jain', amount: 3999, type: 'received', method: 'upi', status: 'completed', date: '2026-06-01', description: '6 Month Pass', category: 'Membership' },
+  { id: 'TX-1007', name: 'Tata Power Co', amount: 8500, type: 'sent', method: 'online', status: 'completed', date: '2026-05-28', description: 'Electricity Bill', category: 'Utilities' },
+  { id: 'TX-1008', name: 'FitCore Supplements', amount: 15000, type: 'sent', method: 'online', status: 'completed', date: '2026-05-25', description: 'Stock Purchase', category: 'Inventory' },
+  { id: 'TX-1009', name: 'Rahul Desai', amount: 999, type: 'received', method: 'cash', status: 'completed', date: '2026-05-01', description: '1 Month Pass', category: 'Membership' },
+  { id: 'TX-1010', name: 'Suresh Hardware', amount: 3400, type: 'sent', method: 'cash', status: 'completed', date: '2026-04-20', description: 'Cable wire replacement', category: 'Maintenance' },
+];
 
-export default function PaymentsScreen() {
-  const [payments, setPayments] = useState<Payment[]>(PAYMENTS);
-  const [statusFilter, setStatusFilter] = useState<FilterType>('all');
-  const [methodFilter, setMethodFilter] = useState<MethodType>('all');
+export default function PaymentsScreen({ navigation }: any) {
+  const [payments, setPayments] = useState<PaymentRecord[]>(INITIAL_TRANSACTIONS);
+  const [typeFilter, setTypeFilter] = useState<'all' | 'received' | 'sent'>('all');
+  const [methodFilter, setMethodFilter] = useState<'all' | 'upi' | 'cash' | 'online'>('all');
 
-  const filtered = payments.filter(p => {
-    const matchStatus = statusFilter === 'all' || p.status === statusFilter;
-    const matchMethod = methodFilter === 'all' || p.method === methodFilter;
-    return matchStatus && matchMethod;
-  });
+  // Add Transaction Form Modal State
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newAmount, setNewAmount] = useState('');
+  const [newType, setNewType] = useState<'received' | 'sent'>('received');
+  const [newMethod, setNewMethod] = useState<'upi' | 'cash' | 'online'>('upi');
+  const [newCategory, setNewCategory] = useState('');
+  const [newDesc, setNewDesc] = useState('');
 
-  const todayTotal = payments.filter(p => p.status === 'completed')
-    .reduce((s, p) => s + p.amount, 0);
-  const pendingTotal = payments.filter(p => p.status === 'pending')
-    .reduce((s, p) => s + p.amount, 0);
+  const handleAddTransaction = () => {
+    if (!newName.trim() || !newAmount.trim() || !newCategory.trim()) {
+      Alert.alert('Required Fields', 'Name, Amount, and Category are required.');
+      return;
+    }
 
-  const upiTotal = payments.filter(p => p.method === 'upi' && p.status === 'completed')
-    .reduce((s, p) => s + p.amount, 0);
-  const cashTotal = payments.filter(p => p.method === 'cash' && p.status === 'completed')
-    .reduce((s, p) => s + p.amount, 0);
-  const onlineTotal = payments.filter(p => p.method === 'online' && p.status === 'completed')
-    .reduce((s, p) => s + p.amount, 0);
+    const amt = parseFloat(newAmount);
+    if (isNaN(amt) || amt <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid positive number for amount.');
+      return;
+    }
 
-  const markPaid = (payment: Payment) => {
-    Alert.alert('Mark as Paid', `Mark ${payment.memberName}'s ₹${payment.amount} as paid?`, [
+    const newTx: PaymentRecord = {
+      id: `TX-${Date.now().toString().slice(-4)}`,
+      name: newName.trim(),
+      amount: amt,
+      type: newType,
+      method: newMethod,
+      status: 'completed',
+      date: new Date().toISOString().split('T')[0],
+      description: newDesc.trim() || `${newCategory} transaction`,
+      category: newCategory.trim(),
+    };
+
+    setPayments(prev => [newTx, ...prev]);
+    Alert.alert('Success', `Recorded ₹${amt.toLocaleString('en-IN')} as ${newType.toUpperCase()}`);
+    setShowAddModal(false);
+    // Reset Form
+    setNewName(''); setNewAmount(''); setNewType('received');
+    setNewMethod('upi'); setNewCategory(''); setNewDesc('');
+  };
+
+  const markPaid = (txId: string) => {
+    Alert.alert('Mark Paid', 'Mark this pending invoice as completed?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Mark Paid',
+        text: 'Confirm',
         onPress: () => setPayments(prev =>
-          prev.map(p => p.id === payment.id ? { ...p, status: 'completed' } : p),
+          prev.map(p => p.id === txId ? { ...p, status: 'completed' } : p),
         ),
       },
     ]);
   };
 
-  const statusColor = (s: PaymentStatus) => {
-    if (s === 'completed') return { bg: '#ECFDF5', text: '#10B981' };
-    if (s === 'pending') return { bg: '#FEF3C7', text: '#F59E0B' };
-    return { bg: '#FEE2E2', text: '#EF4444' };
-  };
+  const filtered = payments.filter(p => {
+    const matchType = typeFilter === 'all' || p.type === typeFilter;
+    const matchMethod = methodFilter === 'all' || p.method === methodFilter;
+    return matchType && matchMethod;
+  });
 
-  const methodIcon = (m: string) => {
+  // Calculations
+  const inflowTotal = payments
+    .filter(p => p.type === 'received' && p.status === 'completed')
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const outflowTotal = payments
+    .filter(p => p.type === 'sent' && p.status === 'completed')
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const netBalance = inflowTotal - outflowTotal;
+  const pendingTotal = payments
+    .filter(p => p.status === 'pending')
+    .reduce((sum, p) => sum + p.amount, 0);
+
+  const getMethodIcon = (m: string) => {
     if (m === 'upi') return '📱';
     if (m === 'cash') return '💵';
     return '💳';
@@ -62,192 +117,343 @@ export default function PaymentsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
+      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
       <View style={styles.root}>
-
+        {/* HEADER */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>Financial</Text>
-            <Text style={styles.headerTitle}>Payments 💰</Text>
+          <View style={styles.headerContent}>
+            {navigation && navigation.canGoBack() && (
+              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} activeOpacity={0.8}>
+                <Text style={styles.backIcon}>←</Text>
+              </TouchableOpacity>
+            )}
+            <View style={[styles.headerTitleBox, (!navigation || !navigation.canGoBack()) && { marginLeft: 0 }]}>
+              <Text style={styles.headerSub}>Financial Ledger</Text>
+              <Text style={styles.headerTitle}>Payments & Cash Flow 💰</Text>
+            </View>
+            <TouchableOpacity style={styles.addBtn} onPress={() => setShowAddModal(true)} activeOpacity={0.85}>
+              <Text style={styles.addBtnText}>+ Record</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
-          {/* Revenue hero */}
-          <View style={styles.revenueBanner}>
-            <View style={styles.revenuePrimary}>
-              <Text style={styles.revenueLabel}>Monthly Revenue</Text>
-              <Text style={styles.revenueVal}>
-                ₹{analytics.monthlyRevenue.toLocaleString('en-IN')}
+          {/* CASH FLOW SUMMARY CARD */}
+          <View style={styles.summaryCard}>
+            <View style={styles.summaryMain}>
+              <Text style={styles.summaryLabel}>Net Cash Flow (Completed)</Text>
+              <Text style={[styles.summaryVal, { color: netBalance >= 0 ? LightColors.success : LightColors.danger }]}>
+                {netBalance >= 0 ? '+' : '-'} ₹{Math.abs(netBalance).toLocaleString('en-IN')}
               </Text>
-              <Text style={styles.revenueGrowth}>↑ +18.4% from last month</Text>
             </View>
-            <View style={styles.revenueSecondary}>
-              <View style={styles.revenueMini}>
-                <Text style={styles.revenueMiniLabel}>Today</Text>
-                <Text style={styles.revenueMiniVal}>₹{todayTotal.toLocaleString('en-IN')}</Text>
+
+            <View style={styles.summaryDivider} />
+
+            <View style={styles.summaryGrid}>
+              <View style={styles.gridCell}>
+                <Text style={styles.cellLabel}>🟢 Total Inflow (Received)</Text>
+                <Text style={styles.cellValue}>₹{inflowTotal.toLocaleString('en-IN')}</Text>
               </View>
-              <View style={styles.revenueMiniDivider} />
-              <View style={styles.revenueMini}>
-                <Text style={[styles.revenueMiniLabel, { color: '#FCA5A5' }]}>Pending</Text>
-                <Text style={[styles.revenueMiniVal, { color: '#FCA5A5' }]}>
-                  ₹{pendingTotal.toLocaleString('en-IN')}
-                </Text>
+              <View style={styles.cellDivider} />
+              <View style={styles.gridCell}>
+                <Text style={styles.cellLabel}>🔴 Total Outflow (Sent)</Text>
+                <Text style={styles.cellValue}>₹{outflowTotal.toLocaleString('en-IN')}</Text>
               </View>
             </View>
           </View>
 
-          {/* Method breakdown */}
-          <Text style={styles.sectionTitle}>Payment Method Breakdown</Text>
-          <View style={styles.methodGrid}>
-            <View style={[styles.methodCard, { borderLeftColor: '#8B5CF6' }]}>
-              <Text style={styles.methodIcon}>📱</Text>
-              <Text style={styles.methodVal}>₹{upiTotal.toLocaleString('en-IN')}</Text>
-              <Text style={styles.methodLabel}>UPI</Text>
-            </View>
-            <View style={[styles.methodCard, { borderLeftColor: '#10B981' }]}>
-              <Text style={styles.methodIcon}>💵</Text>
-              <Text style={styles.methodVal}>₹{cashTotal.toLocaleString('en-IN')}</Text>
-              <Text style={styles.methodLabel}>Cash</Text>
-            </View>
-            <View style={[styles.methodCard, { borderLeftColor: '#3B82F6' }]}>
-              <Text style={styles.methodIcon}>💳</Text>
-              <Text style={styles.methodVal}>₹{onlineTotal.toLocaleString('en-IN')}</Text>
-              <Text style={styles.methodLabel}>Online</Text>
-            </View>
-          </View>
-
-          {/* Pending alert */}
-          {payments.filter(p => p.status === 'pending').length > 0 && (
-            <View style={styles.pendingAlert}>
-              <Text style={styles.pendingAlertIcon}>⚠️</Text>
-              <Text style={styles.pendingAlertText}>
-                {payments.filter(p => p.status === 'pending').length} payment
-                {payments.filter(p => p.status === 'pending').length > 1 ? 's' : ''} pending — ₹{pendingTotal.toLocaleString('en-IN')} to collect
+          {/* PENDING NOTIFICATION BANNER */}
+          {pendingTotal > 0 && (
+            <View style={styles.pendingBanner}>
+              <Text style={{ fontSize: 16 }}>⚠️</Text>
+              <Text style={styles.pendingText}>
+                Pending collection: <Text style={{ fontWeight: '800' }}>₹{pendingTotal.toLocaleString('en-IN')}</Text>
               </Text>
             </View>
           )}
 
-          {/* Filters */}
-          <Text style={styles.sectionTitle}>Transaction History</Text>
-          <View style={styles.filterRow}>
-            {(['all', 'completed', 'pending', 'refunded'] as FilterType[]).map(f => (
-              <TouchableOpacity
-                key={f}
-                style={[styles.filterChip, statusFilter === f && styles.filterChipActive]}
-                onPress={() => setStatusFilter(f)}
-              >
-                <Text style={[styles.filterChipText, statusFilter === f && { color: '#FFFFFF' }]}>
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          {/* FILTERS */}
+          <Text style={styles.sectionTitle}>Transaction Logs</Text>
+          <View style={styles.filterGroup}>
+            {/* Inflow vs Outflow */}
+            <View style={styles.filterRow}>
+              {(['all', 'received', 'sent'] as const).map(f => (
+                <TouchableOpacity
+                  key={f}
+                  style={[styles.filterChip, typeFilter === f && styles.filterChipActive]}
+                  onPress={() => setTypeFilter(f)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.filterChipText, typeFilter === f && { color: '#FFFFFF' }]}>
+                    {f === 'all' ? 'All Logs' : f === 'received' ? 'Received (Inflow)' : 'Sent (Outflow)'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Methods */}
+            <View style={styles.filterRow}>
+              {(['all', 'upi', 'cash', 'online'] as const).map(m => (
+                <TouchableOpacity
+                  key={m}
+                  style={[styles.methodChip, methodFilter === m && styles.methodChipActive]}
+                  onPress={() => setMethodFilter(m)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.methodChipText, methodFilter === m && { color: LightColors.accentViolet }]}>
+                    {m === 'all' ? 'All Methods' : `${getMethodIcon(m)} ${m.toUpperCase()}`}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
-          <View style={styles.methodFilterRow}>
-            {(['all', 'upi', 'cash', 'online'] as MethodType[]).map(m => (
-              <TouchableOpacity
-                key={m}
-                style={[styles.methodFilterChip, methodFilter === m && styles.methodFilterChipActive]}
-                onPress={() => setMethodFilter(m)}
-              >
-                <Text style={[styles.methodFilterText, methodFilter === m && { color: '#8B5CF6' }]}>
-                  {m === 'all' ? 'All Methods' : `${methodIcon(m)} ${m.toUpperCase()}`}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <Text style={styles.countLabel}>{filtered.length} transactions match filters</Text>
 
-          <Text style={styles.countLabel}>{filtered.length} transactions</Text>
+          {/* TRANSACTION LEDGER LIST */}
+          <View style={styles.ledgerList}>
+            {filtered.length === 0 ? (
+              <View style={styles.emptyCard}>
+                <Text style={{ fontSize: 44, marginBottom: 8 }}>📊</Text>
+                <Text style={styles.emptyText}>No matching transactions found</Text>
+              </View>
+            ) : (
+              filtered.map(tx => {
+                const isInflow = tx.type === 'received';
+                return (
+                  <View key={tx.id} style={styles.txCard}>
+                    <View style={styles.txLeft}>
+                      <View style={[styles.iconWrapper, { backgroundColor: isInflow ? `${LightColors.success}10` : `${LightColors.danger}10` }]}>
+                        <Text style={{ fontSize: 18 }}>{isInflow ? '📥' : '📤'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.txName} numberOfLines={1}>{tx.name}</Text>
+                        <Text style={styles.txDesc} numberOfLines={1}>{tx.description}</Text>
+                        <Text style={styles.txMeta}>{tx.date} · {tx.category} · {getMethodIcon(tx.method)} {tx.method.toUpperCase()}</Text>
+                      </View>
+                    </View>
 
-          {/* Transaction list */}
-          <View style={styles.txList}>
-            {filtered.map(tx => {
-              const sc = statusColor(tx.status);
-              return (
-                <View key={tx.id} style={styles.txCard}>
-                  <View style={styles.txLeft}>
-                    <View style={styles.txAvatar}>
-                      <Text style={{ fontSize: 20 }}>{methodIcon(tx.method)}</Text>
-                    </View>
-                    <View>
-                      <Text style={styles.txMember}>{tx.memberName}</Text>
-                      <Text style={styles.txDesc}>{tx.description}</Text>
-                      <Text style={styles.txDate}>{tx.date}</Text>
-                    </View>
-                  </View>
-                  <View style={styles.txRight}>
-                    <Text style={styles.txAmount}>₹{tx.amount.toLocaleString('en-IN')}</Text>
-                    <View style={[styles.txStatusPill, { backgroundColor: sc.bg }]}>
-                      <Text style={[styles.txStatusText, { color: sc.text }]}>
-                        {tx.status.toUpperCase()}
+                    <View style={styles.txRight}>
+                      <Text style={[styles.txAmount, { color: isInflow ? LightColors.success : LightColors.danger }]}>
+                        {isInflow ? '+' : '-'} ₹{tx.amount.toLocaleString('en-IN')}
                       </Text>
+                      {tx.status === 'pending' ? (
+                        <TouchableOpacity style={styles.payBtn} onPress={() => markPaid(tx.id)} activeOpacity={0.8}>
+                          <Text style={styles.payBtnText}>Collect Payment</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={[styles.statusBadge, { backgroundColor: isInflow ? `${LightColors.success}15` : `${LightColors.danger}15` }]}>
+                          <Text style={[styles.statusBadgeText, { color: isInflow ? LightColors.success : LightColors.danger }]}>
+                            {tx.status.toUpperCase()}
+                          </Text>
+                        </View>
+                      )}
                     </View>
-                    <Text style={styles.txId}>{tx.id}</Text>
-                    {tx.status === 'pending' && (
-                      <TouchableOpacity style={styles.markPaidBtn} onPress={() => markPaid(tx)}>
-                        <Text style={styles.markPaidText}>Mark Paid</Text>
-                      </TouchableOpacity>
-                    )}
                   </View>
-                </View>
-              );
-            })}
+                );
+              })
+            )}
           </View>
         </ScrollView>
+
+        {/* ADD TRANSACTION MODAL */}
+        <Modal visible={showAddModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowAddModal(false)}>
+          <SafeAreaView style={styles.modalRoot}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Record Transaction</Text>
+              <TouchableOpacity onPress={() => setShowAddModal(false)} style={styles.closeBtn} activeOpacity={0.8}>
+                <Text style={styles.closeBtnText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
+              {/* Type Switch */}
+              <Text style={styles.inputLabel}>Transaction Type *</Text>
+              <View style={styles.modalTypeRow}>
+                <TouchableOpacity
+                  style={[styles.typeBtn, newType === 'received' && { backgroundColor: LightColors.success, borderColor: LightColors.success }]}
+                  onPress={() => setNewType('received')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.typeBtnText, newType === 'received' && { color: '#FFFFFF' }]}>📥 Inflow (Money Received)</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.typeBtn, newType === 'sent' && { backgroundColor: LightColors.danger, borderColor: LightColors.danger }]}
+                  onPress={() => setNewType('sent')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.typeBtnText, newType === 'sent' && { color: '#FFFFFF' }]}>📤 Outflow (Money Sent)</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Payee / Member Name */}
+              <Text style={styles.inputLabel}>{newType === 'received' ? 'Received From (Member Name) *' : 'Paid To (Supplier / Payee Name) *'}</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder={newType === 'received' ? 'e.g. Rahul Patil' : 'e.g. Power Grid Co.'}
+                placeholderTextColor={LightColors.textMuted}
+                value={newName}
+                onChangeText={setNewName}
+              />
+
+              {/* Amount */}
+              <Text style={styles.inputLabel}>Amount (₹) *</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. 5000"
+                placeholderTextColor={LightColors.textMuted}
+                keyboardType="numeric"
+                value={newAmount}
+                onChangeText={setNewAmount}
+              />
+
+              {/* Category */}
+              <Text style={styles.inputLabel}>Category *</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder={newType === 'received' ? 'e.g. Membership, Store Sale' : 'e.g. Rent, Salary, Maintenance'}
+                placeholderTextColor={LightColors.textMuted}
+                value={newCategory}
+                onChangeText={setNewCategory}
+              />
+
+              {/* Method */}
+              <Text style={styles.inputLabel}>Payment Method *</Text>
+              <View style={styles.modalTypeRow}>
+                {(['upi', 'cash', 'online'] as const).map(m => (
+                  <TouchableOpacity
+                    key={m}
+                    style={[styles.methodBtn, newMethod === m && { backgroundColor: LightColors.accentViolet, borderColor: LightColors.accentViolet }]}
+                    onPress={() => setNewMethod(m)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.methodBtnText, newMethod === m && { color: '#FFFFFF' }]}>
+                      {getMethodIcon(m)} {m.toUpperCase()}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Description */}
+              <Text style={styles.inputLabel}>Description (Optional)</Text>
+              <TextInput
+                style={[styles.modalInput, { height: 70, textAlignVertical: 'top' }]}
+                placeholder="Details of the payment..."
+                placeholderTextColor={LightColors.textMuted}
+                multiline={true}
+                numberOfLines={3}
+                value={newDesc}
+                onChangeText={setNewDesc}
+              />
+
+              {/* Save Button */}
+              <TouchableOpacity style={styles.saveBtn} onPress={handleAddTransaction} activeOpacity={0.85}>
+                <Text style={styles.saveBtnText}>💾 Save Transaction</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7C3AED' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#7C3AED', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  scroll: { padding: 20, paddingBottom: 40 },
-  revenueBanner: { backgroundColor: '#8B5CF6', borderRadius: 20, padding: 20, marginBottom: 20 },
-  revenuePrimary: { marginBottom: 16 },
-  revenueLabel: { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.8)' },
-  revenueVal: { fontSize: 36, fontWeight: '800', color: '#FFFFFF', marginTop: 4 },
-  revenueGrowth: { fontSize: 12, color: '#A7F3D0', fontWeight: '600', marginTop: 4 },
-  revenueSecondary: { flexDirection: 'row', alignItems: 'center' },
-  revenueMini: { flex: 1 },
-  revenueMiniLabel: { fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.7)' },
-  revenueMiniVal: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', marginTop: 2 },
-  revenueMiniDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.2)', marginHorizontal: 16 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 12 },
-  methodGrid: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  methodCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', borderLeftWidth: 3, alignItems: 'center', ...Shadows.card },
-  methodIcon: { fontSize: 22, marginBottom: 6 },
-  methodVal: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
-  methodLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600', marginTop: 3 },
-  pendingAlert: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', borderRadius: 12, padding: 14, marginBottom: 20, gap: 8, borderWidth: 1, borderColor: '#FCD34D' },
-  pendingAlertIcon: { fontSize: 18 },
-  pendingAlertText: { flex: 1, fontSize: 12, fontWeight: '600', color: '#92400E' },
-  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 10 },
-  filterChip: { flex: 1, paddingVertical: 9, borderRadius: 20, backgroundColor: '#F1F5F9', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-  filterChipActive: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
-  filterChipText: { fontSize: 11, fontWeight: '700', color: '#94A3B8' },
-  methodFilterRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  methodFilterChip: { flex: 1, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F8FAFC', alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0' },
-  methodFilterChipActive: { backgroundColor: '#EDE9FE', borderColor: '#C4B5FD' },
-  methodFilterText: { fontSize: 10, fontWeight: '700', color: '#94A3B8' },
-  countLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '600', marginBottom: 12 },
-  txList: { gap: 12 },
-  txCard: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.card },
-  txLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, flex: 1 },
-  txAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' },
-  txMember: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
-  txDesc: { fontSize: 12, color: '#475569', marginTop: 2 },
-  txDate: { fontSize: 11, color: '#94A3B8', marginTop: 3 },
-  txRight: { alignItems: 'flex-end', gap: 5 },
-  txAmount: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
-  txStatusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  txStatusText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  txId: { fontSize: 9, color: '#94A3B8', fontWeight: '600', letterSpacing: 0.3 },
-  markPaidBtn: { backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  markPaidText: { fontSize: 11, fontWeight: '700', color: '#10B981' },
+  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
+  root: { flex: 1, backgroundColor: LightColors.bgBase },
+  header: {
+    backgroundColor: LightColors.bgSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: LightColors.border,
+  },
+  headerContent: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  backBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: LightColors.bgElevated, alignItems: 'center', justifyContent: 'center',
+  },
+  backIcon: { fontSize: 20, fontWeight: '800', color: LightColors.textPrimary },
+  headerTitleBox: { flex: 1, marginLeft: 12 },
+  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: LightColors.textPrimary },
+  addBtn: {
+    backgroundColor: `${LightColors.accentViolet}15`,
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    borderWidth: 1, borderColor: LightColors.accentViolet,
+  },
+  addBtnText: { fontSize: 13, fontWeight: '700', color: LightColors.accentViolet },
+  scroll: {
+    padding: 20, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  summaryCard: {
+    backgroundColor: LightColors.bgSurface, borderRadius: 18, padding: 20,
+    marginBottom: 20, borderWidth: 1, borderColor: LightColors.border, ...Shadows.card,
+  },
+  summaryMain: { alignItems: 'center', marginBottom: 14 },
+  summaryLabel: { fontSize: 12, fontWeight: '600', color: LightColors.textMuted },
+  summaryVal: { fontSize: 32, fontWeight: '800', marginTop: 4 },
+  summaryDivider: { height: 1, backgroundColor: LightColors.border, marginBottom: 14 },
+  summaryGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  gridCell: { flex: 1, alignItems: 'center' },
+  cellLabel: { fontSize: 11, fontWeight: '600', color: LightColors.textMuted },
+  cellValue: { fontSize: 16, fontWeight: '800', color: LightColors.textPrimary, marginTop: 4 },
+  cellDivider: { width: 1, height: 30, backgroundColor: LightColors.border },
+  pendingBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: LightColors.warningBg, borderRadius: 12, padding: 14,
+    marginBottom: 20, borderWidth: 1, borderColor: LightColors.warning,
+  },
+  pendingText: { fontSize: 13, fontWeight: '600', color: LightColors.warning },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 12 },
+  filterGroup: { gap: 8, marginBottom: 16 },
+  filterRow: { flexDirection: 'row', gap: 8 },
+  filterChip: { flex: 1, paddingVertical: 10, borderRadius: 20, backgroundColor: LightColors.bgElevated, alignItems: 'center', borderWidth: 1, borderColor: LightColors.border },
+  filterChipActive: { backgroundColor: LightColors.accentViolet, borderColor: LightColors.accentViolet },
+  filterChipText: { fontSize: 11, fontWeight: '700', color: LightColors.textMuted },
+  methodChip: { flex: 1, paddingVertical: 9, borderRadius: 20, backgroundColor: LightColors.bgElevated, alignItems: 'center', borderWidth: 1, borderColor: LightColors.border },
+  methodChipActive: { backgroundColor: `${LightColors.accentViolet}15`, borderColor: LightColors.accentViolet },
+  methodChipText: { fontSize: 10, fontWeight: '700', color: LightColors.textMuted },
+  countLabel: { fontSize: 12, color: LightColors.textMuted, fontWeight: '600', marginBottom: 12 },
+  ledgerList: { gap: 12 },
+  emptyCard: { backgroundColor: LightColors.bgSurface, borderRadius: 16, borderStyle: 'dashed', borderWidth: 2, borderColor: LightColors.border, padding: 32, alignItems: 'center' },
+  emptyText: { fontSize: 14, fontWeight: '600', color: LightColors.textMuted },
+  txCard: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: LightColors.bgSurface, borderRadius: 14, padding: 16,
+    borderWidth: 1, borderColor: LightColors.border, ...Shadows.card,
+  },
+  txLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, paddingRight: 10 },
+  iconWrapper: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  txName: { fontSize: 14, fontWeight: '700', color: LightColors.textPrimary },
+  txDesc: { fontSize: 12, color: LightColors.textSecondary, marginTop: 1 },
+  txMeta: { fontSize: 10, color: LightColors.textMuted, marginTop: 3 },
+  txRight: { alignItems: 'flex-end', gap: 6 },
+  txAmount: { fontSize: 16, fontWeight: '800' },
+  payBtn: { backgroundColor: LightColors.warningBg, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: LightColors.warning },
+  payBtnText: { fontSize: 10, fontWeight: '700', color: LightColors.warning },
+  statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  statusBadgeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.2 },
+  // Add Modal styles
+  modalRoot: { flex: 1, backgroundColor: LightColors.bgBase },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 20, backgroundColor: LightColors.bgSurface, borderBottomWidth: 1, borderBottomColor: LightColors.border,
+  },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary },
+  closeBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: LightColors.bgElevated, alignItems: 'center', justifyContent: 'center' },
+  closeBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
+  modalScroll: { padding: 20, gap: 14 },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary, marginTop: 6 },
+  modalInput: { backgroundColor: LightColors.bgSurface, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
+  modalTypeRow: { flexDirection: 'row', gap: 10 },
+  typeBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: LightColors.border, backgroundColor: LightColors.bgSurface, alignItems: 'center' },
+  typeBtnText: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary },
+  methodBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: LightColors.border, backgroundColor: LightColors.bgSurface, alignItems: 'center' },
+  methodBtnText: { fontSize: 11, fontWeight: '700', color: LightColors.textSecondary },
+  saveBtn: { backgroundColor: LightColors.accentViolet, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 20 },
+  saveBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
 });

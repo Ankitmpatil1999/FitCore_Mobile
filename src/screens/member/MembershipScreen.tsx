@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Alert,
@@ -50,8 +50,10 @@ export default function MembershipScreen() {
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <Text style={styles.headerSub}>Your Plan</Text>
-          <Text style={styles.headerTitle}>Membership 🏷️</Text>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerSub}>Your Plan</Text>
+            <Text style={styles.headerTitle}>Membership 🏷️</Text>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -208,10 +210,17 @@ export default function MembershipScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0EA5E9' },
   root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#0EA5E9', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  header: { backgroundColor: '#0EA5E9' },
+  headerContent: {
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  scroll: { padding: 20, paddingBottom: 40 },
+  scroll: {
+    padding: 20, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   currentPlanCard: { backgroundColor: '#FFFFFF', borderRadius: 20, padding: 20, marginBottom: 28, borderTopWidth: 4, borderWidth: 1, borderColor: '#E2E8F0' },
   planCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
   tierRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },

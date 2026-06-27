@@ -1,10 +1,11 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Alert, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
+import { Colors } from '../../theme';
 import { getPlanById, getTrainerById, getDaysRemaining } from '../../data/mockData';
 
 export default function ProfileScreen({ navigation }: any) {
@@ -28,12 +29,14 @@ export default function ProfileScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0EA5E9" />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.bgSurface} />
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <Text style={styles.headerSub}>Account</Text>
-          <Text style={styles.headerTitle}>My Profile 👤</Text>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerSub}>Account</Text>
+            <Text style={styles.headerTitle}>My Profile 👤</Text>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -136,8 +139,8 @@ export default function ProfileScreen({ navigation }: any) {
                 <Switch
                   value={item.val}
                   onValueChange={item.set}
-                  trackColor={{ false: '#CBD5E1', true: '#BAE6FD' }}
-                  thumbColor={item.val ? '#0EA5E9' : '#F8FAFC'}
+                  trackColor={{ false: 'rgba(255,255,255,0.08)', true: 'rgba(0, 240, 255, 0.2)' }}
+                  thumbColor={item.val ? Colors.accentCyan : '#4B5563'}
                 />
               </View>
             ))}
@@ -183,48 +186,58 @@ export default function ProfileScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0EA5E9' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#0EA5E9', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  scroll: { padding: 20, paddingBottom: 40 },
+  safeArea: { flex: 1, backgroundColor: Colors.bgSurface },
+  root: { flex: 1, backgroundColor: Colors.bgBase },
+  header: {
+    backgroundColor: Colors.bgSurface,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  headerContent: {
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  headerSub: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
+  scroll: {
+    padding: 20, paddingBottom: 80,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   profileHero: { alignItems: 'center', marginBottom: 20 },
-  avatarLarge: { width: 88, height: 88, borderRadius: 44, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 3, borderColor: '#C4B5FD' },
-  avatarLargeText: { fontSize: 28, fontWeight: '800', color: '#8B5CF6' },
-  profileName: { fontSize: 24, fontWeight: '800', color: '#0F172A', marginBottom: 4 },
-  profilePhone: { fontSize: 14, color: '#94A3B8', fontWeight: '500', marginBottom: 12 },
-  gymBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#EFF6FF', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: '#DBEAFE' },
+  avatarLarge: { width: 88, height: 88, borderRadius: 44, backgroundColor: 'rgba(121, 40, 202, 0.15)', alignItems: 'center', justifyContent: 'center', marginBottom: 12, borderWidth: 2, borderColor: Colors.accentViolet },
+  avatarLargeText: { fontSize: 28, fontWeight: '800', color: Colors.accentViolet },
+  profileName: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary, marginBottom: 4 },
+  profilePhone: { fontSize: 14, color: Colors.textSecondary, fontWeight: '500', marginBottom: 12 },
+  gymBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: Colors.cyanBg, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: Colors.accentCyan },
   gymBadgeIcon: { fontSize: 14 },
-  gymBadgeText: { fontSize: 13, fontWeight: '700', color: '#0EA5E9' },
-  membershipBar: { backgroundColor: '#0F172A', borderRadius: 16, padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  membershipBarLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '600' },
-  membershipBarPlan: { fontSize: 16, fontWeight: '800', color: '#FFFFFF', marginTop: 2 },
+  gymBadgeText: { fontSize: 13, fontWeight: '700', color: Colors.accentCyan },
+  membershipBar: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderWidth: 1, borderColor: Colors.border },
+  membershipBarLabel: { fontSize: 11, color: Colors.textSecondary, fontWeight: '600' },
+  membershipBarPlan: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary, marginTop: 2 },
   membershipBarRight: { alignItems: 'flex-end', gap: 8 },
   daysLeft: { fontSize: 13, fontWeight: '800' },
-  renewBtn: { backgroundColor: '#0EA5E9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
-  renewBtnText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
-  section: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 16 },
+  renewBtn: { backgroundColor: Colors.accentCyan, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 },
+  renewBtnText: { fontSize: 12, fontWeight: '700', color: '#000000' },
+  section: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: Colors.border },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary, marginBottom: 16 },
   detailsGrid: { flexDirection: 'row', flexWrap: 'wrap' },
   detailCell: { width: '50%', paddingVertical: 8, paddingRight: 8 },
-  detailLabel: { fontSize: 10, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase' },
-  detailVal: { fontSize: 14, fontWeight: '600', color: '#0F172A', marginTop: 3 },
+  detailLabel: { fontSize: 10, fontWeight: '600', color: Colors.textSecondary, textTransform: 'uppercase' },
+  detailVal: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary, marginTop: 3 },
   trainerCard: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  trainerAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' },
-  trainerAvatarText: { fontSize: 16, fontWeight: '800', color: '#8B5CF6' },
-  trainerName: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
-  trainerSpec: { fontSize: 12, color: '#475569', marginTop: 2 },
-  trainerTimings: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
-  chatTrainerBtn: { backgroundColor: '#EFF6FF', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
-  chatTrainerBtnText: { fontSize: 12, fontWeight: '700', color: '#0EA5E9' },
-  notifRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  notifLabel: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
-  notifSub: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
-  quickLinkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
+  trainerAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(121, 40, 202, 0.15)', alignItems: 'center', justifyContent: 'center' },
+  trainerAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.accentViolet },
+  trainerName: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary },
+  trainerSpec: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  trainerTimings: { fontSize: 11, color: Colors.textMuted, marginTop: 2 },
+  chatTrainerBtn: { backgroundColor: 'rgba(0, 240, 255, 0.1)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20 },
+  chatTrainerBtnText: { fontSize: 12, fontWeight: '700', color: Colors.accentCyan },
+  notifRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  notifLabel: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
+  notifSub: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  quickLinkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
   quickLinkIcon: { fontSize: 20 },
-  quickLinkLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: '#0F172A' },
-  quickLinkArrow: { fontSize: 22, color: '#94A3B8' },
-  logoutBtn: { backgroundColor: '#FEE2E2', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
-  logoutBtnText: { fontSize: 15, fontWeight: '700', color: '#EF4444' },
+  quickLinkLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
+  quickLinkArrow: { fontSize: 22, color: Colors.textSecondary },
+  logoutBtn: { backgroundColor: 'rgba(239, 68, 68, 0.1)', borderRadius: 16, paddingVertical: 16, alignItems: 'center' },
+  logoutBtnText: { fontSize: 15, fontWeight: '700', color: Colors.danger },
 });

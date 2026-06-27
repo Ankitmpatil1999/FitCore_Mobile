@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Alert,
@@ -95,48 +95,54 @@ export default function NotificationsScreen() {
       <View style={styles.root}>
         {/* HEADER */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>FitCore Gym</Text>
-            <Text style={styles.headerTitle}>Notifications 🔔</Text>
-          </View>
-          {totalUnread > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{totalUnread} new</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>FitCore Gym</Text>
+              <Text style={styles.headerTitle}>Notifications 🔔</Text>
             </View>
-          )}
+            {totalUnread > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>{totalUnread} new</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* ACTION ROW */}
-        <View style={styles.actionRow}>
-          <TouchableOpacity style={styles.actionBtn} onPress={markAllRead} activeOpacity={0.7}>
-            <Text style={styles.actionBtnText}>✅ Mark all read</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={clearAll} activeOpacity={0.7}>
-            <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>🗑️ Clear all</Text>
-          </TouchableOpacity>
+        <View style={styles.actionRowContainer}>
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.actionBtn} onPress={markAllRead} activeOpacity={0.7}>
+              <Text style={styles.actionBtnText}>✅ Mark all read</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDanger]} onPress={clearAll} activeOpacity={0.7}>
+              <Text style={[styles.actionBtnText, { color: '#EF4444' }]}>🗑️ Clear all</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* FILTER TABS */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll}>
-          {([
-            { key: 'all', label: '📋 All' },
-            { key: 'unread', label: `🔴 Unread (${totalUnread})` },
-            { key: 'expiry', label: '⏰ Expiry' },
-            { key: 'payment', label: '💰 Payments' },
-            { key: 'general', label: '📢 General' },
-          ] as { key: FilterTab; label: string }[]).map(tab => (
-            <TouchableOpacity
-              key={tab.key}
-              style={[styles.filterChip, activeTab === tab.key && styles.filterChipActive]}
-              onPress={() => setActiveTab(tab.key)}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.filterChipText, activeTab === tab.key && styles.filterChipTextActive]}>
-                {tab.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <View style={styles.tabsContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabsScroll} contentContainerStyle={styles.tabsContent}>
+            {([
+              { key: 'all', label: '📋 All' },
+              { key: 'unread', label: `🔴 Unread (${totalUnread})` },
+              { key: 'expiry', label: '⏰ Expiry' },
+              { key: 'payment', label: '💰 Payments' },
+              { key: 'general', label: '📢 General' },
+            ] as { key: FilterTab; label: string }[]).map(tab => (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.filterChip, activeTab === tab.key && styles.filterChipActive]}
+                onPress={() => setActiveTab(tab.key)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.filterChipText, activeTab === tab.key && styles.filterChipTextActive]}>
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
 
         {/* NOTIFICATIONS LIST */}
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -218,8 +224,12 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0EA5E9' },
   root: { flex: 1, backgroundColor: '#F8FAFC' },
   header: {
-    backgroundColor: '#0EA5E9', flexDirection: 'row', justifyContent: 'space-between',
+    backgroundColor: '#0EA5E9',
+  },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 16,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
   },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', marginTop: 2 },
@@ -228,9 +238,12 @@ const styles = StyleSheet.create({
     borderRadius: 20, borderWidth: 2, borderColor: '#FFFFFF',
   },
   unreadBadgeText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
+  actionRowContainer: {
+    backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
+  },
   actionRow: {
     flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingVertical: 10,
-    backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
+    width: '100%', maxWidth: 600, alignSelf: 'center',
   },
   actionBtn: {
     flex: 1, paddingVertical: 8, borderRadius: 10, borderWidth: 1,
@@ -238,9 +251,14 @@ const styles = StyleSheet.create({
   },
   actionBtnDanger: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
   actionBtnText: { fontSize: 13, fontWeight: '700', color: '#10B981' },
+  tabsContainer: {
+    backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
+  },
   tabsScroll: {
-    backgroundColor: '#FFFFFF', paddingVertical: 10, paddingHorizontal: 16,
-    borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  tabsContent: {
+    paddingVertical: 10, paddingHorizontal: 16,
   },
   filterChip: {
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, marginRight: 8,
@@ -249,7 +267,10 @@ const styles = StyleSheet.create({
   filterChipActive: { backgroundColor: '#0EA5E9', borderColor: '#0EA5E9' },
   filterChipText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
   filterChipTextActive: { color: '#FFFFFF' },
-  scroll: { padding: 16, paddingBottom: 40 },
+  scroll: {
+    padding: 16, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   emptyState: { alignItems: 'center', justifyContent: 'center', marginTop: 60, gap: 8 },
   emptyTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
   emptySubtitle: { fontSize: 13, color: '#94A3B8', fontWeight: '500' },

@@ -1,10 +1,10 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Modal, TextInput, Alert, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Shadows } from '../../theme';
+import { LightColors, Shadows } from '../../theme';
 import { TRAINERS, MEMBERS, Trainer } from '../../data/mockData';
 
 export default function TrainersScreen() {
@@ -77,17 +77,19 @@ export default function TrainersScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
+      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>Manage</Text>
-            <Text style={styles.headerTitle}>Trainers 🏋️</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>Manage</Text>
+              <Text style={styles.headerTitle}>Trainers 🏋️</Text>
+            </View>
+            <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
+              <Text style={styles.addBtnText}>+ Add Trainer</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-            <Text style={styles.addBtnText}>+ Add Trainer</Text>
-          </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -257,8 +259,8 @@ export default function TrainersScreen() {
                   <Switch
                     value={fAvail}
                     onValueChange={setFAvail}
-                    trackColor={{ false: '#CBD5E1', true: '#C4B5FD' }}
-                    thumbColor={fAvail ? '#8B5CF6' : '#F8FAFC'}
+                    trackColor={{ false: LightColors.borderHover, true: `${LightColors.accentViolet}50` }}
+                    thumbColor={fAvail ? LightColors.accentViolet : LightColors.bgElevated}
                   />
                 </View>
 
@@ -280,62 +282,77 @@ export default function TrainersScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7C3AED' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#7C3AED', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  addBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
+  root: { flex: 1, backgroundColor: LightColors.bgBase },
+  header: {
+    backgroundColor: LightColors.bgSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: LightColors.border,
+  },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary },
+  addBtn: { backgroundColor: LightColors.accentViolet, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: LightColors.accentViolet },
   addBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  scroll: { padding: 20, gap: 16, paddingBottom: 40 },
-  subLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '600', marginBottom: 4 },
-  trainerCard: { backgroundColor: '#FFFFFF', borderRadius: 16, borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.card },
+  scroll: {
+    padding: 20, gap: 16, paddingBottom: 100,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  subLabel: {
+    fontSize: 12, color: LightColors.textMuted, fontWeight: '600', marginBottom: 4,
+    width: '90%', maxWidth: 600, alignSelf: 'center',
+  },
+  trainerCard: { backgroundColor: LightColors.bgSurface, borderRadius: 16, borderWidth: 1, borderColor: LightColors.border, ...Shadows.card },
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', padding: 16, gap: 12 },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 16, fontWeight: '800', color: '#8B5CF6' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: `${LightColors.accentViolet}15`, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 16, fontWeight: '800', color: LightColors.accentViolet },
   trainerInfo: { flex: 1 },
-  trainerName: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
-  trainerSpec: { fontSize: 13, color: '#475569', marginTop: 2 },
-  trainerExp: { fontSize: 12, color: '#94A3B8', marginTop: 4 },
+  trainerName: { fontSize: 16, fontWeight: '800', color: LightColors.textPrimary },
+  trainerSpec: { fontSize: 13, color: LightColors.textSecondary, marginTop: 2 },
+  trainerExp: { fontSize: 12, color: LightColors.textMuted, marginTop: 4 },
   availPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   availText: { fontSize: 11, fontWeight: '700' },
-  cardDivider: { height: 1, backgroundColor: '#F1F5F9' },
+  cardDivider: { height: 1, backgroundColor: LightColors.bgElevated },
   cardBottom: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12 },
   cardStat: { flex: 1, alignItems: 'center' },
-  cardStatVal: { fontSize: 13, fontWeight: '700', color: '#0F172A', textAlign: 'center' },
-  cardStatLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600', marginTop: 2 },
-  cardStatDivider: { width: 1, backgroundColor: '#E2E8F0' },
+  cardStatVal: { fontSize: 13, fontWeight: '700', color: LightColors.textPrimary, textAlign: 'center' },
+  cardStatLabel: { fontSize: 10, color: LightColors.textMuted, fontWeight: '600', marginTop: 2 },
+  cardStatDivider: { width: 1, backgroundColor: LightColors.border },
   // Detail
   detailHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
-  detailName: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  detailSpec: { fontSize: 14, color: '#475569', marginTop: 4 },
-  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, marginBottom: 16 },
+  detailName: { fontSize: 20, fontWeight: '800', color: LightColors.textPrimary },
+  detailSpec: { fontSize: 14, color: LightColors.textSecondary, marginTop: 4 },
+  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 12, marginBottom: 16 },
   detailCell: { width: '50%', padding: 8 },
-  detailCellLabel: { fontSize: 10, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase' },
-  detailCellVal: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginTop: 3 },
-  detailSection: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 12 },
-  detailSectionTitle: { fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 8 },
-  detailText: { fontSize: 13, color: '#475569', lineHeight: 20 },
+  detailCellLabel: { fontSize: 10, fontWeight: '600', color: LightColors.textMuted, textTransform: 'uppercase' },
+  detailCellVal: { fontSize: 14, fontWeight: '700', color: LightColors.textPrimary, marginTop: 3 },
+  detailSection: { backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 14, marginBottom: 12 },
+  detailSectionTitle: { fontSize: 13, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 8 },
+  detailText: { fontSize: 13, color: LightColors.textSecondary, lineHeight: 20 },
   assignedRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 10 },
-  smallAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' },
-  smallAvatarText: { fontSize: 11, fontWeight: '800', color: '#8B5CF6' },
-  assignedName: { flex: 1, fontSize: 13, fontWeight: '700', color: '#0F172A' },
-  assignedPhone: { fontSize: 11, color: '#94A3B8' },
-  removeBtn: { backgroundColor: '#FEE2E2', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
-  removeBtnText: { fontSize: 14, fontWeight: '700', color: '#EF4444' },
-  closeBtn: { backgroundColor: '#F1F5F9', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 12 },
-  closeBtnText: { fontSize: 14, fontWeight: '700', color: '#475569' },
+  smallAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: `${LightColors.accentViolet}15`, alignItems: 'center', justifyContent: 'center' },
+  smallAvatarText: { fontSize: 11, fontWeight: '800', color: LightColors.accentViolet },
+  assignedName: { flex: 1, fontSize: 13, fontWeight: '700', color: LightColors.textPrimary },
+  assignedPhone: { fontSize: 11, color: LightColors.textMuted },
+  removeBtn: { backgroundColor: LightColors.dangerBg, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
+  removeBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.danger },
+  closeBtn: { backgroundColor: LightColors.bgElevated, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 12 },
+  closeBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 20, textAlign: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#0F172A' },
+  modalSheet: { backgroundColor: LightColors.bgSurface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: LightColors.border, alignSelf: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 20, textAlign: 'center' },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary, marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
   modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 12 },
-  cancelBtn: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: '#475569' },
-  submitBtn: { flex: 1, backgroundColor: '#8B5CF6', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  cancelBtn: { flex: 1, backgroundColor: LightColors.bgElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  cancelBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
+  submitBtn: { flex: 1, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   submitBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 });

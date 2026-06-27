@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Modal, TextInput, Alert,
@@ -14,7 +14,7 @@ import { useAppContext } from '../../context/AppContext';
 const GYM_ID = 'gym1';
 const analytics = ANALYTICS[GYM_ID];
 
-export default function OwnerDashboard() {
+export default function OwnerDashboard({ navigation }: any) {
   const { currentUser, currentGym, logout } = useAppContext();
   const [addMemberModal, setAddMemberModal] = useState(false);
   const [notifModal, setNotifModal] = useState(false);
@@ -61,29 +61,31 @@ export default function OwnerDashboard() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
+      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
       <View style={styles.root}>
 
         {/* ── HEADER ── */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.gymName}>{currentGym?.name ?? 'FitCore Elite'}</Text>
-            <Text style={styles.ownerGreet}>
-              Welcome back, {currentUser?.name?.split(' ')[0] ?? 'Owner'} 👋
-            </Text>
+          <View style={styles.headerContent}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.gymName}>{currentGym?.name ?? 'FitCore Elite'}</Text>
+              <Text style={styles.ownerGreet}>
+                Welcome back, {currentUser?.name?.split(' ')[0] ?? 'Owner'} 👋
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.notifBtn}
+              onPress={() => setNotifModal(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.notifIcon}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.notifBtn}
-            onPress={() => setNotifModal(true)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.notifIcon}>🔔</Text>
-            {unreadCount > 0 && (
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>{unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -101,17 +103,17 @@ export default function OwnerDashboard() {
 
           {/* ── STATS GRID ── */}
           <View style={styles.statsGrid}>
-            <StatCard icon="💰" value={`₹${analytics.todayRevenue.toLocaleString('en-IN')}`} label="Today's Revenue" color="#8B5CF6" bg="#EDE9FE" />
-            <StatCard icon="✅" value={`${analytics.todayCheckIns}`} label="Today's Check-ins" color="#10B981" bg="#ECFDF5" />
-            <StatCard icon="👥" value={`${analytics.activeMembers}`} label="Active Members" color="#3B82F6" bg="#EFF6FF" />
-            <StatCard icon="⏳" value={`₹${analytics.pendingAmount.toLocaleString('en-IN')}`} label="Pending Payments" color="#EF4444" bg="#FEE2E2" />
+            <StatCard icon="💰" value={`₹${analytics.todayRevenue.toLocaleString('en-IN')}`} label="Today's Revenue" color={LightColors.accentViolet} bg={`${LightColors.accentViolet}15`} />
+            <StatCard icon="✅" value={`${analytics.todayCheckIns}`} label="Today's Check-ins" color={LightColors.success} bg={`${LightColors.success}15`} />
+            <StatCard icon="👥" value={`${analytics.activeMembers}`} label="Active Members" color={LightColors.info} bg={`${LightColors.info}15`} />
+            <StatCard icon="⏳" value={`₹${analytics.pendingAmount.toLocaleString('en-IN')}`} label="Pending Payments" color={LightColors.danger} bg={`${LightColors.danger}15`} />
           </View>
 
           {/* ── QUICK ACTIONS ── */}
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
+          <Text style={styles.sectionTitle}>Gym Management Actions</Text>
           <View style={styles.quickActions}>
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: '#8B5CF6' }]}
+              style={[styles.actionBtn, { backgroundColor: LightColors.accentViolet }]}
               onPress={() => setAddMemberModal(true)}
               activeOpacity={0.85}
             >
@@ -119,25 +121,36 @@ export default function OwnerDashboard() {
               <Text style={styles.actionLabel}>Add Member</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: '#3B82F6' }]}
+              style={[styles.actionBtn, { backgroundColor: LightColors.success }]}
+              onPress={() => navigation.navigate('Plans')}
               activeOpacity={0.85}
             >
-              <Text style={styles.actionIcon}>📢</Text>
-              <Text style={styles.actionLabel}>Notify All</Text>
+              <Text style={styles.actionIcon}>🏷️</Text>
+              <Text style={styles.actionLabel}>Plans</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: '#10B981' }]}
+              style={[styles.actionBtn, { backgroundColor: LightColors.info }]}
+              onPress={() => navigation.navigate('Payments')}
               activeOpacity={0.85}
             >
-              <Text style={styles.actionIcon}>📊</Text>
-              <Text style={styles.actionLabel}>Reports</Text>
+              <Text style={styles.actionIcon}>💰</Text>
+              <Text style={styles.actionLabel}>Payments</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: '#F59E0B' }]}
+              style={[styles.actionBtn, { backgroundColor: LightColors.warning }]}
+              onPress={() => navigation.navigate('Shop')}
               activeOpacity={0.85}
             >
-              <Text style={styles.actionIcon}>🎁</Text>
-              <Text style={styles.actionLabel}>Offers</Text>
+              <Text style={styles.actionIcon}>🛒</Text>
+              <Text style={styles.actionLabel}>Store</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionBtn, { backgroundColor: '#F43F5E' }]}
+              onPress={() => navigation.navigate('Analytics')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.actionIcon}>📈</Text>
+              <Text style={styles.actionLabel}>Analytics</Text>
             </TouchableOpacity>
           </View>
 
@@ -195,8 +208,8 @@ export default function OwnerDashboard() {
                 return (
                   <View key={a.id}>
                     <View style={styles.checkInRow}>
-                      <View style={[styles.memberAvatar, { backgroundColor: '#EDE9FE' }]}>
-                        <Text style={[styles.memberAvatarText, { color: '#8B5CF6' }]}>
+                      <View style={[styles.memberAvatar, { backgroundColor: `${LightColors.accentViolet}15` }]}>
+                        <Text style={[styles.memberAvatarText, { color: LightColors.accentViolet }]}>
                           {member?.avatar ?? '?'}
                         </Text>
                       </View>
@@ -345,86 +358,96 @@ function getNotifColor(type: string) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7C3AED' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
+  root: { flex: 1, backgroundColor: LightColors.bgBase },
   header: {
-    backgroundColor: '#7C3AED',
+    backgroundColor: LightColors.bgSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: LightColors.border,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 20,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
   },
   headerLeft: { flex: 1 },
-  gymName: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.5 },
-  ownerGreet: { fontSize: 13, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  notifBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  gymName: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary, letterSpacing: -0.5 },
+  ownerGreet: { fontSize: 13, color: LightColors.textSecondary, marginTop: 2 },
+  notifBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: LightColors.bgElevated, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   notifIcon: { fontSize: 20 },
-  notifBadge: { position: 'absolute', top: 6, right: 6, width: 16, height: 16, borderRadius: 8, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center' },
+  notifBadge: { position: 'absolute', top: 6, right: 6, width: 16, height: 16, borderRadius: 8, backgroundColor: LightColors.danger, alignItems: 'center', justifyContent: 'center' },
   notifBadgeText: { fontSize: 9, color: '#fff', fontWeight: '800' },
-  scroll: { padding: 20, paddingBottom: 40 },
-  dateChip: { backgroundColor: '#EDE9FE', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, alignSelf: 'flex-start', marginBottom: 20 },
-  dateChipText: { fontSize: 12, fontWeight: '600', color: '#7C3AED' },
+  scroll: {
+    padding: 20, paddingBottom: 100,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  dateChip: { backgroundColor: `${LightColors.accentViolet}15`, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, alignSelf: 'flex-start', marginBottom: 20 },
+  dateChipText: { fontSize: 12, fontWeight: '600', color: LightColors.accentViolet },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 28 },
   statCard: {
     flex: 1, minWidth: '45%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: LightColors.bgSurface,
     borderRadius: 12, padding: 16,
-    borderWidth: 1, borderColor: '#E2E8F0',
+    borderWidth: 1, borderColor: LightColors.border,
     ...Shadows.card,
   },
   statIcon: { fontSize: 22, marginBottom: 8 },
   statValue: { fontSize: 20, fontWeight: '800' },
-  statLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '600', marginTop: 3 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 12 },
+  statLabel: { fontSize: 11, color: LightColors.textMuted, fontWeight: '600', marginTop: 3 },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: LightColors.textPrimary, marginBottom: 12 },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionSub: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
-  quickActions: { flexDirection: 'row', gap: 10, marginBottom: 28 },
-  actionBtn: { flex: 1, alignItems: 'center', borderRadius: 12, paddingVertical: 14, gap: 6 },
+  sectionSub: { fontSize: 12, color: LightColors.textMuted, fontWeight: '600' },
+  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 28 },
+  actionBtn: { width: '18%', minWidth: '18%', flexGrow: 1, alignItems: 'center', borderRadius: 12, paddingVertical: 14, gap: 6 },
   actionIcon: { fontSize: 20 },
-  actionLabel: { fontSize: 10, fontWeight: '700', color: '#FFFFFF' },
-  urgentPill: { backgroundColor: '#FEE2E2', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  urgentText: { fontSize: 11, fontWeight: '700', color: '#EF4444' },
-  expiryCard: { backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 16, marginBottom: 28, ...Shadows.card },
+  actionLabel: { fontSize: 9, fontWeight: '700', color: '#FFFFFF', textAlign: 'center' },
+  urgentPill: { backgroundColor: LightColors.dangerBg, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  urgentText: { fontSize: 11, fontWeight: '700', color: LightColors.danger },
+  expiryCard: { backgroundColor: LightColors.bgSurface, borderRadius: 12, borderWidth: 1, borderColor: LightColors.border, paddingHorizontal: 16, marginBottom: 28, ...Shadows.card },
   expiryRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
-  memberAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#ECFDF5', alignItems: 'center', justifyContent: 'center' },
-  memberAvatarText: { fontSize: 13, fontWeight: '800', color: '#10B981' },
-  memberName: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
-  memberPhone: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
-  daysLeftPill: { backgroundColor: '#FEE2E2', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  daysLeftText: { fontSize: 11, fontWeight: '700', color: '#EF4444' },
-  divider: { height: 1, backgroundColor: '#F1F5F9' },
-  attendanceCard: { backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 16, marginBottom: 28, ...Shadows.card },
+  memberAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: LightColors.successBg, alignItems: 'center', justifyContent: 'center' },
+  memberAvatarText: { fontSize: 13, fontWeight: '800', color: LightColors.success },
+  memberName: { fontSize: 14, fontWeight: '700', color: LightColors.textPrimary },
+  memberPhone: { fontSize: 11, color: LightColors.textMuted, marginTop: 2 },
+  daysLeftPill: { backgroundColor: LightColors.dangerBg, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  daysLeftText: { fontSize: 11, fontWeight: '700', color: LightColors.danger },
+  divider: { height: 1, backgroundColor: LightColors.bgElevated },
+  attendanceCard: { backgroundColor: LightColors.bgSurface, borderRadius: 12, borderWidth: 1, borderColor: LightColors.border, paddingHorizontal: 16, marginBottom: 28, ...Shadows.card },
   checkInRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
-  checkTime: { fontSize: 12, color: '#10B981', fontWeight: '600', marginTop: 2 },
-  durationPill: { fontSize: 11, fontWeight: '700', color: '#8B5CF6', backgroundColor: '#EDE9FE', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  emptyCard: { backgroundColor: '#F8FAFC', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', padding: 32, marginBottom: 28 },
+  checkTime: { fontSize: 12, color: LightColors.success, fontWeight: '600', marginTop: 2 },
+  durationPill: { fontSize: 11, fontWeight: '700', color: LightColors.accentViolet, backgroundColor: `${LightColors.accentViolet}15`, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  emptyCard: { backgroundColor: LightColors.bgBase, borderRadius: 12, borderWidth: 1, borderColor: LightColors.border, alignItems: 'center', padding: 32, marginBottom: 28 },
   emptyIcon: { fontSize: 36, marginBottom: 8 },
-  emptyText: { fontSize: 13, color: '#94A3B8', fontWeight: '500' },
-  notifCard: { backgroundColor: '#FFFFFF', borderRadius: 12, borderWidth: 1, borderColor: '#E2E8F0', paddingHorizontal: 16, marginBottom: 28, ...Shadows.card },
+  emptyText: { fontSize: 13, color: LightColors.textMuted, fontWeight: '500' },
+  notifCard: { backgroundColor: LightColors.bgSurface, borderRadius: 12, borderWidth: 1, borderColor: LightColors.border, paddingHorizontal: 16, marginBottom: 28, ...Shadows.card },
   notifRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 14, gap: 10 },
   notifFullRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 16, gap: 10 },
   notifTypePill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, marginTop: 2 },
   notifTypeText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  notifTitle: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
-  notifMessage: { fontSize: 12, color: '#475569', marginTop: 2, lineHeight: 17 },
-  notifDate: { fontSize: 10, color: '#94A3B8', marginTop: 4 },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#8B5CF6', marginTop: 4 },
+  notifTitle: { fontSize: 13, fontWeight: '700', color: LightColors.textPrimary },
+  notifMessage: { fontSize: 12, color: LightColors.textSecondary, marginTop: 2, lineHeight: 17 },
+  notifDate: { fontSize: 10, color: LightColors.textMuted, marginTop: 4 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: LightColors.accentViolet, marginTop: 4 },
   summaryGrid: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  summaryCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', ...Shadows.card },
-  summaryVal: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
-  summaryLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600', marginTop: 4, textAlign: 'center' },
+  summaryCard: { flex: 1, backgroundColor: LightColors.bgSurface, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: LightColors.border, alignItems: 'center', ...Shadows.card },
+  summaryVal: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary },
+  summaryLabel: { fontSize: 10, color: LightColors.textMuted, fontWeight: '600', marginTop: 4, textAlign: 'center' },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%' },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 20, textAlign: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#0F172A' },
+  modalSheet: { backgroundColor: LightColors.bgSurface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '85%' },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: LightColors.border, alignSelf: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 20, textAlign: 'center' },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary, marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
   modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  cancelBtn: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: '#475569' },
-  submitBtn: { flex: 1, backgroundColor: '#8B5CF6', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
+  cancelBtn: { flex: 1, backgroundColor: LightColors.bgElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  cancelBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
+  submitBtn: { flex: 1, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   submitBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 });

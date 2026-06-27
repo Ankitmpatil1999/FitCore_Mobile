@@ -4,7 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { enableScreens } from 'react-native-screens';
 
-import { LightColors } from './src/theme';
+import { Colors } from './src/theme';
 import { AppProvider, useAppContext } from './src/context/AppContext';
 import LoginScreen from './src/screens/shared/LoginScreen';
 import MemberNavigator from './src/navigation/MemberNavigator';
@@ -21,7 +21,7 @@ function AppInner() {
     <View style={styles.root}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor="#0EA5E9"
+        backgroundColor={Colors.bgBase}
       />
       {!isLoggedIn ? (
         <LoginScreen />
@@ -53,6 +53,6 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: LightColors.bgBase,
+    backgroundColor: Colors.bgBase,
   },
 });

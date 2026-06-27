@@ -6,18 +6,20 @@ import { LightColors, Typography } from '../theme';
 import VendorDashboard from '../screens/vendor/VendorDashboard';
 import VendorProductsScreen from '../screens/vendor/VendorProductsScreen';
 import VendorOrdersScreen from '../screens/vendor/VendorOrdersScreen';
+import VendorAnalyticsScreen from '../screens/vendor/VendorAnalyticsScreen';
 import VendorProfileScreen from '../screens/vendor/VendorProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
-export default function VendorNavigator() {
-  const TAB_ICONS: Record<string, string> = {
-    Dashboard: '📊',
-    Products: '📦',
-    Orders: '📝',
-    Settings: '⚙️',
-  };
+const TAB_ICONS: Record<string, string> = {
+  Dashboard: '\u{1F4CA}',   // 📊
+  Products: '\u{1F4E6}',   // 📦
+  Orders: '\u{1F4DD}',   // 📝
+  Analytics: '\u{1F4C8}',   // 📈
+  Settings: '\u{2699}',    // ⚙  (no variation selector to avoid Metro issues)
+};
 
+export default function VendorNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -28,7 +30,7 @@ export default function VendorNavigator() {
         tabBarLabelStyle: styles.tabBarLabel,
         tabBarIcon: ({ focused }) => (
           <Text style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-            {TAB_ICONS[route.name] ?? '📋'}
+            {TAB_ICONS[route.name] ?? '\u{1F4CB}'}
           </Text>
         ),
       })}
@@ -36,6 +38,7 @@ export default function VendorNavigator() {
       <Tab.Screen name="Dashboard" component={VendorDashboard} />
       <Tab.Screen name="Products" component={VendorProductsScreen} />
       <Tab.Screen name="Orders" component={VendorOrdersScreen} />
+      <Tab.Screen name="Analytics" component={VendorAnalyticsScreen} />
       <Tab.Screen name="Settings" component={VendorProfileScreen} />
     </Tab.Navigator>
   );

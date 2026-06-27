@@ -1,10 +1,10 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, TextInput, Modal, Alert, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Shadows } from '../../theme';
+import { LightColors, Shadows } from '../../theme';
 import {
   MEMBERS, MEMBERSHIP_PLANS, TRAINERS, Member, MemberStatus,
   getPlanById, getTrainerById, getDaysRemaining,
@@ -112,9 +112,9 @@ export default function MembersScreen() {
   };
 
   const statusColor = (s: MemberStatus) => {
-    if (s === 'active') return { bg: '#ECFDF5', text: '#10B981' };
-    if (s === 'expired') return { bg: '#FEE2E2', text: '#EF4444' };
-    return { bg: '#FEF3C7', text: '#F59E0B' };
+    if (s === 'active') return { bg: LightColors.successBg, text: LightColors.success };
+    if (s === 'expired') return { bg: LightColors.dangerBg, text: LightColors.danger };
+    return { bg: LightColors.warningBg, text: LightColors.warning };
   };
 
   const goalLabel = (g: Member['goal']) => {
@@ -129,18 +129,20 @@ export default function MembersScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
+      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
       <View style={styles.root}>
 
         {/* HEADER */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>Manage</Text>
-            <Text style={styles.headerTitle}>Members 👥</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>Manage</Text>
+              <Text style={styles.headerTitle}>Members 👥</Text>
+            </View>
+            <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
+              <Text style={styles.addBtnText}>+ Add Member</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-            <Text style={styles.addBtnText}>+ Add Member</Text>
-          </TouchableOpacity>
         </View>
 
         {/* SEARCH */}
@@ -273,16 +275,16 @@ export default function MembersScreen() {
 
                     {/* Actions */}
                     <View style={styles.actionRow}>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEF3C7' }]} onPress={() => toggleFreeze(detailMember)}>
-                        <Text style={styles.actionBtnText}>
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: LightColors.warningBg }]} onPress={() => toggleFreeze(detailMember)}>
+                        <Text style={[styles.actionBtnText, { color: LightColors.warning }]}>
                           {detailMember.status === 'frozen' ? '▶️ Unfreeze' : '❄️ Freeze'}
                         </Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#ECFDF5' }]}>
-                        <Text style={styles.actionBtnText}>🔄 Renew</Text>
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: LightColors.successBg }]}>
+                        <Text style={[styles.actionBtnText, { color: LightColors.success }]}>🔄 Renew</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => removeMember(detailMember)}>
-                        <Text style={styles.actionBtnText}>🗑️ Remove</Text>
+                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: LightColors.dangerBg }]} onPress={() => removeMember(detailMember)}>
+                        <Text style={[styles.actionBtnText, { color: LightColors.danger }]}>🗑️ Remove</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -369,8 +371,8 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 }
 const detailItemStyles = StyleSheet.create({
   box: { width: '50%', paddingVertical: 8, paddingHorizontal: 4 },
-  label: { fontSize: 10, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase' },
-  value: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginTop: 3 },
+  label: { fontSize: 10, fontWeight: '600', color: LightColors.textMuted, textTransform: 'uppercase' },
+  value: { fontSize: 14, fontWeight: '700', color: LightColors.textPrimary, marginTop: 3 },
 });
 
 function FormField({
@@ -397,69 +399,87 @@ function FormField({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7C3AED' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
+  root: { flex: 1, backgroundColor: LightColors.bgBase },
   header: {
-    backgroundColor: '#7C3AED',
+    backgroundColor: LightColors.bgSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: LightColors.border,
+  },
+  headerContent: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
   },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  addBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary },
+  addBtn: { backgroundColor: LightColors.accentViolet, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: LightColors.accentViolet },
   addBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  searchContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF', marginHorizontal: 16, marginTop: 16, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: '#E2E8F0' },
+  searchContainer: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: LightColors.bgSurface,
+    marginHorizontal: 16, marginTop: 16, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: LightColors.border,
+    width: '90%', maxWidth: 600, alignSelf: 'center',
+  },
   searchIcon: { fontSize: 16, marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 14, color: '#0F172A' },
-  filterRow: { flexDirection: 'row', paddingHorizontal: 16, marginTop: 12, gap: 8 },
-  filterTab: { flex: 1, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F1F5F9', alignItems: 'center' },
-  filterTabActive: { backgroundColor: '#8B5CF6' },
-  filterTabText: { fontSize: 11, fontWeight: '700', color: '#94A3B8' },
+  searchInput: { flex: 1, fontSize: 14, color: LightColors.textPrimary },
+  filterRow: {
+    flexDirection: 'row', paddingHorizontal: 16, marginTop: 12, gap: 8,
+    width: '90%', maxWidth: 600, alignSelf: 'center',
+  },
+  filterTab: { flex: 1, paddingVertical: 8, borderRadius: 20, backgroundColor: LightColors.bgElevated, alignItems: 'center' },
+  filterTabActive: { backgroundColor: LightColors.accentViolet },
+  filterTabText: { fontSize: 11, fontWeight: '700', color: LightColors.textMuted },
   filterTabTextActive: { color: '#FFFFFF' },
-  countLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '600', paddingHorizontal: 16, marginTop: 10, marginBottom: 4 },
-  list: { padding: 16, gap: 12, paddingBottom: 40 },
-  memberCard: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#E2E8F0', gap: 12, ...Shadows.card },
+  countLabel: {
+    fontSize: 12, color: LightColors.textMuted, fontWeight: '600', paddingHorizontal: 16, marginTop: 10, marginBottom: 4,
+    width: '90%', maxWidth: 600, alignSelf: 'center',
+  },
+  list: {
+    padding: 16, gap: 12, paddingBottom: 100,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  memberCard: { flexDirection: 'row', backgroundColor: LightColors.bgSurface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: LightColors.border, gap: 12, ...Shadows.card },
   cardLeft: {},
   cardMid: { flex: 1, gap: 3 },
   cardRight: { alignItems: 'flex-end', gap: 8 },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 15, fontWeight: '800', color: '#8B5CF6' },
-  memberName: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
-  memberPhone: { fontSize: 12, color: '#94A3B8' },
-  memberPlan: { fontSize: 12, color: '#475569', fontWeight: '600' },
-  memberDays: { fontSize: 12, color: '#10B981', fontWeight: '600' },
+  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: `${LightColors.accentViolet}15`, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 15, fontWeight: '800', color: LightColors.accentViolet },
+  memberName: { fontSize: 15, fontWeight: '700', color: LightColors.textPrimary },
+  memberPhone: { fontSize: 12, color: LightColors.textMuted },
+  memberPlan: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '600' },
+  memberDays: { fontSize: 12, color: LightColors.success, fontWeight: '600' },
   statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
   statusText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  goalChip: { fontSize: 10, fontWeight: '600', color: '#8B5CF6', backgroundColor: '#EDE9FE', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  goalChip: { fontSize: 10, fontWeight: '600', color: LightColors.accentViolet, backgroundColor: `${LightColors.accentViolet}15`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   emptyState: { alignItems: 'center', padding: 40 },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyText: { fontSize: 14, color: '#94A3B8', fontWeight: '500' },
+  emptyText: { fontSize: 14, color: LightColors.textMuted, fontWeight: '500' },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 20, textAlign: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#0F172A' },
+  modalSheet: { backgroundColor: LightColors.bgSurface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: LightColors.border, alignSelf: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 20, textAlign: 'center' },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary, marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
   modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 12 },
-  cancelBtn: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: '#475569' },
-  submitBtn: { flex: 1, backgroundColor: '#8B5CF6', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  cancelBtn: { flex: 1, backgroundColor: LightColors.bgElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  cancelBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
+  submitBtn: { flex: 1, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   submitBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-  planChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#F1F5F9', marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
-  planChipActive: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
-  planChipText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  planChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: LightColors.bgElevated, marginRight: 8, borderWidth: 1, borderColor: LightColors.border },
+  planChipActive: { backgroundColor: LightColors.accentViolet, borderColor: LightColors.accentViolet },
+  planChipText: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary },
   // Detail modal
   detailAvatarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  detailName: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
-  detailPhone: { fontSize: 13, color: '#475569', marginTop: 4 },
-  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: '#F8FAFC', borderRadius: 12, padding: 12, marginBottom: 16 },
-  detailSection: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, marginBottom: 16 },
-  detailSectionTitle: { fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 10 },
-  detailRow: { fontSize: 13, color: '#475569', fontWeight: '500', marginBottom: 6 },
+  detailName: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary },
+  detailPhone: { fontSize: 13, color: LightColors.textSecondary, marginTop: 4 },
+  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 12, marginBottom: 16 },
+  detailSection: { backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 14, marginBottom: 16 },
+  detailSectionTitle: { fontSize: 13, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 10 },
+  detailRow: { fontSize: 13, color: LightColors.textSecondary, fontWeight: '500', marginBottom: 6 },
   actionRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
   actionBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
-  actionBtnText: { fontSize: 12, fontWeight: '700', color: '#0F172A' },
-  closeBtn: { backgroundColor: '#F1F5F9', borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 12 },
-  closeBtnText: { fontSize: 14, fontWeight: '700', color: '#475569' },
+  actionBtnText: { fontSize: 12, fontWeight: '700', color: LightColors.textPrimary },
+  closeBtn: { backgroundColor: LightColors.bgElevated, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 12 },
+  closeBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
 });

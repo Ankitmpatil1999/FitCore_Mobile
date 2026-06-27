@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar,
@@ -36,15 +36,17 @@ export default function MyGymScreen() {
 
         {/* HEADER */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>Your Gym</Text>
-            <Text style={styles.headerTitle}>{gym.name}</Text>
-          </View>
-          <View style={[styles.statusBadge, { backgroundColor: gym.isOpen ? '#ECFDF5' : '#FEE2E2' }]}>
-            <View style={[styles.statusDot, { backgroundColor: gym.isOpen ? '#10B981' : '#EF4444' }]} />
-            <Text style={[styles.statusText, { color: gym.isOpen ? '#10B981' : '#EF4444' }]}>
-              {gym.isOpen ? 'Open' : 'Closed'}
-            </Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>Your Gym</Text>
+              <Text style={styles.headerTitle}>{gym.name}</Text>
+            </View>
+            <View style={[styles.statusBadge, { backgroundColor: gym.isOpen ? '#ECFDF5' : '#FEE2E2' }]}>
+              <View style={[styles.statusDot, { backgroundColor: gym.isOpen ? '#10B981' : '#EF4444' }]} />
+              <Text style={[styles.statusText, { color: gym.isOpen ? '#10B981' : '#EF4444' }]}>
+                {gym.isOpen ? 'Open' : 'Closed'}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -141,13 +143,21 @@ export default function MyGymScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0EA5E9' },
   root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#0EA5E9', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  header: { backgroundColor: '#0EA5E9' },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
   statusBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
   statusText: { fontSize: 12, fontWeight: '700' },
-  scroll: { padding: 20, paddingBottom: 40 },
+  scroll: {
+    padding: 20, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   gymInfoCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
   gymTagline: { fontSize: 15, fontStyle: 'italic', color: '#475569', marginBottom: 12 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginBottom: 10 },

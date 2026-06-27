@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -74,7 +74,7 @@ export default function OwnerProfile({ onLogout, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor={LightColors.accentViolet} />
+      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
       <View style={styles.root}>
         <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         {/* Header */}
@@ -150,7 +150,7 @@ export default function OwnerProfile({ onLogout, route }: Props) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: LightColors.accentViolet,
+    backgroundColor: LightColors.bgSurface,
   },
   root: {
     flex: 1,
@@ -159,6 +159,9 @@ const styles = StyleSheet.create({
   container: {
     padding: Spacing.xl,
     paddingBottom: 40,
+    width: '100%',
+    maxWidth: 600,
+    alignSelf: 'center',
   },
   header: {
     marginBottom: 24,
@@ -176,10 +179,10 @@ const styles = StyleSheet.create({
   photoBox: {
     width: '100%',
     height: 160,
-    backgroundColor: 'rgba(139, 92, 246, 0.08)',
+    backgroundColor: `${LightColors.accentViolet}15`,
     borderRadius: Radii.lg,
     borderWidth: 2,
-    borderColor: 'rgba(139, 92, 246, 0.25)',
+    borderColor: `${LightColors.accentViolet}35`,
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
@@ -254,7 +257,7 @@ const styles = StyleSheet.create({
     fontWeight: Typography.fontWeightBold,
   },
   logoutBtn: {
-    backgroundColor: LightColors.danger,
+    backgroundColor: LightColors.dangerBg,
     borderRadius: Radii.md,
     paddingVertical: 14,
     alignItems: 'center',
@@ -262,7 +265,7 @@ const styles = StyleSheet.create({
     ...Shadows.card,
   },
   logoutBtnText: {
-    color: '#FFFFFF',
+    color: LightColors.danger,
     fontSize: Typography.fontSizeMd,
     fontWeight: Typography.fontWeightBold,
   },

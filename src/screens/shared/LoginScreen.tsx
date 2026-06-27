@@ -223,6 +223,8 @@ export default function LoginScreen() {
             status: 'active',
             joinDate: new Date().toISOString().split('T')[0],
             expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+            trainerId: 'trainer1',
+            photo: '',
           };
           MEMBERS.push(newMember);
         } else if (signupRole === 'vendor') {
@@ -244,6 +246,7 @@ export default function LoginScreen() {
             ifsc: ifsc,
             status: 'pending', // Awaiting Admin Approval
             avatar: storeName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'VS',
+            shopImage: '🏪',
             rating: 5.0,
             totalReviews: 0,
             joinDate: new Date().toISOString().split('T')[0],
@@ -252,6 +255,12 @@ export default function LoginScreen() {
             deliveryMethods: ['local', 'partner'],
             freeDeliveryAbove: 999,
             deliveryCharges: 49,
+            kycDocuments: [
+              { type: 'aadhaar', label: 'Aadhaar Card', number: '', status: 'not_uploaded', uploadedAt: '' },
+              { type: 'pan', label: 'PAN Card', number: '', status: 'not_uploaded', uploadedAt: '' },
+              { type: 'electricity_bill', label: 'Electricity Bill', number: '', status: 'not_uploaded', uploadedAt: '' },
+              { type: 'shop_license', label: 'Shop License', number: '', status: 'not_uploaded', uploadedAt: '' },
+            ],
           };
           VENDOR_STORES.push(newStore);
         }

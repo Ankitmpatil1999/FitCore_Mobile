@@ -1,10 +1,10 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, TextInput, Alert, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Shadows } from '../../theme';
+import { LightColors, Shadows } from '../../theme';
 import { GYMS, FACILITIES, Gym } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 
@@ -48,21 +48,23 @@ export default function GymProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
+      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>Settings</Text>
-            <Text style={styles.headerTitle}>Gym Profile 🏢</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>Settings</Text>
+              <Text style={styles.headerTitle}>Gym Profile 🏢</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.editBtn, isEditing && { backgroundColor: LightColors.success }]}
+              onPress={() => isEditing ? handleSave() : setIsEditing(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.editBtnText}>{isEditing ? '✅ Save' : '✏️ Edit'}</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={[styles.editBtn, isEditing && { backgroundColor: '#10B981' }]}
-            onPress={() => isEditing ? handleSave() : setIsEditing(true)}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.editBtnText}>{isEditing ? '✅ Save' : '✏️ Edit'}</Text>
-          </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -124,8 +126,8 @@ export default function GymProfileScreen() {
                 <Switch
                   value={isOpen}
                   onValueChange={setIsOpen}
-                  trackColor={{ false: '#CBD5E1', true: '#C4B5FD' }}
-                  thumbColor={isOpen ? '#8B5CF6' : '#F8FAFC'}
+                  trackColor={{ false: LightColors.borderHover, true: `${LightColors.accentViolet}50` }}
+                  thumbColor={isOpen ? LightColors.accentViolet : LightColors.bgElevated}
                 />
               )}
             </View>
@@ -209,39 +211,51 @@ export default function GymProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7C3AED' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#7C3AED', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  editBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
+  root: { flex: 1, backgroundColor: LightColors.bgBase },
+  header: {
+    backgroundColor: LightColors.bgSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: LightColors.border,
+  },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary },
+  editBtn: { backgroundColor: LightColors.accentViolet, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: LightColors.accentViolet },
   editBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  scroll: { padding: 20, paddingBottom: 40 },
-  section: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, marginBottom: 16, ...Shadows.card },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 16 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', marginBottom: 5, marginTop: 12 },
-  fieldValue: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
-  input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#0F172A' },
+  scroll: {
+    padding: 20, paddingBottom: 100,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  section: { backgroundColor: LightColors.bgSurface, borderRadius: 16, padding: 20, marginBottom: 16, ...Shadows.card },
+  sectionTitle: { fontSize: 15, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 16 },
+  fieldLabel: { fontSize: 11, fontWeight: '700', color: LightColors.textMuted, textTransform: 'uppercase', marginBottom: 5, marginTop: 12 },
+  fieldValue: { fontSize: 14, fontWeight: '600', color: LightColors.textPrimary },
+  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
-  ratingText: { fontSize: 13, fontWeight: '700', color: '#94A3B8', marginLeft: 8 },
+  ratingText: { fontSize: 13, fontWeight: '700', color: LightColors.textMuted, marginLeft: 8 },
   switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
   facilitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  facilityChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  facilityChipActive: { backgroundColor: '#EDE9FE', borderColor: '#C4B5FD' },
+  facilityChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: LightColors.bgElevated, borderWidth: 1, borderColor: LightColors.border },
+  facilityChipActive: { backgroundColor: `${LightColors.accentViolet}15`, borderColor: LightColors.accentViolet },
   facilityIcon: { fontSize: 16 },
-  facilityName: { fontSize: 12, fontWeight: '600', color: '#94A3B8' },
-  facilityNameActive: { color: '#8B5CF6' },
-  editHint: { fontSize: 11, color: '#94A3B8', marginTop: 10, fontStyle: 'italic' },
-  subPlanCard: { backgroundColor: '#F8FAFC', borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: '#E2E8F0' },
-  subPlanCardActive: { borderColor: '#8B5CF6', backgroundColor: '#EDE9FE' },
+  facilityName: { fontSize: 12, fontWeight: '600', color: LightColors.textMuted },
+  facilityNameActive: { color: LightColors.accentViolet },
+  editHint: { fontSize: 11, color: LightColors.textMuted, marginTop: 10, fontStyle: 'italic' },
+  subPlanCard: { backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: LightColors.border },
+  subPlanCardActive: { borderColor: LightColors.accentViolet, backgroundColor: `${LightColors.accentViolet}15` },
   subPlanTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  subPlanName: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
-  subPlanPrice: { fontSize: 13, color: '#8B5CF6', fontWeight: '700', marginTop: 3 },
-  activePlanBadge: { backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  activePlanText: { fontSize: 11, fontWeight: '700', color: '#10B981' },
-  subFeature: { fontSize: 12, color: '#475569', fontWeight: '500', marginBottom: 4 },
-  upgradeBtn: { marginTop: 12, backgroundColor: '#8B5CF6', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  subPlanName: { fontSize: 16, fontWeight: '800', color: LightColors.textPrimary },
+  subPlanPrice: { fontSize: 13, color: LightColors.accentViolet, fontWeight: '700', marginTop: 3 },
+  activePlanBadge: { backgroundColor: LightColors.successBg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  activePlanText: { fontSize: 11, fontWeight: '700', color: LightColors.success },
+  subFeature: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500', marginBottom: 4 },
+  upgradeBtn: { marginTop: 12, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
   upgradeBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  logoutBtn: { backgroundColor: '#FEE2E2', borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  logoutBtnText: { fontSize: 15, fontWeight: '700', color: '#EF4444' },
+  logoutBtn: { backgroundColor: LightColors.dangerBg, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
+  logoutBtnText: { fontSize: 15, fontWeight: '700', color: LightColors.danger },
 });

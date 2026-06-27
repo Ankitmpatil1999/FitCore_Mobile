@@ -1,10 +1,11 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
+import { Colors } from '../../theme';
 import { getWorkoutPlanByMember, WorkoutDay, Exercise } from '../../data/mockData';
 
 const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -16,7 +17,6 @@ export default function WorkoutScreen() {
   const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const [selectedDay, setSelectedDay] = useState(todayName);
   const [doneExercises, setDoneExercises] = useState<Set<string>>(new Set());
-  const [restTimer, setRestTimer] = useState<number | null>(null);
 
   const selectedDayData: WorkoutDay | undefined = workoutPlan?.days.find(d => d.day === selectedDay);
 
@@ -34,50 +34,54 @@ export default function WorkoutScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#10B981" />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.bgSurface} />
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>{workoutPlan?.name ?? 'Your Workout Plan'}</Text>
-            <Text style={styles.headerTitle}>Workout 💪</Text>
-          </View>
-          {totalCount > 0 && (
-            <View style={styles.progressBadge}>
-              <Text style={styles.progressBadgeText}>{completedCount}/{totalCount}</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>{workoutPlan?.name ?? 'Your Workout Plan'}</Text>
+              <Text style={styles.headerTitle}>Workout 💪</Text>
             </View>
-          )}
+            {totalCount > 0 && (
+              <View style={styles.progressBadge}>
+                <Text style={styles.progressBadgeText}>{completedCount}/{totalCount}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Day selector */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelectorScroll}>
-          {DAYS_OF_WEEK.map(day => {
-            const dayData = workoutPlan?.days.find(d => d.day === day);
-            const isRest = !dayData || dayData.exercises.length === 0;
-            const isToday = day === todayName;
-            const isSelected = day === selectedDay;
-            return (
-              <TouchableOpacity
-                key={day}
-                style={[
-                  styles.dayChip,
-                  isSelected && styles.dayChipSelected,
-                  isToday && !isSelected && styles.dayChipToday,
-                ]}
-                onPress={() => setSelectedDay(day)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.dayShort, isSelected && { color: '#FFFFFF' }]}>
-                  {day.slice(0, 3)}
-                </Text>
-                <Text style={[styles.dayFocus, isSelected && { color: 'rgba(255,255,255,0.8)' }]} numberOfLines={1}>
-                  {isRest ? 'Rest' : (dayData?.focus.split(' ').slice(0, 1).join('') ?? '')}
-                </Text>
-                {isToday && <View style={styles.todayDot} />}
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <View style={styles.daySelectorContainer}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.daySelectorScroll} contentContainerStyle={styles.daySelectorContent}>
+            {DAYS_OF_WEEK.map(day => {
+              const dayData = workoutPlan?.days.find(d => d.day === day);
+              const isRest = !dayData || dayData.exercises.length === 0;
+              const isToday = day === todayName;
+              const isSelected = day === selectedDay;
+              return (
+                <TouchableOpacity
+                  key={day}
+                  style={[
+                    styles.dayChip,
+                    isSelected && styles.dayChipSelected,
+                    isToday && !isSelected && styles.dayChipToday,
+                  ]}
+                  onPress={() => setSelectedDay(day)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.dayShort, isSelected ? { color: '#000000' } : { color: Colors.textPrimary }]}>
+                    {day.slice(0, 3)}
+                  </Text>
+                  <Text style={[styles.dayFocus, isSelected ? { color: 'rgba(0,0,0,0.6)' } : { color: Colors.textSecondary }]} numberOfLines={1}>
+                    {isRest ? 'Rest' : (dayData?.focus.split(' ').slice(0, 1).join('') ?? '')}
+                  </Text>
+                  {isToday && <View style={[styles.todayDot, isSelected && { backgroundColor: '#000000' }]} />}
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -118,8 +122,8 @@ export default function WorkoutScreen() {
                 return (
                   <View key={ex.id} style={[styles.exerciseCard, isDone && styles.exerciseCardDone]}>
                     <View style={styles.exerciseTop}>
-                      <View style={[styles.exNum, { backgroundColor: isDone ? '#ECFDF5' : '#F1F5F9' }]}>
-                        <Text style={[styles.exNumText, { color: isDone ? '#10B981' : '#94A3B8' }]}>
+                      <View style={[styles.exNum, { backgroundColor: isDone ? Colors.successBg : 'rgba(255,255,255,0.05)' }]}>
+                        <Text style={[styles.exNumText, { color: isDone ? Colors.success : Colors.textSecondary }]}>
                           {isDone ? '✓' : i + 1}
                         </Text>
                       </View>
@@ -184,57 +188,77 @@ export default function WorkoutScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#10B981' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#10B981', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  progressBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-  progressBadgeText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
-  daySelectorScroll: { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0', paddingVertical: 12, paddingHorizontal: 16 },
-  dayChip: { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, marginRight: 8, backgroundColor: '#F8FAFC', minWidth: 64 },
-  dayChipSelected: { backgroundColor: '#10B981' },
-  dayChipToday: { backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#6EE7B7' },
-  dayShort: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
-  dayFocus: { fontSize: 10, color: '#94A3B8', fontWeight: '600', marginTop: 2 },
-  todayDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#10B981', marginTop: 4 },
-  scroll: { padding: 20, paddingBottom: 40 },
+  safeArea: { flex: 1, backgroundColor: Colors.bgSurface },
+  root: { flex: 1, backgroundColor: Colors.bgBase },
+  header: {
+    backgroundColor: Colors.bgSurface,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  headerSub: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
+  progressBadge: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: Colors.border },
+  progressBadgeText: { fontSize: 14, fontWeight: '800', color: Colors.textPrimary },
+  daySelectorContainer: {
+    backgroundColor: Colors.bgSurface,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  daySelectorScroll: {
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  daySelectorContent: {
+    paddingVertical: 12, paddingHorizontal: 16,
+  },
+  dayChip: { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 12, marginRight: 8, backgroundColor: Colors.bgCard, minWidth: 64, borderWidth: 1, borderColor: Colors.border },
+  dayChipSelected: { backgroundColor: Colors.accentCyan, borderColor: Colors.accentCyan },
+  dayChipToday: { backgroundColor: Colors.cyanBg, borderWidth: 1, borderColor: Colors.accentCyan },
+  dayShort: { fontSize: 13, fontWeight: '800' },
+  dayFocus: { fontSize: 10, fontWeight: '600', marginTop: 2 },
+  todayDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: Colors.accentCyan, marginTop: 4 },
+  scroll: {
+    padding: 20, paddingBottom: 80,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   emptyState: { alignItems: 'center', padding: 60 },
   emptyIcon: { fontSize: 64, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#0F172A', textAlign: 'center' },
-  emptySubtitle: { fontSize: 13, color: '#94A3B8', marginTop: 8, textAlign: 'center' },
-  restCard: { backgroundColor: '#FFFFFF', borderRadius: 24, padding: 40, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', gap: 10 },
-  restTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  restSubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center' },
-  restTip: { backgroundColor: '#F0FDF4', borderRadius: 12, padding: 14, marginTop: 8 },
-  restTipText: { fontSize: 13, color: '#10B981', fontWeight: '600', textAlign: 'center' },
-  focusCard: { backgroundColor: '#10B981', borderRadius: 16, padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center' },
+  emptySubtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 8, textAlign: 'center' },
+  restCard: { backgroundColor: Colors.bgCard, borderRadius: 24, padding: 40, alignItems: 'center', borderWidth: 1, borderColor: Colors.border, gap: 10 },
+  restTitle: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary },
+  restSubtitle: { fontSize: 13, color: Colors.textSecondary, textAlign: 'center' },
+  restTip: { backgroundColor: Colors.successBg, borderRadius: 12, padding: 14, marginTop: 8 },
+  restTipText: { fontSize: 13, color: Colors.success, fontWeight: '600', textAlign: 'center' },
+  focusCard: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderLeftWidth: 4, borderLeftColor: Colors.accentCyan, borderWidth: 1, borderColor: Colors.border },
   focusLeft: {},
-  focusLabel: { fontSize: 11, color: 'rgba(255,255,255,0.8)', fontWeight: '600', textTransform: 'uppercase' },
-  focusName: { fontSize: 20, fontWeight: '800', color: '#FFFFFF', marginTop: 4 },
-  ringProgress: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)' },
-  ringVal: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
-  ringLabel: { fontSize: 9, color: 'rgba(255,255,255,0.8)', fontWeight: '600' },
-  exerciseCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#E2E8F0' },
-  exerciseCardDone: { backgroundColor: '#F0FDF4', borderColor: '#6EE7B7' },
+  focusLabel: { fontSize: 11, color: Colors.textSecondary, fontWeight: '600', textTransform: 'uppercase' },
+  focusName: { fontSize: 20, fontWeight: '800', color: Colors.textPrimary, marginTop: 4 },
+  ringProgress: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(255,255,255,0.03)', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: Colors.accentCyan },
+  ringVal: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
+  ringLabel: { fontSize: 9, color: Colors.textSecondary, fontWeight: '600' },
+  exerciseCard: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: Colors.border },
+  exerciseCardDone: { backgroundColor: Colors.successBg, borderColor: Colors.success },
   exerciseTop: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },
   exNum: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   exNumText: { fontSize: 13, fontWeight: '800' },
   exerciseInfo: { flex: 1 },
-  exName: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
-  musclePill: { backgroundColor: '#EFF6FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start', marginTop: 4 },
-  muscleText: { fontSize: 10, fontWeight: '700', color: '#0EA5E9' },
-  doneBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  doneBtnActive: { backgroundColor: '#10B981', borderColor: '#10B981' },
-  doneBtnText: { fontSize: 12, fontWeight: '700', color: '#475569' },
-  exStats: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderRadius: 10, padding: 10 },
+  exName: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary },
+  musclePill: { backgroundColor: Colors.cyanBg, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, alignSelf: 'flex-start', marginTop: 4 },
+  muscleText: { fontSize: 10, fontWeight: '700', color: Colors.accentCyan },
+  doneBtn: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: Colors.border },
+  doneBtnActive: { backgroundColor: Colors.success, borderColor: Colors.success },
+  doneBtnText: { fontSize: 12, fontWeight: '700', color: Colors.textSecondary },
+  exStats: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.bgElevated, borderRadius: 10, padding: 10 },
   exStat: { flex: 1, alignItems: 'center' },
-  exStatVal: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
-  exStatLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600', marginTop: 2 },
-  exStatDivider: { width: 1, height: 28, backgroundColor: '#E2E8F0' },
+  exStatVal: { fontSize: 14, fontWeight: '800', color: Colors.textPrimary },
+  exStatLabel: { fontSize: 10, color: Colors.textSecondary, fontWeight: '600', marginTop: 2 },
+  exStatDivider: { width: 1, height: 28, backgroundColor: Colors.border },
   restBtn: { flex: 1, alignItems: 'center', paddingVertical: 4 },
-  restBtnText: { fontSize: 12, fontWeight: '700', color: '#8B5CF6' },
-  completionBanner: { backgroundColor: '#ECFDF5', borderRadius: 20, padding: 32, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#6EE7B7' },
-  completionTitle: { fontSize: 22, fontWeight: '800', color: '#10B981' },
-  completionSub: { fontSize: 13, color: '#475569', marginTop: 8, textAlign: 'center' },
+  restBtnText: { fontSize: 12, fontWeight: '700', color: Colors.accentViolet },
+  completionBanner: { backgroundColor: Colors.successBg, borderRadius: 20, padding: 32, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: Colors.success },
+  completionTitle: { fontSize: 22, fontWeight: '800', color: Colors.success },
+  completionSub: { fontSize: 13, color: Colors.textSecondary, marginTop: 8, textAlign: 'center' },
 });

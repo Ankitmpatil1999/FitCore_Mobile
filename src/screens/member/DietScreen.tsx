@@ -1,9 +1,10 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Colors } from '../../theme';
 import { DIET_PLANS, DietType } from '../../data/mockData';
 
 const DIET_TYPES: { id: DietType; label: string; icon: string }[] = [
@@ -39,12 +40,14 @@ export default function DietScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#F59E0B" />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.bgSurface} />
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <Text style={styles.headerSub}>Nutrition</Text>
-          <Text style={styles.headerTitle}>Diet Plan 🥗</Text>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerSub}>Nutrition</Text>
+            <Text style={styles.headerTitle}>Diet Plan 🥗</Text>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -60,7 +63,7 @@ export default function DietScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={styles.dietTypeIcon}>{dt.icon}</Text>
-                <Text style={[styles.dietTypeLabel, selectedDietType === dt.id && { color: '#FFFFFF' }]}>
+                <Text style={[styles.dietTypeLabel, selectedDietType === dt.id ? { color: '#000000' } : { color: Colors.textPrimary }]}>
                   {dt.label}
                 </Text>
               </TouchableOpacity>
@@ -75,28 +78,28 @@ export default function DietScreen() {
                 <Text style={styles.macroVal}>{diet.totalCalories}</Text>
                 <Text style={styles.macroLabel}>Calories</Text>
                 <View style={styles.macroBar}>
-                  <View style={[styles.macroBarFill, { width: `${Math.min(100, (totalCaloriesConsumed / diet.totalCalories) * 100)}%`, backgroundColor: '#F59E0B' }]} />
+                  <View style={[styles.macroBarFill, { width: `${Math.min(100, (totalCaloriesConsumed / diet.totalCalories) * 100)}%`, backgroundColor: Colors.accentCyan }]} />
                 </View>
               </View>
               <View style={styles.macroItem}>
-                <Text style={[styles.macroVal, { color: '#3B82F6' }]}>{diet.totalProtein}g</Text>
+                <Text style={[styles.macroVal, { color: Colors.info }]}>{diet.totalProtein}g</Text>
                 <Text style={styles.macroLabel}>Protein</Text>
                 <View style={styles.macroBar}>
-                  <View style={[styles.macroBarFill, { width: '70%', backgroundColor: '#3B82F6' }]} />
+                  <View style={[styles.macroBarFill, { width: '70%', backgroundColor: Colors.info }]} />
                 </View>
               </View>
               <View style={styles.macroItem}>
-                <Text style={[styles.macroVal, { color: '#10B981' }]}>~220g</Text>
+                <Text style={[styles.macroVal, { color: Colors.success }]}>~220g</Text>
                 <Text style={styles.macroLabel}>Carbs</Text>
                 <View style={styles.macroBar}>
-                  <View style={[styles.macroBarFill, { width: '55%', backgroundColor: '#10B981' }]} />
+                  <View style={[styles.macroBarFill, { width: '55%', backgroundColor: Colors.success }]} />
                 </View>
               </View>
               <View style={styles.macroItem}>
-                <Text style={[styles.macroVal, { color: '#8B5CF6' }]}>~65g</Text>
+                <Text style={[styles.macroVal, { color: Colors.accentViolet }]}>~65g</Text>
                 <Text style={styles.macroLabel}>Fats</Text>
                 <View style={styles.macroBar}>
-                  <View style={[styles.macroBarFill, { width: '40%', backgroundColor: '#8B5CF6' }]} />
+                  <View style={[styles.macroBarFill, { width: '40%', backgroundColor: Colors.accentViolet }]} />
                 </View>
               </View>
             </View>
@@ -134,7 +137,7 @@ export default function DietScreen() {
                 activeOpacity={0.8}
               >
                 <Text style={styles.mealTabIcon}>{m.icon}</Text>
-                <Text style={[styles.mealTabLabel, selectedMeal === m.key && { color: '#F59E0B' }]}>
+                <Text style={[styles.mealTabLabel, selectedMeal === m.key ? { color: Colors.accentCyan } : { color: Colors.textSecondary }]}>
                   {m.label}
                 </Text>
               </TouchableOpacity>
@@ -146,11 +149,11 @@ export default function DietScreen() {
             <View style={styles.mealCardHeader}>
               <Text style={styles.mealCardName}>{meal.name}</Text>
               <View style={styles.mealMacroRow}>
-                <View style={[styles.mealMacroPill, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={[styles.mealMacroText, { color: '#F59E0B' }]}>{mealCalories} cal</Text>
+                <View style={[styles.mealMacroPill, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                  <Text style={[styles.mealMacroText, { color: Colors.textPrimary }]}>{mealCalories} cal</Text>
                 </View>
-                <View style={[styles.mealMacroPill, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={[styles.mealMacroText, { color: '#3B82F6' }]}>{mealProtein}g protein</Text>
+                <View style={[styles.mealMacroPill, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                  <Text style={[styles.mealMacroText, { color: Colors.textPrimary }]}>{mealProtein}g protein</Text>
                 </View>
               </View>
             </View>
@@ -201,56 +204,66 @@ export default function DietScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F59E0B' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#F59E0B', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  scroll: { padding: 20, paddingBottom: 40 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 12 },
+  safeArea: { flex: 1, backgroundColor: Colors.bgSurface },
+  root: { flex: 1, backgroundColor: Colors.bgBase },
+  header: {
+    backgroundColor: Colors.bgSurface,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  headerContent: {
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  headerSub: { fontSize: 12, color: Colors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: Colors.textPrimary },
+  scroll: {
+    padding: 20, paddingBottom: 80,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 12, marginTop: 8 },
   dietTypeScroll: { marginBottom: 24 },
-  dietTypeChip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, backgroundColor: '#FFFFFF', marginRight: 10, borderWidth: 1, borderColor: '#E2E8F0' },
-  dietTypeChipActive: { backgroundColor: '#F59E0B', borderColor: '#F59E0B' },
+  dietTypeChip: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, backgroundColor: Colors.bgCard, marginRight: 10, borderWidth: 1, borderColor: Colors.border },
+  dietTypeChipActive: { backgroundColor: Colors.accentCyan, borderColor: Colors.accentCyan },
   dietTypeIcon: { fontSize: 16 },
-  dietTypeLabel: { fontSize: 12, fontWeight: '700', color: '#475569' },
-  macroCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
-  macroCardTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 16 },
+  dietTypeLabel: { fontSize: 12, fontWeight: '700' },
+  macroCard: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: Colors.border },
+  macroCardTitle: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary, marginBottom: 16 },
   macroGrid: { flexDirection: 'row', gap: 10 },
   macroItem: { flex: 1, alignItems: 'center', gap: 4 },
-  macroVal: { fontSize: 16, fontWeight: '800', color: '#F59E0B' },
-  macroLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600' },
-  macroBar: { width: '100%', height: 5, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden', marginTop: 4 },
+  macroVal: { fontSize: 16, fontWeight: '800', color: Colors.accentCyan },
+  macroLabel: { fontSize: 10, color: Colors.textSecondary, fontWeight: '600' },
+  macroBar: { width: '100%', height: 5, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden', marginTop: 4 },
   macroBarFill: { height: '100%', borderRadius: 3 },
-  waterCard: { backgroundColor: '#EFF6FF', borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: '#DBEAFE' },
+  waterCard: { backgroundColor: 'rgba(59, 130, 246, 0.05)', borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(59, 130, 246, 0.15)' },
   waterGlasses: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  glassBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#DBEAFE', alignItems: 'center', justifyContent: 'center' },
-  glassBtnFilled: { backgroundColor: '#3B82F6' },
-  waterText: { fontSize: 13, fontWeight: '700', color: '#1E40AF', marginBottom: 10 },
-  waterProgressBar: { height: 8, backgroundColor: '#DBEAFE', borderRadius: 4, overflow: 'hidden' },
-  waterProgressFill: { height: '100%', backgroundColor: '#3B82F6', borderRadius: 4 },
+  glassBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(59, 130, 246, 0.12)', alignItems: 'center', justifyContent: 'center' },
+  glassBtnFilled: { backgroundColor: Colors.info },
+  waterText: { fontSize: 13, fontWeight: '700', color: Colors.textPrimary, marginBottom: 10 },
+  waterProgressBar: { height: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 4, overflow: 'hidden' },
+  waterProgressFill: { height: '100%', backgroundColor: Colors.info, borderRadius: 4 },
   mealTabRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  mealTab: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12, backgroundColor: '#FFFFFF', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0' },
-  mealTabActive: { backgroundColor: '#FEF3C7', borderColor: '#FCD34D' },
+  mealTab: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12, backgroundColor: Colors.bgCard, borderRadius: 14, borderWidth: 1, borderColor: Colors.border },
+  mealTabActive: { backgroundColor: 'rgba(0, 240, 255, 0.1)', borderColor: Colors.accentCyan },
   mealTabIcon: { fontSize: 20 },
-  mealTabLabel: { fontSize: 10, fontWeight: '700', color: '#94A3B8' },
-  mealCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
+  mealTabLabel: { fontSize: 10, fontWeight: '700' },
+  mealCard: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: Colors.border },
   mealCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
-  mealCardName: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
+  mealCardName: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
   mealMacroRow: { gap: 6 },
   mealMacroPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
   mealMacroText: { fontSize: 11, fontWeight: '700' },
-  foodRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#F1F5F9' },
+  foodRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.border },
   foodLeft: {},
-  foodName: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
-  foodQty: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
+  foodName: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
+  foodQty: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
   foodRight: { alignItems: 'flex-end' },
-  foodCal: { fontSize: 14, fontWeight: '700', color: '#F59E0B' },
-  foodProtein: { fontSize: 11, color: '#3B82F6', fontWeight: '600', marginTop: 2 },
-  allMealsCard: { backgroundColor: '#FFFFFF', borderRadius: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  foodCal: { fontSize: 14, fontWeight: '700', color: Colors.accentCyan },
+  foodProtein: { fontSize: 11, color: Colors.info, fontWeight: '600', marginTop: 2 },
+  allMealsCard: { backgroundColor: Colors.bgCard, borderRadius: 16, paddingHorizontal: 16, borderWidth: 1, borderColor: Colors.border },
   allMealRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, gap: 12 },
   allMealIcon: { fontSize: 24 },
-  allMealName: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
-  allMealItems: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
-  allMealCal: { fontSize: 14, fontWeight: '800', color: '#F59E0B' },
-  divider: { height: 1, backgroundColor: '#F1F5F9' },
+  allMealName: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  allMealItems: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
+  allMealCal: { fontSize: 14, fontWeight: '800', color: Colors.accentCyan },
+  divider: { height: 1, backgroundColor: Colors.border },
 });

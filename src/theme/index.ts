@@ -1,15 +1,15 @@
 export const Colors = {
   // Backgrounds
-  bgBase: '#06070A',
-  bgSurface: '#0F1014',
-  bgCard: '#141519',
-  bgElevated: '#1A1B21',
+  bgBase: '#000000',
+  bgSurface: '#08090C',
+  bgCard: '#0F1015',
+  bgElevated: '#17181F',
 
   // Accents
-  accentCyan: '#00F0FF',
-  accentViolet: '#7928CA',
-  accentGradientStart: '#00F0FF',
-  accentGradientEnd: '#7928CA',
+  accentCyan: '#4B4DF3',
+  accentViolet: '#2C65DE',
+  accentGradientStart: '#6B7DF2',
+  accentGradientEnd: '#2C65DE',
 
   // Semantic
   success: '#10B981',
@@ -23,19 +23,19 @@ export const Colors = {
   textMuted: '#4B5563',
 
   // Borders
-  border: 'rgba(255,255,255,0.08)',
-  borderHover: 'rgba(255,255,255,0.16)',
+  border: 'rgba(107, 125, 242, 0.15)',
+  borderHover: 'rgba(107, 125, 242, 0.3)',
 
   // Transparent overlays
   overlay: 'rgba(0,0,0,0.6)',
-  glass: 'rgba(255,255,255,0.03)',
-  glassBorder: 'rgba(255,255,255,0.08)',
+  glass: 'rgba(107, 125, 242, 0.04)',
+  glassBorder: 'rgba(107, 125, 242, 0.15)',
 
   // Status backgrounds
   successBg: 'rgba(16,185,129,0.1)',
   warningBg: 'rgba(245,158,11,0.1)',
   dangerBg: 'rgba(239,68,68,0.1)',
-  cyanBg: 'rgba(0,240,255,0.08)',
+  cyanBg: 'rgba(107, 125, 242, 0.1)',
 };
 
 export const LightColors = {
@@ -46,10 +46,10 @@ export const LightColors = {
   bgElevated: '#F1F5F9',
 
   // Accents
-  accentCyan: '#0EA5E9',
-  accentViolet: '#8B5CF6',
-  accentGradientStart: '#0EA5E9',
-  accentGradientEnd: '#8B5CF6',
+  accentCyan: '#5EA2D6',
+  accentViolet: '#2C65DE',
+  accentGradientStart: '#6B7DF2',
+  accentGradientEnd: '#2C65DE',
 
   // Semantic
   success: '#10B981',
@@ -75,7 +75,7 @@ export const LightColors = {
   successBg: '#ECFDF5',
   warningBg: '#FEF3C7',
   dangerBg: '#FEE2E2',
-  cyanBg: '#E0F2FE',
+  cyanBg: '#E2EEFC',
 };
 
 export const Typography = {

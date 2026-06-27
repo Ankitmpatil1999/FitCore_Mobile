@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, TextInput, Alert,
@@ -92,21 +92,23 @@ export default function TrainerChatScreen({ navigation }: any) {
 
         {/* Chat header */}
         <View style={styles.chatHeader}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => navigation?.goBack?.()} activeOpacity={0.7}>
-            <Text style={styles.backBtnText}>←</Text>
-          </TouchableOpacity>
-          <View style={styles.trainerAvatar}>
-            <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
+          <View style={styles.chatHeaderContent}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation?.goBack?.()} activeOpacity={0.7}>
+              <Text style={styles.backBtnText}>←</Text>
+            </TouchableOpacity>
+            <View style={styles.trainerAvatar}>
+              <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
+            </View>
+            <View style={styles.trainerInfo}>
+              <Text style={styles.trainerName}>{trainer.name}</Text>
+              <Text style={styles.trainerStatus}>
+                {trainer.available ? '🟢 Available' : '🟡 Busy'} · {trainer.specialization}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.bookBtn} onPress={() => setBookingModal(true)} activeOpacity={0.85}>
+              <Text style={styles.bookBtnText}>📅 Book PT</Text>
+            </TouchableOpacity>
           </View>
-          <View style={styles.trainerInfo}>
-            <Text style={styles.trainerName}>{trainer.name}</Text>
-            <Text style={styles.trainerStatus}>
-              {trainer.available ? '🟢 Available' : '🟡 Busy'} · {trainer.specialization}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.bookBtn} onPress={() => setBookingModal(true)} activeOpacity={0.85}>
-            <Text style={styles.bookBtnText}>📅 Book PT</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Messages */}
@@ -147,18 +149,20 @@ export default function TrainerChatScreen({ navigation }: any) {
         </ScrollView>
 
         {/* Input bar */}
-        <View style={styles.inputBar}>
-          <TextInput
-            style={styles.msgInput}
-            placeholder="Message your trainer..."
-            placeholderTextColor="#94A3B8"
-            value={input}
-            onChangeText={setInput}
-            multiline
-          />
-          <TouchableOpacity style={styles.sendBtn} onPress={sendMessage} activeOpacity={0.85}>
-            <Text style={styles.sendBtnText}>Send</Text>
-          </TouchableOpacity>
+        <View style={styles.inputBarContainer}>
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.msgInput}
+              placeholder="Message your trainer..."
+              placeholderTextColor="#94A3B8"
+              value={input}
+              onChangeText={setInput}
+              multiline
+            />
+            <TouchableOpacity style={styles.sendBtn} onPress={sendMessage} activeOpacity={0.85}>
+              <Text style={styles.sendBtnText}>Send</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Book PT session modal */}
@@ -215,7 +219,11 @@ export default function TrainerChatScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0EA5E9' },
   root: { flex: 1, backgroundColor: '#F8FAFC' },
-  chatHeader: { backgroundColor: '#0EA5E9', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, gap: 10 },
+  chatHeader: { backgroundColor: '#0EA5E9' },
+  chatHeaderContent: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, gap: 10,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   backBtnText: { fontSize: 22, color: '#FFFFFF', fontWeight: '700' },
   trainerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
@@ -225,7 +233,10 @@ const styles = StyleSheet.create({
   trainerStatus: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   bookBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   bookBtnText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
-  messagesScroll: { padding: 16, paddingBottom: 8 },
+  messagesScroll: {
+    padding: 16, paddingBottom: 8,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   dateSeparator: { alignItems: 'center', marginVertical: 12 },
   dateSeparatorText: { fontSize: 11, color: '#94A3B8', fontWeight: '600', backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 },
   messageRow: { marginBottom: 12 },
@@ -238,7 +249,13 @@ const styles = StyleSheet.create({
   bubbleMember: { backgroundColor: '#0EA5E9', borderBottomRightRadius: 4 },
   messageText: { fontSize: 14, color: '#0F172A', lineHeight: 20 },
   messageTime: { fontSize: 10, color: '#94A3B8', marginTop: 5, textAlign: 'right' },
-  inputBar: { flexDirection: 'row', alignItems: 'flex-end', padding: 12, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0', gap: 10 },
+  inputBarContainer: {
+    backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0',
+  },
+  inputBar: {
+    flexDirection: 'row', alignItems: 'flex-end', padding: 12, gap: 10,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   msgInput: { flex: 1, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: '#0F172A', maxHeight: 80 },
   sendBtn: { backgroundColor: '#0EA5E9', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 12 },
   sendBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
@@ -247,7 +264,7 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 16, color: '#94A3B8' },
   // Modal
   modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
+  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', textAlign: 'center' },
   modalSubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 20 },

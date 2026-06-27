@@ -1,10 +1,10 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Modal, TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Shadows } from '../../theme';
+import { LightColors, Shadows } from '../../theme';
 import { MEMBERSHIP_PLANS, MembershipPlan } from '../../data/mockData';
 
 const TIER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
@@ -103,17 +103,19 @@ export default function MembershipPlansScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
+      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>Configure</Text>
-            <Text style={styles.headerTitle}>Membership Plans 📋</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>Configure</Text>
+              <Text style={styles.headerTitle}>Membership Plans 📋</Text>
+            </View>
+            <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.85}>
+              <Text style={styles.addBtnText}>+ New Plan</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.85}>
-            <Text style={styles.addBtnText}>+ New Plan</Text>
-          </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -163,16 +165,16 @@ export default function MembershipPlansScreen() {
                 </View>
 
                 <View style={styles.planActions}>
-                  <TouchableOpacity style={[styles.planActionBtn, { backgroundColor: '#EFF6FF' }]} onPress={() => openEdit(plan)}>
-                    <Text style={[styles.planActionText, { color: '#3B82F6' }]}>✏️ Edit</Text>
+                  <TouchableOpacity style={[styles.planActionBtn, { backgroundColor: LightColors.cyanBg }]} onPress={() => openEdit(plan)}>
+                    <Text style={[styles.planActionText, { color: LightColors.info }]}>✏️ Edit</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.planActionBtn, { backgroundColor: plan.isActive ? '#FEF3C7' : '#ECFDF5' }]} onPress={() => togglePause(plan)}>
-                    <Text style={[styles.planActionText, { color: plan.isActive ? '#F59E0B' : '#10B981' }]}>
+                  <TouchableOpacity style={[styles.planActionBtn, { backgroundColor: plan.isActive ? LightColors.warningBg : LightColors.successBg }]} onPress={() => togglePause(plan)}>
+                    <Text style={[styles.planActionText, { color: plan.isActive ? LightColors.warning : LightColors.success }]}>
                       {plan.isActive ? '⏸ Pause' : '▶️ Resume'}
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity style={[styles.planActionBtn, { backgroundColor: '#FEE2E2' }]} onPress={() => deletePlan(plan)}>
-                    <Text style={[styles.planActionText, { color: '#EF4444' }]}>🗑️ Delete</Text>
+                  <TouchableOpacity style={[styles.planActionBtn, { backgroundColor: LightColors.dangerBg }]} onPress={() => deletePlan(plan)}>
+                    <Text style={[styles.planActionText, { color: LightColors.danger }]}>🗑️ Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -233,48 +235,63 @@ export default function MembershipPlansScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7C3AED' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#7C3AED', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  addBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
+  root: { flex: 1, backgroundColor: LightColors.bgBase },
+  header: {
+    backgroundColor: LightColors.bgSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: LightColors.border,
+  },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary },
+  addBtn: { backgroundColor: LightColors.accentViolet, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: LightColors.accentViolet },
   addBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  scroll: { padding: 20, gap: 16, paddingBottom: 40 },
-  subLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '600', marginBottom: 4 },
-  planCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, borderWidth: 2, ...Shadows.card },
+  scroll: {
+    padding: 20, gap: 16, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  subLabel: {
+    fontSize: 12, color: LightColors.textMuted, fontWeight: '600', marginBottom: 4,
+    width: '90%', maxWidth: 600, alignSelf: 'center',
+  },
+  planCard: { backgroundColor: LightColors.bgSurface, borderRadius: 16, padding: 20, borderWidth: 2, ...Shadows.card },
   planTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   tierBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
   tierIcon: { fontSize: 14 },
   tierText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  pausedBadge: { backgroundColor: '#FEE2E2', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  pausedText: { fontSize: 9, fontWeight: '800', color: '#EF4444' },
-  discountBadge: { backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, marginLeft: 'auto' },
-  discountText: { fontSize: 10, fontWeight: '800', color: '#10B981' },
-  planName: { fontSize: 20, fontWeight: '800', color: '#0F172A', marginBottom: 8 },
+  pausedBadge: { backgroundColor: LightColors.dangerBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  pausedText: { fontSize: 9, fontWeight: '800', color: LightColors.danger },
+  discountBadge: { backgroundColor: LightColors.successBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, marginLeft: 'auto' },
+  discountText: { fontSize: 10, fontWeight: '800', color: LightColors.success },
+  planName: { fontSize: 20, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 8 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 16 },
-  planPrice: { fontSize: 28, fontWeight: '800', color: '#8B5CF6' },
-  planMRP: { fontSize: 14, color: '#94A3B8', textDecorationLine: 'line-through', marginLeft: 8 },
-  planDuration: { fontSize: 13, color: '#94A3B8', fontWeight: '600' },
+  planPrice: { fontSize: 28, fontWeight: '800', color: LightColors.accentViolet },
+  planMRP: { fontSize: 14, color: LightColors.textMuted, textDecorationLine: 'line-through', marginLeft: 8 },
+  planDuration: { fontSize: 13, color: LightColors.textMuted, fontWeight: '600' },
   featureList: { gap: 6, marginBottom: 20 },
-  featureItem: { fontSize: 13, color: '#475569', fontWeight: '500' },
+  featureItem: { fontSize: 13, color: LightColors.textSecondary, fontWeight: '500' },
   planActions: { flexDirection: 'row', gap: 10 },
   planActionBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   planActionText: { fontSize: 12, fontWeight: '700' },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 20, textAlign: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#0F172A' },
+  modalSheet: { backgroundColor: LightColors.bgSurface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: LightColors.border, alignSelf: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 20, textAlign: 'center' },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary, marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
   tierRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  tierChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  tierChipActive: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
-  tierChipText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  tierChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: LightColors.bgElevated, borderWidth: 1, borderColor: LightColors.border },
+  tierChipActive: { backgroundColor: LightColors.accentViolet, borderColor: LightColors.accentViolet },
+  tierChipText: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary },
   modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 12 },
-  cancelBtn: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: '#475569' },
-  submitBtn: { flex: 1, backgroundColor: '#8B5CF6', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  cancelBtn: { flex: 1, backgroundColor: LightColors.bgElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  cancelBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
+  submitBtn: { flex: 1, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   submitBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 });

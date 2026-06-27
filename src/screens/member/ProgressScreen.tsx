@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, TextInput, Alert,
@@ -69,13 +69,15 @@ export default function ProgressScreen() {
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>Body Tracking</Text>
-            <Text style={styles.headerTitle}>Progress 📈</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>Body Tracking</Text>
+              <Text style={styles.headerTitle}>Progress 📈</Text>
+            </View>
+            <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
+              <Text style={styles.addBtnText}>+ Log Today</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-            <Text style={styles.addBtnText}>+ Log Today</Text>
-          </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -221,12 +223,20 @@ export default function ProgressScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#8B5CF6' },
   root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#8B5CF6', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
+  header: { backgroundColor: '#8B5CF6' },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
   addBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
   addBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  scroll: { padding: 20, paddingBottom: 40 },
+  scroll: {
+    padding: 20, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 12 },
   chartCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
   chartBars: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-around', height: 120, paddingTop: 20 },
@@ -259,7 +269,7 @@ const styles = StyleSheet.create({
   addPhotoBtnText: { fontSize: 12, fontWeight: '700', color: '#8B5CF6' },
   // Modal
   modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%' },
+  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, maxHeight: '80%', width: '100%', maxWidth: 600, alignSelf: 'center' },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 20, textAlign: 'center' },
   inputLabel: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6, marginTop: 10 },

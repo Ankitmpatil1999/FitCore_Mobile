@@ -1,10 +1,10 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Modal, TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Shadows } from '../../theme';
+import { LightColors, Shadows } from '../../theme';
 import { PRODUCTS, Product, ProductCategory } from '../../data/mockData';
 
 const CATEGORY_LABELS: Record<ProductCategory, string> = {
@@ -14,15 +14,27 @@ const CATEGORY_LABELS: Record<ProductCategory, string> = {
   mass_gainer: 'Mass Gainer',
   accessories: 'Accessories',
   apparel: 'Apparel',
+  bcaa: 'BCAA',
+  multivitamin: 'Multivitamin',
+  fish_oil: 'Fish Oil',
+  peanut_butter: 'Peanut Butter',
+  oats: 'Oats',
+  equipment: 'Equipment',
 };
 
 const CATEGORY_COLORS: Record<ProductCategory, string> = {
-  protein: '#8B5CF6',
+  protein: '#6366F1',
   creatine: '#3B82F6',
   pre_workout: '#EF4444',
   mass_gainer: '#10B981',
   accessories: '#F59E0B',
   apparel: '#EC4899',
+  bcaa: '#10B981',
+  multivitamin: '#3B82F6',
+  fish_oil: '#F59E0B',
+  peanut_butter: '#EF4444',
+  oats: '#6366F1',
+  equipment: '#6366F1',
 };
 
 export default function ProductStoreScreen() {
@@ -91,17 +103,19 @@ export default function ProductStoreScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
+      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>Inventory</Text>
-            <Text style={styles.headerTitle}>Product Store 🛒</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>Inventory</Text>
+              <Text style={styles.headerTitle}>Product Store 🛒</Text>
+            </View>
+            <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
+              <Text style={styles.addBtnText}>+ Add Product</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-            <Text style={styles.addBtnText}>+ Add Product</Text>
-          </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -270,55 +284,67 @@ export default function ProductStoreScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#7C3AED' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#7C3AED', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20 },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.7)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  addBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
+  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
+  root: { flex: 1, backgroundColor: LightColors.bgBase },
+  header: {
+    backgroundColor: LightColors.bgSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: LightColors.border,
+  },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary },
+  addBtn: { backgroundColor: LightColors.accentViolet, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: LightColors.accentViolet },
   addBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  scroll: { padding: 20, paddingBottom: 40 },
+  scroll: {
+    padding: 20, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   statsRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  statCard: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.card },
-  statVal: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
-  statLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600', marginTop: 4 },
-  alertBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF3C7', borderRadius: 12, padding: 12, marginBottom: 16, gap: 8, borderWidth: 1, borderColor: '#FCD34D' },
+  statCard: { flex: 1, backgroundColor: LightColors.bgSurface, borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: LightColors.border, ...Shadows.card },
+  statVal: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary },
+  statLabel: { fontSize: 10, color: LightColors.textMuted, fontWeight: '600', marginTop: 4 },
+  alertBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: LightColors.warningBg, borderRadius: 12, padding: 12, marginBottom: 16, gap: 8, borderWidth: 1, borderColor: LightColors.warning },
   alertIcon: { fontSize: 16 },
-  alertText: { flex: 1, fontSize: 12, fontWeight: '600', color: '#92400E' },
+  alertText: { flex: 1, fontSize: 12, fontWeight: '600', color: LightColors.warning },
   catScroll: { marginBottom: 16 },
-  catChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#F1F5F9', marginRight: 8, borderWidth: 1, borderColor: '#E2E8F0' },
-  catChipActive: { backgroundColor: '#8B5CF6', borderColor: '#8B5CF6' },
-  catChipText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  catChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: LightColors.bgElevated, marginRight: 8, borderWidth: 1, borderColor: LightColors.border },
+  catChipActive: { backgroundColor: LightColors.accentViolet, borderColor: LightColors.accentViolet },
+  catChipText: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary },
   productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
-  productCard: { width: '47%', backgroundColor: '#FFFFFF', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', ...Shadows.card, position: 'relative' },
-  productEmoji: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
-  discountBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  discountText: { fontSize: 9, fontWeight: '800', color: '#10B981' },
-  productBrand: { fontSize: 10, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase' },
-  productName: { fontSize: 13, fontWeight: '700', color: '#0F172A', marginTop: 3, marginBottom: 8 },
+  productCard: { width: '47%', backgroundColor: LightColors.bgSurface, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: LightColors.border, ...Shadows.card, position: 'relative' },
+  productEmoji: { width: 56, height: 56, borderRadius: 28, backgroundColor: LightColors.bgElevated, alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
+  discountBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: LightColors.successBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+  discountText: { fontSize: 9, fontWeight: '800', color: LightColors.success },
+  productBrand: { fontSize: 10, fontWeight: '600', color: LightColors.textMuted, textTransform: 'uppercase' },
+  productName: { fontSize: 13, fontWeight: '700', color: LightColors.textPrimary, marginTop: 3, marginBottom: 8 },
   priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 8 },
-  productPrice: { fontSize: 16, fontWeight: '800', color: '#8B5CF6' },
-  productMRP: { fontSize: 11, color: '#94A3B8', textDecorationLine: 'line-through' },
+  productPrice: { fontSize: 16, fontWeight: '800', color: LightColors.accentViolet },
+  productMRP: { fontSize: 11, color: LightColors.textMuted, textDecorationLine: 'line-through' },
   stockRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
   stockPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
   stockText: { fontSize: 10, fontWeight: '700' },
-  soldText: { fontSize: 10, color: '#94A3B8', fontWeight: '600' },
-  expiryText: { fontSize: 10, color: '#94A3B8', marginBottom: 8 },
-  removeBtn: { backgroundColor: '#FEE2E2', borderRadius: 8, paddingVertical: 7, alignItems: 'center', marginTop: 6 },
-  removeBtnText: { fontSize: 11, fontWeight: '700', color: '#EF4444' },
+  soldText: { fontSize: 10, color: LightColors.textMuted, fontWeight: '600' },
+  expiryText: { fontSize: 10, color: LightColors.textMuted, marginBottom: 8 },
+  removeBtn: { backgroundColor: LightColors.dangerBg, borderRadius: 8, paddingVertical: 7, alignItems: 'center', marginTop: 6 },
+  removeBtnText: { fontSize: 11, fontWeight: '700', color: LightColors.danger },
   // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24 },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A', marginBottom: 20, textAlign: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#0F172A' },
+  modalSheet: { backgroundColor: LightColors.bgSurface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: LightColors.border, alignSelf: 'center', marginBottom: 20 },
+  modalTitle: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 20, textAlign: 'center' },
+  inputLabel: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary, marginBottom: 6, marginTop: 12 },
+  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  catSelectBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  catSelectText: { fontSize: 12, fontWeight: '700', color: '#475569' },
+  catSelectBtn: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: LightColors.bgElevated, borderWidth: 1, borderColor: LightColors.border },
+  catSelectText: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary },
   modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 12 },
-  cancelBtn: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: '#475569' },
-  submitBtn: { flex: 1, backgroundColor: '#8B5CF6', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  cancelBtn: { flex: 1, backgroundColor: LightColors.bgElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  cancelBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
+  submitBtn: { flex: 1, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   submitBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
 });

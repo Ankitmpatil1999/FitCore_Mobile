@@ -914,6 +914,18 @@ export function calculateBMI(weightKg: number, heightCm: number): number {
 
 // ── VENDOR STORE ─────────────────────────────
 
+export type KycDocType = 'aadhaar' | 'pan' | 'electricity_bill' | 'shop_license';
+export type KycStatus = 'not_uploaded' | 'pending' | 'verified' | 'rejected';
+
+export interface KycDocument {
+  type: KycDocType;
+  label: string;
+  number: string;              // document number where applicable
+  status: KycStatus;
+  uploadedAt: string;
+  rejectionReason?: string;
+}
+
 export interface VendorStore {
   id: string;
   userId: string;               // links to USERS
@@ -932,6 +944,7 @@ export interface VendorStore {
   ifsc: string;
   status: VendorStatus;
   avatar: string;               // initials/emoji
+  shopImage: string;            // emoji placeholder for shop image
   rating: number;
   totalReviews: number;
   joinDate: string;
@@ -940,6 +953,7 @@ export interface VendorStore {
   deliveryMethods: DeliveryMethod[];
   freeDeliveryAbove: number;    // 0 = no free delivery
   deliveryCharges: number;
+  kycDocuments: KycDocument[];  // KYC verification documents
 }
 
 export const VENDOR_STORES: VendorStore[] = [
@@ -961,6 +975,7 @@ export const VENDOR_STORES: VendorStore[] = [
     ifsc: 'HDFC0001234',
     status: 'approved',
     avatar: 'MZ',
+    shopImage: '🏪',
     rating: 4.7,
     totalReviews: 234,
     joinDate: '2026-01-10',
@@ -969,6 +984,12 @@ export const VENDOR_STORES: VendorStore[] = [
     deliveryMethods: ['self', 'local'],
     freeDeliveryAbove: 999,
     deliveryCharges: 49,
+    kycDocuments: [
+      { type: 'aadhaar', label: 'Aadhaar Card', number: '1234 5678 9012', status: 'verified', uploadedAt: '2026-01-05' },
+      { type: 'pan', label: 'PAN Card', number: 'ABCPS1234D', status: 'verified', uploadedAt: '2026-01-05' },
+      { type: 'electricity_bill', label: 'Electricity Bill', number: '', status: 'pending', uploadedAt: '2026-01-08' },
+      { type: 'shop_license', label: 'Shop License', number: 'MH/SHOP/2024/1234', status: 'pending', uploadedAt: '2026-01-08' },
+    ],
   },
 ];
 
@@ -987,8 +1008,12 @@ export interface VendorProduct {
   flavours: string[];
   images: string[];             // emoji placeholders for now
   mrp: number;
-  price: number;
-  discount: number;             // percentage
+  price: number;                // default / member price
+  ownerPrice: number;           // special price for gym owners (bulk)
+  memberPrice: number;          // price for gym members
+  margin: number;               // profit margin % from cost price
+  discount: number;             // percentage off MRP for members
+  ownerDiscount: number;        // percentage off MRP for owners
   stock: number;
   lowStockThreshold: number;
   expiryDate: string;
@@ -1015,7 +1040,11 @@ export const VENDOR_PRODUCTS: VendorProduct[] = [
     images: ['💪'],
     mrp: 4999,
     price: 3999,
+    ownerPrice: 3499,
+    memberPrice: 3999,
+    margin: 18,
     discount: 20,
+    ownerDiscount: 30,
     stock: 24,
     lowStockThreshold: 5,
     expiryDate: '2027-08-01',
@@ -1040,7 +1069,11 @@ export const VENDOR_PRODUCTS: VendorProduct[] = [
     images: ['🏋️'],
     mrp: 3499,
     price: 2799,
+    ownerPrice: 2399,
+    memberPrice: 2799,
+    margin: 20,
     discount: 20,
+    ownerDiscount: 31,
     stock: 18,
     lowStockThreshold: 5,
     expiryDate: '2027-06-01',
@@ -1065,7 +1098,11 @@ export const VENDOR_PRODUCTS: VendorProduct[] = [
     images: ['⚗️'],
     mrp: 1299,
     price: 999,
+    ownerPrice: 849,
+    memberPrice: 999,
+    margin: 22,
     discount: 23,
+    ownerDiscount: 35,
     stock: 15,
     lowStockThreshold: 3,
     expiryDate: '2027-03-01',
@@ -1090,7 +1127,11 @@ export const VENDOR_PRODUCTS: VendorProduct[] = [
     images: ['🔥'],
     mrp: 2499,
     price: 1899,
+    ownerPrice: 1699,
+    memberPrice: 1899,
+    margin: 15,
     discount: 24,
+    ownerDiscount: 32,
     stock: 9,
     lowStockThreshold: 3,
     expiryDate: '2026-12-01',
@@ -1115,7 +1156,11 @@ export const VENDOR_PRODUCTS: VendorProduct[] = [
     images: ['🏋️'],
     mrp: 5999,
     price: 4499,
+    ownerPrice: 3999,
+    memberPrice: 4499,
+    margin: 25,
     discount: 25,
+    ownerDiscount: 33,
     stock: 7,
     lowStockThreshold: 2,
     expiryDate: '2027-04-01',
@@ -1140,7 +1185,11 @@ export const VENDOR_PRODUCTS: VendorProduct[] = [
     images: ['💊'],
     mrp: 1799,
     price: 1299,
+    ownerPrice: 1099,
+    memberPrice: 1299,
+    margin: 20,
     discount: 28,
+    ownerDiscount: 39,
     stock: 12,
     lowStockThreshold: 3,
     expiryDate: '2027-02-01',
@@ -1165,7 +1214,11 @@ export const VENDOR_PRODUCTS: VendorProduct[] = [
     images: ['🥤'],
     mrp: 499,
     price: 349,
+    ownerPrice: 279,
+    memberPrice: 349,
+    margin: 30,
     discount: 30,
+    ownerDiscount: 44,
     stock: 45,
     lowStockThreshold: 10,
     expiryDate: 'N/A',
@@ -1190,7 +1243,11 @@ export const VENDOR_PRODUCTS: VendorProduct[] = [
     images: ['🥜'],
     mrp: 799,
     price: 599,
+    ownerPrice: 499,
+    memberPrice: 599,
+    margin: 22,
     discount: 25,
+    ownerDiscount: 38,
     stock: 30,
     lowStockThreshold: 5,
     expiryDate: '2026-12-15',
@@ -1571,6 +1628,11 @@ export const VENDOR_ANALYTICS = {
     totalReviews: 234,
     returnsThisMonth: 1,
     topProduct: 'MuscleBlaze Whey Protein 2kg',
+    // Buyer breakdown
+    ownerOrderCount: 8,
+    memberOrderCount: 20,
+    ownerRevenue: 98200,
+    memberRevenue: 86050,
     revenueChart: [
       { label: 'Jan', value: 28000 },
       { label: 'Feb', value: 32000 },
@@ -1578,6 +1640,23 @@ export const VENDOR_ANALYTICS = {
       { label: 'Apr', value: 29000 },
       { label: 'May', value: 38000 },
       { label: 'Jun', value: 22250 },
+    ],
+    // Monthly buyer chart for analytics screen
+    ownerRevenueChart: [
+      { label: 'Jan', value: 15000 },
+      { label: 'Feb', value: 18000 },
+      { label: 'Mar', value: 20000 },
+      { label: 'Apr', value: 16000 },
+      { label: 'May', value: 22000 },
+      { label: 'Jun', value: 7200 },
+    ],
+    memberRevenueChart: [
+      { label: 'Jan', value: 13000 },
+      { label: 'Feb', value: 14000 },
+      { label: 'Mar', value: 15000 },
+      { label: 'Apr', value: 13000 },
+      { label: 'May', value: 16000 },
+      { label: 'Jun', value: 15050 },
     ],
     ordersByStatus: {
       new: 2,

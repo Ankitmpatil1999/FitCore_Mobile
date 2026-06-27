@@ -1,10 +1,11 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
+import { LightColors, Shadows } from '../../theme';
 import { PAYMENTS, MEMBERS, Payment, Member } from '../../data/mockData';
 
 // ── Analytics data derived from mockData ────────────────────────
@@ -70,19 +71,19 @@ export default function OwnerAnalytics() {
   // Chart data and config
   const chartConfigs: Record<ChartMode, { data: { label: string; value: number }[]; color: string; unit: string; title: string; subtitle: string }> = {
     revenue: {
-      data: REVENUE_MONTHS, color: '#8B5CF6', unit: 'K',
+      data: REVENUE_MONTHS, color: LightColors.accentViolet, unit: 'K',
       title: 'Monthly Revenue', subtitle: '6-month trend (₹ thousands)',
     },
     members: {
-      data: MEMBER_GROWTH, color: '#0EA5E9', unit: '',
+      data: MEMBER_GROWTH, color: LightColors.info, unit: '',
       title: 'Member Growth', subtitle: 'Total members over 6 months',
     },
     products: {
-      data: PRODUCT_SALES, color: '#10B981', unit: ' sold',
+      data: PRODUCT_SALES, color: LightColors.success, unit: ' sold',
       title: 'Product Sales', subtitle: 'Top selling products this month',
     },
     peak: {
-      data: PEAK_HOURS, color: '#F59E0B', unit: '',
+      data: PEAK_HOURS, color: LightColors.warning, unit: '',
       title: 'Peak Hours', subtitle: 'Average daily check-ins per hour',
     },
   };
@@ -93,16 +94,18 @@ export default function OwnerAnalytics() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#8B5CF6" />
+      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
       <View style={styles.root}>
         {/* HEADER */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.headerSub}>{gym?.name ?? 'FitCore'} · Analytics</Text>
-            <Text style={styles.headerTitle}>Reports & Insights 📈</Text>
-          </View>
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleBadgeText}>LIVE DATA</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.headerSub}>{gym?.name ?? 'FitCore'} · Analytics</Text>
+              <Text style={styles.headerTitle}>Reports & Insights 📈</Text>
+            </View>
+            <View style={styles.roleBadge}>
+              <Text style={styles.roleBadgeText}>LIVE DATA</Text>
+            </View>
           </View>
         </View>
 
@@ -111,12 +114,12 @@ export default function OwnerAnalytics() {
           {/* ── KPI CARDS ── */}
           <View style={styles.kpiGrid}>
             {[
-              { icon: '💰', label: 'Total Revenue', val: `₹${(totalRevenue / 1000).toFixed(1)}K`, color: '#8B5CF6', bg: '#EDE9FE' },
-              { icon: '📅', label: 'This Month', val: `₹${(thisMonthRevenue / 1000).toFixed(1)}K`, color: '#0EA5E9', bg: '#E0F2FE' },
-              { icon: '✅', label: 'Active Members', val: activeMembers.toString(), color: '#10B981', bg: '#ECFDF5' },
-              { icon: '⏰', label: 'Expired', val: expiredMembers.toString(), color: '#EF4444', bg: '#FEE2E2' },
-              { icon: '🔄', label: 'Renewal Rate', val: `${renewalRate}%`, color: '#F59E0B', bg: '#FEF3C7' },
-              { icon: '⚠️', label: 'Pending Dues', val: `₹${(pendingPayments / 1000).toFixed(1)}K`, color: '#EF4444', bg: '#FEE2E2' },
+              { icon: '💰', label: 'Total Revenue', val: `₹${(totalRevenue / 1000).toFixed(1)}K`, color: LightColors.accentViolet, bg: `${LightColors.accentViolet}15` },
+              { icon: '📅', label: 'This Month', val: `₹${(thisMonthRevenue / 1000).toFixed(1)}K`, color: LightColors.info, bg: LightColors.cyanBg },
+              { icon: '✅', label: 'Active Members', val: activeMembers.toString(), color: LightColors.success, bg: LightColors.successBg },
+              { icon: '⏰', label: 'Expired', val: expiredMembers.toString(), color: LightColors.danger, bg: LightColors.dangerBg },
+              { icon: '🔄', label: 'Renewal Rate', val: `${renewalRate}%`, color: LightColors.warning, bg: LightColors.warningBg },
+              { icon: '⚠️', label: 'Pending Dues', val: `₹${(pendingPayments / 1000).toFixed(1)}K`, color: LightColors.danger, bg: LightColors.dangerBg },
             ].map(kpi => (
               <View key={kpi.label} style={[styles.kpiCard, { backgroundColor: kpi.bg }]}>
                 <Text style={styles.kpiIcon}>{kpi.icon}</Text>
@@ -178,9 +181,9 @@ export default function OwnerAnalytics() {
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>💰 Revenue Breakdown</Text>
             {[
-              { label: 'UPI Payments', val: PAYMENTS.filter(p => p.method === 'upi' && p.status === 'completed').reduce((s, p) => s + p.amount, 0), color: '#8B5CF6' },
-              { label: 'Cash Payments', val: PAYMENTS.filter(p => p.method === 'cash' && p.status === 'completed').reduce((s, p) => s + p.amount, 0), color: '#10B981' },
-              { label: 'Online / Card', val: PAYMENTS.filter(p => p.method === 'online' && p.status === 'completed').reduce((s, p) => s + p.amount, 0), color: '#0EA5E9' },
+              { label: 'UPI Payments', val: PAYMENTS.filter(p => p.method === 'upi' && p.status === 'completed').reduce((s, p) => s + p.amount, 0), color: LightColors.accentViolet },
+              { label: 'Cash Payments', val: PAYMENTS.filter(p => p.method === 'cash' && p.status === 'completed').reduce((s, p) => s + p.amount, 0), color: LightColors.success },
+              { label: 'Online / Card', val: PAYMENTS.filter(p => p.method === 'online' && p.status === 'completed').reduce((s, p) => s + p.amount, 0), color: LightColors.info },
             ].map(row => {
               const pct = totalRevenue > 0 ? Math.round((row.val / totalRevenue) * 100) : 0;
               return (
@@ -207,9 +210,9 @@ export default function OwnerAnalytics() {
             <Text style={styles.sectionTitle}>👥 Member Status Overview</Text>
             <View style={styles.memberStatusGrid}>
               {[
-                { label: 'Active', count: activeMembers, color: '#10B981', bg: '#ECFDF5', pct: Math.round((activeMembers / Math.max(totalMembers, 1)) * 100) },
-                { label: 'Expired', count: expiredMembers, color: '#EF4444', bg: '#FEE2E2', pct: Math.round((expiredMembers / Math.max(totalMembers, 1)) * 100) },
-                { label: 'Frozen', count: MEMBERS.filter(m => m.status === 'frozen').length, color: '#0EA5E9', bg: '#E0F2FE', pct: Math.round((MEMBERS.filter(m => m.status === 'frozen').length / Math.max(totalMembers, 1)) * 100) },
+                { label: 'Active', count: activeMembers, color: LightColors.success, bg: LightColors.successBg, pct: Math.round((activeMembers / Math.max(totalMembers, 1)) * 100) },
+                { label: 'Expired', count: expiredMembers, color: LightColors.danger, bg: LightColors.dangerBg, pct: Math.round((expiredMembers / Math.max(totalMembers, 1)) * 100) },
+                { label: 'Frozen', count: MEMBERS.filter(m => m.status === 'frozen').length, color: LightColors.info, bg: LightColors.cyanBg, pct: Math.round((MEMBERS.filter(m => m.status === 'frozen').length / Math.max(totalMembers, 1)) * 100) },
               ].map(item => (
                 <View key={item.label} style={[styles.memberStatusCard, { backgroundColor: item.bg }]}>
                   <Text style={[styles.memberStatusCount, { color: item.color }]}>{item.count}</Text>
@@ -220,8 +223,8 @@ export default function OwnerAnalytics() {
             </View>
             {/* Visual progress bar for active members */}
             <View style={styles.totalBar}>
-              <View style={[styles.totalBarFill, { width: `${renewalRate}%`, backgroundColor: '#10B981' }]} />
-              {expiredMembers > 0 && <View style={[styles.totalBarFill, { width: `${Math.round((expiredMembers / Math.max(totalMembers, 1)) * 100)}%`, backgroundColor: '#EF4444' }]} />}
+              <View style={[styles.totalBarFill, { width: `${renewalRate}%`, backgroundColor: LightColors.success }]} />
+              {expiredMembers > 0 && <View style={[styles.totalBarFill, { width: `${Math.round((expiredMembers / Math.max(totalMembers, 1)) * 100)}%`, backgroundColor: LightColors.danger }]} />}
             </View>
             <Text style={styles.totalBarLabel}>{totalMembers} Total Registered Members</Text>
           </View>
@@ -251,7 +254,7 @@ export default function OwnerAnalytics() {
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>🧾 Recent Payments</Text>
             {PAYMENTS.slice(0, 6).map((tx: Payment, idx) => (
-              <View key={tx.id} style={[styles.txRow, idx < Math.min(PAYMENTS.length, 6) - 1 && { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}>
+              <View key={tx.id} style={[styles.txRow, idx < Math.min(PAYMENTS.length, 6) - 1 && { borderBottomWidth: 1, borderBottomColor: LightColors.bgElevated }]}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.txId}>{tx.id}</Text>
                   <Text style={styles.txMember}>{tx.memberName}</Text>
@@ -260,10 +263,10 @@ export default function OwnerAnalytics() {
                 <View style={styles.txRight}>
                   <Text style={styles.txAmt}>₹{tx.amount.toLocaleString('en-IN')}</Text>
                   <View style={[styles.txBadge, {
-                    backgroundColor: tx.status === 'completed' ? '#ECFDF5' : tx.status === 'pending' ? '#FEF3C7' : '#FEE2E2',
+                    backgroundColor: tx.status === 'completed' ? LightColors.successBg : tx.status === 'pending' ? LightColors.warningBg : LightColors.dangerBg,
                   }]}>
                     <Text style={[styles.txBadgeText, {
-                      color: tx.status === 'completed' ? '#10B981' : tx.status === 'pending' ? '#D97706' : '#EF4444',
+                      color: tx.status === 'completed' ? LightColors.success : tx.status === 'pending' ? LightColors.warning : LightColors.danger,
                     }]}>
                       {tx.status.toUpperCase()}
                     </Text>
@@ -277,7 +280,7 @@ export default function OwnerAnalytics() {
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>👤 Recently Joined</Text>
             {MEMBERS.filter(m => m.gymId === 'gym1').slice(0, 5).map((m: Member, idx) => (
-              <View key={m.id} style={[styles.memberRow, idx < 4 && { borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }]}>
+              <View key={m.id} style={[styles.memberRow, idx < 4 && { borderBottomWidth: 1, borderBottomColor: LightColors.bgElevated }]}>
                 <View style={styles.memberAvatar}>
                   <Text style={styles.memberAvatarText}>{m.avatar}</Text>
                 </View>
@@ -286,10 +289,10 @@ export default function OwnerAnalytics() {
                   <Text style={styles.memberMeta}>{m.phone} · Joined {m.joinDate}</Text>
                 </View>
                 <View style={[styles.statusBadge, {
-                  backgroundColor: m.status === 'active' ? '#ECFDF5' : m.status === 'expired' ? '#FEE2E2' : '#E0F2FE',
+                  backgroundColor: m.status === 'active' ? LightColors.successBg : m.status === 'expired' ? LightColors.dangerBg : LightColors.cyanBg,
                 }]}>
                   <Text style={[styles.statusBadgeText, {
-                    color: m.status === 'active' ? '#10B981' : m.status === 'expired' ? '#EF4444' : '#0EA5E9',
+                    color: m.status === 'active' ? LightColors.success : m.status === 'expired' ? LightColors.danger : LightColors.info,
                   }]}>
                     {m.status.toUpperCase()}
                   </Text>
@@ -305,49 +308,58 @@ export default function OwnerAnalytics() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#8B5CF6' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
+  root: { flex: 1, backgroundColor: LightColors.bgBase },
   header: {
-    backgroundColor: '#8B5CF6', flexDirection: 'row', justifyContent: 'space-between',
-    alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 20,
+    backgroundColor: LightColors.bgSurface,
+    borderBottomWidth: 1,
+    borderBottomColor: LightColors.border,
   },
-  headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF', marginTop: 2 },
-  roleBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-  roleBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  scroll: { padding: 16, paddingBottom: 40 },
+  headerContent: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
+  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary, marginTop: 2 },
+  roleBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, backgroundColor: LightColors.bgElevated, borderWidth: 1, borderColor: LightColors.border },
+  roleBadgeText: { color: LightColors.textPrimary, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  scroll: {
+    padding: 16, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   // KPI
   kpiGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 20 },
   kpiCard: { width: '30%', flex: 1, minWidth: '30%', borderRadius: 14, padding: 14, alignItems: 'center', gap: 5 },
   kpiIcon: { fontSize: 22 },
   kpiVal: { fontSize: 16, fontWeight: '800' },
-  kpiLabel: { fontSize: 9, color: '#64748B', fontWeight: '600', textAlign: 'center' },
+  kpiLabel: { fontSize: 9, color: LightColors.textMuted, fontWeight: '600', textAlign: 'center' },
   // Chart tabs
-  chartTabs: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderRadius: 12, padding: 4, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0' },
+  chartTabs: { flexDirection: 'row', backgroundColor: LightColors.bgSurface, borderRadius: 12, padding: 4, marginBottom: 16, borderWidth: 1, borderColor: LightColors.border },
   chartTab: { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 10 },
-  chartTabActive: { backgroundColor: '#8B5CF6' },
-  chartTabText: { fontSize: 10, fontWeight: '700', color: '#64748B' },
+  chartTabActive: { backgroundColor: LightColors.accentViolet },
+  chartTabText: { fontSize: 10, fontWeight: '700', color: LightColors.textMuted },
   chartTabTextActive: { color: '#FFFFFF' },
   // Bar chart
-  chartCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 18, borderWidth: 1, borderColor: '#E2E8F0' },
-  chartTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A', marginBottom: 2 },
-  chartSubtitle: { fontSize: 11, color: '#94A3B8', marginBottom: 16 },
+  chartCard: { backgroundColor: LightColors.bgSurface, borderRadius: 16, padding: 18, marginBottom: 18, borderWidth: 1, borderColor: LightColors.border },
+  chartTitle: { fontSize: 15, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 2 },
+  chartSubtitle: { fontSize: 11, color: LightColors.textMuted, marginBottom: 16 },
   chartArea: { flexDirection: 'row', alignItems: 'flex-end', height: 140, justifyContent: 'space-around' },
   barCol: { alignItems: 'center', flex: 1 },
   barVal: { fontSize: 8, fontWeight: '800', marginBottom: 4 },
-  barTrack: { width: 18, flex: 1, backgroundColor: '#F1F5F9', borderRadius: 9, justifyContent: 'flex-end', overflow: 'hidden' },
+  barTrack: { width: 18, flex: 1, backgroundColor: LightColors.bgElevated, borderRadius: 9, justifyContent: 'flex-end', overflow: 'hidden' },
   barFill: { width: '100%', borderRadius: 9 },
-  barLabel: { fontSize: 8, color: '#94A3B8', fontWeight: '600', marginTop: 5, textAlign: 'center' },
+  barLabel: { fontSize: 8, color: LightColors.textMuted, fontWeight: '600', marginTop: 5, textAlign: 'center' },
   // Sections
-  sectionCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  sectionTitle: { fontSize: 14, fontWeight: '800', color: '#0F172A', marginBottom: 14, textTransform: 'uppercase', letterSpacing: 0.4 },
+  sectionCard: { backgroundColor: LightColors.bgSurface, borderRadius: 16, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: LightColors.border },
+  sectionTitle: { fontSize: 14, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 14, textTransform: 'uppercase', letterSpacing: 0.4 },
   // Revenue breakdown
   breakdownRow: { marginBottom: 14 },
   breakdownLeft: { flexDirection: 'row', alignItems: 'center', marginBottom: 6, gap: 8 },
   breakdownDot: { width: 10, height: 10, borderRadius: 5 },
-  breakdownLabel: { fontSize: 13, fontWeight: '600', color: '#334155' },
+  breakdownLabel: { fontSize: 13, fontWeight: '600', color: LightColors.textPrimary },
   breakdownRight: { gap: 4 },
-  breakdownBar: { height: 8, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden' },
+  breakdownBar: { height: 8, backgroundColor: LightColors.bgElevated, borderRadius: 4, overflow: 'hidden' },
   breakdownFill: { height: '100%', borderRadius: 4 },
   breakdownVal: { fontSize: 12, fontWeight: '700' },
   // Member status
@@ -356,29 +368,29 @@ const styles = StyleSheet.create({
   memberStatusCount: { fontSize: 22, fontWeight: '800' },
   memberStatusLabel: { fontSize: 11, fontWeight: '700' },
   memberStatusPct: { fontSize: 10, fontWeight: '600' },
-  totalBar: { height: 8, backgroundColor: '#F1F5F9', borderRadius: 4, overflow: 'hidden', flexDirection: 'row', marginBottom: 8 },
+  totalBar: { height: 8, backgroundColor: LightColors.bgElevated, borderRadius: 4, overflow: 'hidden', flexDirection: 'row', marginBottom: 8 },
   totalBarFill: { height: '100%' },
-  totalBarLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '600', textAlign: 'center' },
+  totalBarLabel: { fontSize: 11, color: LightColors.textMuted, fontWeight: '600', textAlign: 'center' },
   // Insights
-  insightRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9', gap: 12 },
+  insightRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: LightColors.bgElevated, gap: 12 },
   insightIcon: { fontSize: 22, width: 30, textAlign: 'center' },
-  insightLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '600', marginBottom: 2 },
-  insightVal: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
+  insightLabel: { fontSize: 11, color: LightColors.textMuted, fontWeight: '600', marginBottom: 2 },
+  insightVal: { fontSize: 13, fontWeight: '800', color: LightColors.textPrimary },
   // Payments ledger
   txRow: { paddingVertical: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  txId: { fontSize: 9, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.5 },
-  txMember: { fontSize: 13, fontWeight: '700', color: '#0F172A', marginVertical: 2 },
-  txDesc: { fontSize: 11, color: '#94A3B8' },
+  txId: { fontSize: 9, fontWeight: '700', color: LightColors.textMuted, letterSpacing: 0.5 },
+  txMember: { fontSize: 13, fontWeight: '700', color: LightColors.textPrimary, marginVertical: 2 },
+  txDesc: { fontSize: 11, color: LightColors.textMuted },
   txRight: { alignItems: 'flex-end', gap: 6 },
-  txAmt: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  txAmt: { fontSize: 15, fontWeight: '800', color: LightColors.textPrimary },
   txBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
   txBadgeText: { fontSize: 9, fontWeight: '800' },
   // Members
   memberRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
-  memberAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' },
-  memberAvatarText: { fontSize: 13, fontWeight: '800', color: '#8B5CF6' },
-  memberName: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
-  memberMeta: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
+  memberAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: `${LightColors.accentViolet}15`, alignItems: 'center', justifyContent: 'center' },
+  memberAvatarText: { fontSize: 13, fontWeight: '800', color: LightColors.accentViolet },
+  memberName: { fontSize: 13, fontWeight: '700', color: LightColors.textPrimary },
+  memberMeta: { fontSize: 11, color: LightColors.textMuted, marginTop: 2 },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
   statusBadgeText: { fontSize: 9, fontWeight: '800' },
 });

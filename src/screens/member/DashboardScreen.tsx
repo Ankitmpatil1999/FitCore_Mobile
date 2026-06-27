@@ -1,10 +1,11 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
+import { Colors } from '../../theme';
 import {
   getPlanById, getTrainerById, getWorkoutPlanByMember, getDaysRemaining,
   DIET_PLANS,
@@ -25,22 +26,24 @@ export default function DashboardScreen({ navigation }: any) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0EA5E9" />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.bgSurface} />
       <View style={styles.root}>
 
         {/* HEADER */}
         <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>Welcome back,</Text>
-            <Text style={styles.memberName}>{currentUser?.name ?? 'Champion'} ⚡</Text>
+          <View style={styles.headerContent}>
+            <View>
+              <Text style={styles.greeting}>Welcome back,</Text>
+              <Text style={styles.memberName}>{currentUser?.name ?? 'Champion'} ⚡</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.avatar}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.avatarText}>{currentUser?.avatar ?? 'CH'}</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.avatar}
-            onPress={() => navigation.navigate('Profile')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.avatarText}>{currentUser?.avatar ?? 'CH'}</Text>
-          </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -148,16 +151,16 @@ export default function DashboardScreen({ navigation }: any) {
               </View>
               <View style={styles.dietPreviewCard}>
                 <View style={styles.macroRow}>
-                  <View style={styles.macroPill}>
-                    <Text style={styles.macroVal}>{diet.totalCalories}</Text>
+                  <View style={[styles.macroPill, { backgroundColor: Colors.successBg }]}>
+                    <Text style={[styles.macroVal, { color: Colors.success }]}>{diet.totalCalories}</Text>
                     <Text style={styles.macroLabel}>Cal</Text>
                   </View>
-                  <View style={[styles.macroPill, { backgroundColor: '#EFF6FF' }]}>
-                    <Text style={[styles.macroVal, { color: '#3B82F6' }]}>{diet.totalProtein}g</Text>
+                  <View style={[styles.macroPill, { backgroundColor: Colors.cyanBg }]}>
+                    <Text style={[styles.macroVal, { color: Colors.accentCyan }]}>{diet.totalProtein}g</Text>
                     <Text style={styles.macroLabel}>Protein</Text>
                   </View>
-                  <View style={[styles.macroPill, { backgroundColor: '#FEF3C7' }]}>
-                    <Text style={[styles.macroVal, { color: '#F59E0B' }]}>{diet.waterIntake}</Text>
+                  <View style={[styles.macroPill, { backgroundColor: Colors.warningBg }]}>
+                    <Text style={[styles.macroVal, { color: Colors.warning }]}>{diet.waterIntake}</Text>
                     <Text style={styles.macroLabel}>Glasses</Text>
                   </View>
                 </View>
@@ -227,91 +230,99 @@ export default function DashboardScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0EA5E9' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: { flex: 1, backgroundColor: Colors.bgSurface },
+  root: { flex: 1, backgroundColor: Colors.bgBase },
   header: {
-    backgroundColor: '#0EA5E9',
+    backgroundColor: Colors.bgSurface,
+    borderBottomWidth: 1, borderBottomColor: Colors.border,
+  },
+  headerContent: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
   },
-  greeting: { fontSize: 13, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
-  memberName: { fontSize: 24, fontWeight: '800', color: '#FFFFFF' },
+  greeting: { fontSize: 13, color: Colors.textSecondary, fontWeight: '500' },
+  memberName: { fontSize: 24, fontWeight: '800', color: Colors.textPrimary },
   avatar: {
     width: 48, height: 48, borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.5)',
+    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.15)',
   },
-  avatarText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
-  scroll: { padding: 20, paddingBottom: 40 },
+  avatarText: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary },
+  scroll: {
+    padding: 20, paddingBottom: 80,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   checkInCard: {
-    backgroundColor: '#0F172A', borderRadius: 20, padding: 20, marginBottom: 20,
+    backgroundColor: Colors.bgCard, borderRadius: 20, padding: 20, marginBottom: 20,
+    borderWidth: 1, borderColor: Colors.border,
   },
   checkInTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   statusIndicator: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statusDot: { width: 8, height: 8, borderRadius: 4 },
-  statusLabel: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
-  gymName: { fontSize: 11, color: '#475569', fontWeight: '600' },
-  checkInTip: { fontSize: 13, color: '#94A3B8', marginBottom: 16, lineHeight: 18 },
+  statusLabel: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  gymName: { fontSize: 11, color: Colors.textMuted, fontWeight: '600' },
+  checkInTip: { fontSize: 13, color: Colors.textSecondary, marginBottom: 16, lineHeight: 18 },
   checkInBtn: {
-    backgroundColor: '#0EA5E9', borderRadius: 14, paddingVertical: 14,
+    backgroundColor: Colors.accentCyan, borderRadius: 14, paddingVertical: 14,
     alignItems: 'center',
   },
-  checkInBtnText: { fontSize: 15, fontWeight: '800', color: '#FFFFFF' },
+  checkInBtnText: { fontSize: 15, fontWeight: '800', color: '#000000' },
   membershipCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 20,
-    borderLeftWidth: 4, borderWidth: 1, borderColor: '#E2E8F0',
+    backgroundColor: Colors.bgCard, borderRadius: 16, padding: 18, marginBottom: 20,
+    borderLeftWidth: 4, borderWidth: 1, borderColor: Colors.border,
   },
   membershipTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  membershipPlanName: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
-  membershipExpiry: { fontSize: 12, color: '#94A3B8', marginTop: 3 },
+  membershipPlanName: { fontSize: 16, fontWeight: '800', color: Colors.textPrimary },
+  membershipExpiry: { fontSize: 12, color: Colors.textSecondary, marginTop: 3 },
   daysLeftBadge: { alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14, borderWidth: 1 },
   daysLeftNum: { fontSize: 24, fontWeight: '800' },
   daysLeftLabel: { fontSize: 10, fontWeight: '700' },
-  membershipProgress: { height: 6, backgroundColor: '#F1F5F9', borderRadius: 3, overflow: 'hidden' },
+  membershipProgress: { height: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A', marginBottom: 12 },
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  seeAll: { fontSize: 12, color: '#0EA5E9', fontWeight: '700' },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 12, marginTop: 8 },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, marginTop: 8 },
+  seeAll: { fontSize: 12, color: Colors.accentCyan, fontWeight: '700' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 28 },
   statCard: {
-    flex: 1, minWidth: '45%', backgroundColor: '#FFFFFF', borderRadius: 14,
-    padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#E2E8F0',
+    flex: 1, minWidth: '45%', backgroundColor: Colors.bgCard, borderRadius: 14,
+    padding: 16, alignItems: 'center', borderWidth: 1, borderColor: Colors.border,
   },
   statIcon: { fontSize: 24, marginBottom: 6 },
-  statVal: { fontSize: 15, fontWeight: '800', color: '#0F172A', textAlign: 'center' },
-  statLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600', marginTop: 4, textAlign: 'center' },
-  workoutPreviewCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
-  workoutFocus: { fontSize: 14, fontWeight: '800', color: '#0EA5E9', marginBottom: 12 },
-  exerciseRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' },
-  exerciseNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
-  exerciseNumText: { fontSize: 11, fontWeight: '800', color: '#0EA5E9' },
-  exerciseName: { flex: 1, fontSize: 13, fontWeight: '600', color: '#0F172A' },
-  exerciseMeta: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
-  moreExercises: { fontSize: 12, color: '#0EA5E9', fontWeight: '600', marginTop: 10, textAlign: 'center' },
-  dietPreviewCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
+  statVal: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary, textAlign: 'center' },
+  statLabel: { fontSize: 10, color: Colors.textSecondary, fontWeight: '600', marginTop: 4, textAlign: 'center' },
+  workoutPreviewCard: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: Colors.border },
+  workoutFocus: { fontSize: 14, fontWeight: '800', color: Colors.accentCyan, marginBottom: 12 },
+  exerciseRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.05)' },
+  exerciseNum: { width: 24, height: 24, borderRadius: 12, backgroundColor: 'rgba(0, 240, 255, 0.1)', alignItems: 'center', justifyContent: 'center' },
+  exerciseNumText: { fontSize: 11, fontWeight: '800', color: Colors.accentCyan },
+  exerciseName: { flex: 1, fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
+  exerciseMeta: { fontSize: 12, color: Colors.textSecondary, fontWeight: '600' },
+  moreExercises: { fontSize: 12, color: Colors.accentCyan, fontWeight: '600', marginTop: 10, textAlign: 'center' },
+  dietPreviewCard: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 18, marginBottom: 24, borderWidth: 1, borderColor: Colors.border },
   macroRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  macroPill: { flex: 1, backgroundColor: '#ECFDF5', borderRadius: 12, padding: 12, alignItems: 'center' },
-  macroVal: { fontSize: 18, fontWeight: '800', color: '#10B981' },
-  macroLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '600', marginTop: 3 },
+  macroPill: { flex: 1, borderRadius: 12, padding: 12, alignItems: 'center' },
+  macroVal: { fontSize: 18, fontWeight: '800' },
+  macroLabel: { fontSize: 10, color: Colors.textSecondary, fontWeight: '600', marginTop: 3 },
   mealRow: { flexDirection: 'row', gap: 8 },
-  mealChip: { flex: 1, backgroundColor: '#F8FAFC', borderRadius: 12, padding: 10, alignItems: 'center', gap: 4 },
+  mealChip: { flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 12, padding: 10, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: Colors.border },
   mealIcon: { fontSize: 18 },
-  mealName: { fontSize: 10, fontWeight: '700', color: '#0F172A' },
-  mealCal: { fontSize: 10, color: '#94A3B8', fontWeight: '600' },
-  trainerCard: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24, borderWidth: 1, borderColor: '#E2E8F0' },
-  trainerAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' },
-  trainerAvatarText: { fontSize: 16, fontWeight: '800', color: '#8B5CF6' },
-  trainerName: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
-  trainerSpec: { fontSize: 12, color: '#475569', marginTop: 2 },
-  trainerTimings: { fontSize: 11, color: '#94A3B8', marginTop: 3 },
+  mealName: { fontSize: 10, fontWeight: '700', color: Colors.textPrimary },
+  mealCal: { fontSize: 10, color: Colors.textSecondary, fontWeight: '600' },
+  trainerCard: { backgroundColor: Colors.bgCard, borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 24, borderWidth: 1, borderColor: Colors.border },
+  trainerAvatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(121, 40, 202, 0.15)', alignItems: 'center', justifyContent: 'center' },
+  trainerAvatarText: { fontSize: 16, fontWeight: '800', color: Colors.accentViolet },
+  trainerName: { fontSize: 15, fontWeight: '800', color: Colors.textPrimary },
+  trainerSpec: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  trainerTimings: { fontSize: 11, color: Colors.textMuted, marginTop: 3 },
   availDot: { width: 10, height: 10, borderRadius: 5 },
   quickGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   quickCard: {
     width: '30%', flex: 1, minWidth: '28%',
-    backgroundColor: '#FFFFFF', borderRadius: 16, padding: 16,
+    backgroundColor: Colors.bgCard, borderRadius: 16, padding: 16,
     alignItems: 'center', gap: 8,
-    borderWidth: 1, borderColor: '#E2E8F0',
+    borderWidth: 1, borderColor: Colors.border,
   },
-  quickLabel: { fontSize: 11, fontWeight: '700', color: '#475569', textAlign: 'center' },
+  quickLabel: { fontSize: 11, fontWeight: '700', color: Colors.textSecondary, textAlign: 'center' },
 });

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar,
@@ -31,24 +31,28 @@ export default function CheckInScreen() {
       <View style={styles.root}>
 
         <View style={styles.header}>
-          <Text style={styles.headerSub}>Gym Access</Text>
-          <Text style={styles.headerTitle}>Check-In 🪪</Text>
+          <View style={styles.headerContent}>
+            <Text style={styles.headerSub}>Gym Access</Text>
+            <Text style={styles.headerTitle}>Check-In 🪪</Text>
+          </View>
         </View>
 
         {/* Tab bar */}
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'qr' && styles.tabActive]}
-            onPress={() => setActiveTab('qr')}
-          >
-            <Text style={[styles.tabText, activeTab === 'qr' && styles.tabTextActive]}>QR Pass</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'history' && styles.tabActive]}
-            onPress={() => setActiveTab('history')}
-          >
-            <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>Attendance History</Text>
-          </TouchableOpacity>
+        <View style={styles.tabBarContainer}>
+          <View style={styles.tabBar}>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'qr' && styles.tabActive]}
+              onPress={() => setActiveTab('qr')}
+            >
+              <Text style={[styles.tabText, activeTab === 'qr' && styles.tabTextActive]}>QR Pass</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'history' && styles.tabActive]}
+              onPress={() => setActiveTab('history')}
+            >
+              <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextActive]}>Attendance History</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -209,15 +213,23 @@ export default function CheckInScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#0EA5E9' },
   root: { flex: 1, backgroundColor: '#F8FAFC' },
-  header: { backgroundColor: '#0EA5E9', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 },
+  header: { backgroundColor: '#0EA5E9' },
+  headerContent: {
+    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   headerSub: { fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: '500' },
   headerTitle: { fontSize: 22, fontWeight: '800', color: '#FFFFFF' },
-  tabBar: { flexDirection: 'row', backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  tabBarContainer: { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' },
+  tabBar: { flexDirection: 'row', width: '100%', maxWidth: 600, alignSelf: 'center' },
   tab: { flex: 1, paddingVertical: 14, alignItems: 'center' },
   tabActive: { borderBottomWidth: 2, borderBottomColor: '#0EA5E9' },
   tabText: { fontSize: 13, fontWeight: '600', color: '#94A3B8' },
   tabTextActive: { color: '#0EA5E9', fontWeight: '800' },
-  scroll: { padding: 20, paddingBottom: 40 },
+  scroll: {
+    padding: 20, paddingBottom: 40,
+    width: '100%', maxWidth: 600, alignSelf: 'center',
+  },
   qrCard: { backgroundColor: '#0F172A', borderRadius: 24, padding: 24, alignItems: 'center', marginBottom: 28 },
   qrCardLabel: { fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: '600', marginBottom: 20, letterSpacing: 1, textTransform: 'uppercase' },
   qrBox: { backgroundColor: '#FFFFFF', borderRadius: 16, padding: 20, alignItems: 'center', marginBottom: 16 },
