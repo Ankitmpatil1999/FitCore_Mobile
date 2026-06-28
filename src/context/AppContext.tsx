@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   USERS, MEMBERS, GYMS,
   getMemberByPhone, getGymById,
@@ -30,6 +31,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentVendor, setCurrentVendor] = useState<VendorStore | null>(null);
   const [role, setRole] = useState<Role | null>(null);
 
+  // Load saved session on app startup
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const savedPhone = await AsyncStorage.getItem('user_phone');
+        const savedPassword = await AsyncStorage.getItem('user_password');
+        if (savedPhone && savedPassword) {
+          login(savedPhone, savedPassword);
+        }
+      } catch (e) {
+        console.log('Error restoring session:', e);
+      }
+    };
+    loadSession();
+  }, []);
+
   const login = (phone: string, password: string): { success: boolean; error?: string } => {
     // Find user by phone
     const user = USERS.find(u => u.phone === phone);
@@ -56,6 +73,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setRole('member');
       setCurrentMember(null);
       setCurrentVendor(null);
+      
+      // Save session credentials
+      AsyncStorage.setItem('user_phone', phone);
+      AsyncStorage.setItem('user_password', password);
+      
       return { success: true };
     }
 
@@ -81,10 +103,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setCurrentVendor(null);
     }
 
+    // Save session credentials
+    AsyncStorage.setItem('user_phone', phone);
+    AsyncStorage.setItem('user_password', password);
+
     return { success: true };
   };
 
   const logout = () => {
+    // Clear session credentials
+    AsyncStorage.removeItem('user_phone');
+    AsyncStorage.removeItem('user_password');
+    
     setCurrentUser(null);
     setCurrentMember(null);
     setCurrentGym(null);

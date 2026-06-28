@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LightColors, Shadows } from '../../theme';
 import { MEMBERSHIP_PLANS, MembershipPlan } from '../../data/mockData';
+import { useAppContext } from '../../context/AppContext';
 
 const TIER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   bronze: { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' },
@@ -19,7 +20,10 @@ const TIER_ICONS: Record<string, string> = {
 };
 
 export default function MembershipPlansScreen() {
-  const [plans, setPlans] = useState<MembershipPlan[]>(MEMBERSHIP_PLANS);
+  const { currentGym } = useAppContext();
+  const gymId = currentGym?.id || 'g1';
+
+  const [plans, setPlans] = useState<MembershipPlan[]>(() => MEMBERSHIP_PLANS.filter(p => p.gymId === gymId || !p.gymId || p.gymId === 'gym1'));
   const [addModal, setAddModal] = useState(false);
   const [editPlan, setEditPlan] = useState<MembershipPlan | null>(null);
 
@@ -74,7 +78,7 @@ export default function MembershipPlansScreen() {
     } else {
       const newPlan: MembershipPlan = {
         id: `plan_${Date.now()}`,
-        gymId: 'gym1',
+        gymId: gymId,
         name: fName.trim(),
         duration: parseInt(fDuration, 10),
         price: parseInt(fPrice, 10),

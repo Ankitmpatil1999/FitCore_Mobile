@@ -457,7 +457,8 @@ export default function LoginScreen() {
                 placeholder="e.g. 9876543210"
                 placeholderTextColor="rgba(255, 255, 255, 0.4)"
                 value={mobileNumber}
-                onChangeText={setMobileNumber}
+                onChangeText={(text) => setMobileNumber(text.replace(/[^0-9]/g, ''))}
+                maxLength={10}
                 keyboardType="phone-pad"
                 autoCapitalize="none"
                 autoCorrect={false}

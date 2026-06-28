@@ -9,11 +9,15 @@ import {
   MEMBERS, MEMBERSHIP_PLANS, TRAINERS, Member, MemberStatus,
   getPlanById, getTrainerById, getDaysRemaining,
 } from '../../data/mockData';
+import { useAppContext } from '../../context/AppContext';
 
 type FilterType = 'all' | 'active' | 'expired' | 'frozen';
 
 export default function MembersScreen() {
-  const [members, setMembers] = useState<Member[]>(MEMBERS);
+  const { currentGym } = useAppContext();
+  const gymId = currentGym?.id || 'g1';
+
+  const [members, setMembers] = useState<Member[]>(() => MEMBERS.filter(m => m.gymId === gymId || !m.gymId || m.gymId === 'gym1'));
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
   const [addModal, setAddModal] = useState(false);
@@ -50,7 +54,7 @@ export default function MembersScreen() {
     const newMember: Member = {
       id: `m${Date.now()}`,
       userId: `u${Date.now()}`,
-      gymId: 'gym1',
+      gymId: gymId,
       name: fName.trim(),
       phone: fPhone.trim(),
       email: fEmail.trim(),

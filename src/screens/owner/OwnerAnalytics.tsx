@@ -57,14 +57,14 @@ export default function OwnerAnalytics() {
   const { currentGym } = useAppContext();
   const [chartMode, setChartMode] = useState<ChartMode>('revenue');
 
-  const gym = currentGym;
+  const gymId = currentGym?.id || 'g1';
 
   // Derived stats from mockData
   const totalRevenue = PAYMENTS.filter(p => p.status === 'completed').reduce((s, p) => s + p.amount, 0);
   const thisMonthRevenue = PAYMENTS.filter(p => p.status === 'completed' && p.date.startsWith('2026-06')).reduce((s, p) => s + p.amount, 0);
-  const activeMembers = MEMBERS.filter(m => m.gymId === 'gym1' && m.status === 'active').length;
-  const expiredMembers = MEMBERS.filter(m => m.gymId === 'gym1' && m.status === 'expired').length;
-  const totalMembers = MEMBERS.filter(m => m.gymId === 'gym1').length;
+  const activeMembers = MEMBERS.filter(m => m.gymId === gymId && m.status === 'active').length;
+  const expiredMembers = MEMBERS.filter(m => m.gymId === gymId && m.status === 'expired').length;
+  const totalMembers = MEMBERS.filter(m => m.gymId === gymId).length;
   const pendingPayments = PAYMENTS.filter(p => p.status === 'pending').reduce((s, p) => s + p.amount, 0);
   const renewalRate = Math.round((activeMembers / Math.max(totalMembers, 1)) * 100);
 
@@ -279,7 +279,7 @@ export default function OwnerAnalytics() {
           {/* ── RECENTLY JOINED MEMBERS ── */}
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>👤 Recently Joined</Text>
-            {MEMBERS.filter(m => m.gymId === 'gym1').slice(0, 5).map((m: Member, idx) => (
+            {MEMBERS.filter(m => m.gymId === gymId).slice(0, 5).map((m: Member, idx) => (
               <View key={m.id} style={[styles.memberRow, idx < 4 && { borderBottomWidth: 1, borderBottomColor: LightColors.bgElevated }]}>
                 <View style={styles.memberAvatar}>
                   <Text style={styles.memberAvatarText}>{m.avatar}</Text>

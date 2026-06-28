@@ -11,11 +11,11 @@ import {
 } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 
-const GYM_ID = 'gym1';
-const analytics = ANALYTICS[GYM_ID];
-
 export default function OwnerDashboard({ navigation }: any) {
   const { currentUser, currentGym, logout } = useAppContext();
+  const gymId = currentGym?.id || 'g1';
+  const analytics = ANALYTICS[gymId as keyof typeof ANALYTICS] || ANALYTICS['g1'];
+  
   const [addMemberModal, setAddMemberModal] = useState(false);
   const [notifModal, setNotifModal] = useState(false);
 
@@ -25,7 +25,7 @@ export default function OwnerDashboard({ navigation }: any) {
   const [mEmail, setMEmail] = useState('');
   const [mAge, setMAge] = useState('');
 
-  const notifications = getNotificationsForOwner(GYM_ID);
+  const notifications = getNotificationsForOwner(gymId);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
   const todayStr = new Date().toISOString().split('T')[0];

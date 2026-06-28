@@ -38,7 +38,10 @@ const CATEGORY_COLORS: Record<ProductCategory, string> = {
 };
 
 export default function ProductStoreScreen() {
-  const [products, setProducts] = useState<Product[]>(PRODUCTS);
+  const { currentGym } = useAppContext();
+  const gymId = currentGym?.id || 'g1';
+  
+  const [products, setProducts] = useState<Product[]>(() => PRODUCTS.filter(p => p.gymId === gymId || !p.gymId || p.gymId === 'gym1'));
   const [categoryFilter, setCategoryFilter] = useState<'all' | ProductCategory>('all');
   const [addModal, setAddModal] = useState(false);
 
@@ -75,7 +78,7 @@ export default function ProductStoreScreen() {
     }
     const newProduct: Product = {
       id: `p${Date.now()}`,
-      gymId: 'gym1',
+      gymId: gymId,
       name: fName.trim(),
       brand: fBrand.trim(),
       category: fCategory,

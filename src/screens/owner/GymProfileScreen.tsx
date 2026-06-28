@@ -8,7 +8,7 @@ import { LightColors, Shadows } from '../../theme';
 import { GYMS, FACILITIES, Gym } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 
-const GYM_ID = 'gym1';
+
 
 const SUBSCRIPTION_PLANS = [
   { id: 'basic', name: 'Basic', price: '₹999/month', features: ['Up to 100 members', 'Basic reports', 'QR check-in'] },
@@ -17,8 +17,8 @@ const SUBSCRIPTION_PLANS = [
 ];
 
 export default function GymProfileScreen() {
-  const { logout } = useAppContext();
-  const gym = GYMS.find(g => g.id === GYM_ID)!;
+  const { logout, currentGym } = useAppContext();
+  const gym = currentGym || GYMS[0];
 
   const [gymName, setGymName] = useState(gym.name);
   const [tagline, setTagline] = useState(gym.tagline);

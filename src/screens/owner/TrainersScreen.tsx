@@ -6,9 +6,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LightColors, Shadows } from '../../theme';
 import { TRAINERS, MEMBERS, Trainer } from '../../data/mockData';
+import { useAppContext } from '../../context/AppContext';
 
 export default function TrainersScreen() {
-  const [trainers, setTrainers] = useState<Trainer[]>(TRAINERS);
+  const { currentGym } = useAppContext();
+  const gymId = currentGym?.id || 'g1';
+  
+  const [trainers, setTrainers] = useState<Trainer[]>(() => TRAINERS.filter(t => t.gymId === gymId || !t.gymId || t.gymId === 'gym1'));
   const [addModal, setAddModal] = useState(false);
   const [detailTrainer, setDetailTrainer] = useState<Trainer | null>(null);
 
@@ -34,7 +38,7 @@ export default function TrainersScreen() {
     }
     const newTrainer: Trainer = {
       id: `t${Date.now()}`,
-      gymId: 'gym1',
+      gymId: gymId,
       name: fName.trim(),
       avatar: fName.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
       specialization: fSpec.trim(),
