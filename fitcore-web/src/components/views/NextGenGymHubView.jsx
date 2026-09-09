@@ -55,10 +55,6 @@ export default function NextGenGymHubView({
     const amount = planPriceMap[planKey] || 34999;
     return acc + amount;
   }, 0);
-  const [liveCalories, setLiveCalories] = useState(0);
-  const [passFlipped, setPassFlipped] = useState(false);
-  const [telemetry, setTelemetry] = useState(null);
-  const [isLoadingTelemetry, setIsLoadingTelemetry] = useState(false);
 
   // Fetch Live Telemetry from Backend API
   useEffect(() => {
