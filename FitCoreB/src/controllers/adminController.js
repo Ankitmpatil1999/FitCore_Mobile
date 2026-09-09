@@ -7,10 +7,30 @@ const bcrypt = require('bcrypt');
 exports.getMetrics = async (req, res, next) => {
   try {
     const db = await getDb();
-    const gymsCount = await db.collection('gyms').countDocuments({});
+    const gyms = await db.collection('gyms').find({}).toArray();
+    const gymsCount = gyms.length;
     const membersCount = await db.collection('members').countDocuments({});
     const vendorsCount = await db.collection('vendor_stores').countDocuments({});
     const pendingKycCount = await db.collection('vendor_stores').countDocuments({ status: 'pending' });
+
+    // Fetch dynamic packages pricing from platform_config in MongoDB
+    const config = await db.collection('platform_config').findOne({ configKey: 'global_settings' });
+    const packages = config?.packages || [
+      { id: 'starter', amount: 14999 },
+      { id: 'pro', amount: 34999 },
+      { id: 'enterprise', amount: 69999 }
+    ];
+
+    const packagePriceMap = {};
+    packages.forEach(p => {
+      packagePriceMap[p.id] = Number(p.amount) || (p.id === 'starter' ? 14999 : (p.id === 'enterprise' ? 69999 : 34999));
+    });
+
+    const totalCalculatedRevenue = gyms.reduce((acc, g) => {
+      const planKey = (g.plan || 'pro').toLowerCase();
+      const planAmount = packagePriceMap[planKey] || 34999;
+      return acc + planAmount;
+    }, 0);
 
     res.json({
       success: true,
@@ -19,7 +39,7 @@ exports.getMetrics = async (req, res, next) => {
         totalMembers: membersCount,
         pendingKyc: pendingKycCount,
         totalVendors: vendorsCount,
-        revenue: gymsCount * 35000,
+        revenue: totalCalculatedRevenue,
       }
     });
   } catch (err) {
@@ -94,68 +114,114 @@ exports.getHubTelemetry = async (req, res, next) => {
 
 exports.getConfig = async (req, res, next) => {
   try {
-    const config = {
-      packages: [
-        {
-          id: 'starter',
-          name: 'Starter Club',
-          price: '₹14,999 / yr',
-          capacity: '150 Members',
-          badge: 'Standard',
-          features: ['Basic Member Check-in', 'Manual Turnstile Entry', 'Daily Attendance Logs', 'Standard Reports']
-        },
-        {
-          id: 'pro',
-          name: 'Pro Studio',
-          price: '₹34,999 / yr',
-          capacity: '600 Members',
-          badge: 'Popular',
-          recommended: true,
-          features: ['Smart NFC Turnstile Sync', 'Live Floor Occupancy Gauge', 'Trainer Scheduling & Classes', 'Real-time Calorie Radar', 'Broadcast Push Alerts']
-        },
-        {
-          id: 'enterprise',
-          name: 'Enterprise VIP Flagship',
-          price: '₹69,999 / yr',
-          capacity: 'Unlimited',
-          badge: 'All-Inclusive',
-          features: ['Unlimited Members & Gates', 'Supplement Store POS Integration', 'Multi-Gate Turnstile Access', 'Priority KYC Approvals', 'Dedicated Account Manager']
-        }
-      ],
-      cities: [
-        'Mumbai', 'Delhi NCR', 'Bengaluru', 'Pune', 'Hyderabad', 
-        'Chennai', 'Nagpur', 'Ahmedabad', 'Kolkata', 'Jaipur', 
-        'Chandigarh', 'Lucknow', 'Indore', 'Surat', 'Kochi', 'Goa'
-      ],
-      activityTypes: [
-        { id: 'gym', label: 'Gym / Fitness', icon: '🏋️' },
-        { id: 'yoga', label: 'Yoga', icon: '🧘' },
-        { id: 'dance', label: 'Dance & Zumba', icon: '💃' },
-        { id: 'crossfit', label: 'CrossFit', icon: '🔥' },
-        { id: 'boxing', label: 'Boxing / MMA', icon: '🥊' },
-        { id: 'swimming', label: 'Swimming', icon: '🏊' }
-      ],
-      amenities: [
-        { id: 'turnstile', label: 'NFC Smart Turnstiles', icon: '⚡' },
-        { id: 'cardio', label: 'Cardio Cinema Theatre', icon: '🏃' },
-        { id: 'strength', label: 'Heavy Olympic Strength Zone', icon: '🏋️' },
-        { id: 'spa', label: 'Spa, Steam & Recovery Bath', icon: '🧖' },
-        { id: 'protein', label: 'Protein & Nutrition Bar', icon: '🥤' },
-        { id: 'yoga', label: 'AC Yoga & Pilates Studio', icon: '🧘' },
-        { id: 'shower', label: 'Luxury Shower & Locker Suites', icon: '🚿' },
-        { id: 'wifi', label: 'High-Speed Gym WiFi', icon: '📶' }
-      ],
-      permissionsList: [
-        { key: 'canRegisterMembers', label: 'Member Onboarding & KYC', desc: 'Allow gym to register and edit member profiles' },
-        { key: 'canUseTurnstiles', label: 'NFC Turnstile Scanner Sync', desc: 'Enable automated QR/NFC gate check-in' },
-        { key: 'canAccessStore', label: 'Supplement & Gear POS Store', desc: 'Sell MuscleZone/FitGear partner supplements' },
-        { key: 'canManageTrainers', label: 'Trainer Portal & Commissions', desc: 'Schedule trainer classes and calculate payroll' },
-        { key: 'canBroadcastAlerts', label: 'Push Broadcast Notifications', desc: 'Send real-time alerts to club members' },
-        { key: 'canViewBiometrics', label: 'Live Biometrics Radar', desc: 'Track live calorie and BPM heart rate HUD' }
-      ]
-    };
+    const db = await getDb();
+    let config = await db.collection('platform_config').findOne({ configKey: 'global_settings' });
+
+    if (!config) {
+      // Default initial schema in database
+      config = {
+        configKey: 'global_settings',
+        packages: [
+          {
+            id: 'starter',
+            name: 'Starter Club',
+            price: '₹14,999 / yr',
+            amount: 14999,
+            billingCycle: 'yearly',
+            capacity: '150 Members',
+            badge: 'Standard',
+            features: ['Basic Member Check-in', 'Manual Turnstile Entry', 'Daily Attendance Logs', 'Standard Reports']
+          },
+          {
+            id: 'pro',
+            name: 'Pro Studio',
+            price: '₹34,999 / yr',
+            amount: 34999,
+            billingCycle: 'yearly',
+            capacity: '600 Members',
+            badge: 'Popular',
+            recommended: true,
+            features: ['Smart NFC Turnstile Sync', 'Live Floor Occupancy Gauge', 'Trainer Scheduling & Classes', 'Real-time Calorie Radar', 'Broadcast Push Alerts']
+          },
+          {
+            id: 'enterprise',
+            name: 'Enterprise VIP Flagship',
+            price: '₹69,999 / yr',
+            amount: 69999,
+            billingCycle: 'yearly',
+            capacity: 'Unlimited',
+            badge: 'All-Inclusive',
+            features: ['Unlimited Members & Gates', 'Supplement Store POS Integration', 'Multi-Gate Turnstile Access', 'Priority KYC Approvals', 'Dedicated Account Manager']
+          }
+        ],
+        cities: [
+          'Mumbai', 'Delhi NCR', 'Bengaluru', 'Pune', 'Hyderabad', 
+          'Chennai', 'Nagpur', 'Ahmedabad', 'Kolkata', 'Jaipur', 
+          'Chandigarh', 'Lucknow', 'Indore', 'Surat', 'Kochi', 'Goa'
+        ],
+        activityTypes: [
+          { id: 'gym', label: 'Gym / Fitness', icon: '🏋️' },
+          { id: 'yoga', label: 'Yoga', icon: '🧘' },
+          { id: 'dance', label: 'Dance & Zumba', icon: '💃' },
+          { id: 'crossfit', label: 'CrossFit', icon: '🔥' },
+          { id: 'boxing', label: 'Boxing / MMA', icon: '🥊' },
+          { id: 'swimming', label: 'Swimming', icon: '🏊' }
+        ],
+        amenities: [
+          { id: 'turnstile', label: 'NFC Smart Turnstiles', icon: '⚡' },
+          { id: 'cardio', label: 'Cardio Cinema Theatre', icon: '🏃' },
+          { id: 'strength', label: 'Heavy Olympic Strength Zone', icon: '🏋️' },
+          { id: 'spa', label: 'Spa, Steam & Recovery Bath', icon: '🧖' },
+          { id: 'protein', label: 'Protein & Nutrition Bar', icon: '🥤' },
+          { id: 'yoga', label: 'AC Yoga & Pilates Studio', icon: '🧘' },
+          { id: 'shower', label: 'Luxury Shower & Locker Suites', icon: '🚿' },
+          { id: 'wifi', label: 'High-Speed Gym WiFi', icon: '📶' }
+        ],
+        permissionsList: [
+          { key: 'canRegisterMembers', label: 'Member Onboarding & KYC', desc: 'Allow gym to register and edit member profiles' },
+          { key: 'canUseTurnstiles', label: 'NFC Turnstile Scanner Sync', desc: 'Enable automated QR/NFC gate check-in' },
+          { key: 'canAccessStore', label: 'Supplement & Gear POS Store', desc: 'Sell MuscleZone/FitGear partner supplements' },
+          { key: 'canManageTrainers', label: 'Trainer Portal & Commissions', desc: 'Schedule trainer classes and calculate payroll' },
+          { key: 'canBroadcastAlerts', label: 'Push Broadcast Notifications', desc: 'Send real-time alerts to club members' },
+          { key: 'canViewBiometrics', label: 'Live Biometrics Radar', desc: 'Track live calorie and BPM heart rate HUD' }
+        ],
+        updatedAt: new Date().toISOString()
+      };
+      await db.collection('platform_config').insertOne(config);
+    }
 
     res.json({ success: true, data: config });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateConfig = async (req, res, next) => {
+  try {
+    const db = await getDb();
+    const { packages, cities, activityTypes, amenities, permissionsList } = req.body;
+
+    const updateFields = {
+      updatedAt: new Date().toISOString()
+    };
+    if (packages) updateFields.packages = packages;
+    if (cities) updateFields.cities = cities;
+    if (activityTypes) updateFields.activityTypes = activityTypes;
+    if (amenities) updateFields.amenities = amenities;
+    if (permissionsList) updateFields.permissionsList = permissionsList;
+
+    await db.collection('platform_config').updateOne(
+      { configKey: 'global_settings' },
+      { $set: updateFields },
+      { upsert: true }
+    );
+
+    const updated = await db.collection('platform_config').findOne({ configKey: 'global_settings' });
+    res.json({
+      success: true,
+      message: 'Platform SaaS packages and settings updated successfully in database!',
+      data: updated
+    });
   } catch (err) {
     next(err);
   }

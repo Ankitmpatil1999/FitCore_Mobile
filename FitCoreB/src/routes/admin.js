@@ -68,6 +68,7 @@ router.get('/gyms', adminController.getGyms);
  *         description: Gym created successfully
  */
 router.get('/config', adminController.getConfig);
+router.put('/config', adminController.updateConfig);
 router.post('/gyms', adminController.createGym);
 
 /**

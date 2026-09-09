@@ -20,6 +20,7 @@ export default function NextGenGymHubView({
   members = [], 
   trainers = [], 
   classes = [], 
+  plans = [],
   selectedGymId = 'all',
   setSelectedGymId,
   setTab,
@@ -38,6 +39,22 @@ export default function NextGenGymHubView({
   const passId = `FC-${(currentUser.id || 'XXXXXX').slice(-6).toUpperCase()}`;
   const [chartPeriod, setChartPeriod] = useState('monthly');
   const [liveBpm, setLiveBpm] = useState(0);
+  const [liveCalories, setLiveCalories] = useState(0);
+  const [passFlipped, setPassFlipped] = useState(false);
+  const [telemetry, setTelemetry] = useState(null);
+  const [isLoadingTelemetry, setIsLoadingTelemetry] = useState(false);
+
+  // Calculate dynamic SaaS subscription revenue from MongoDB packages
+  const planPriceMap = {};
+  plans.forEach(p => {
+    planPriceMap[p.id] = Number(p.amount) || (p.id === 'starter' ? 14999 : (p.id === 'enterprise' ? 69999 : 34999));
+  });
+
+  const totalSaaSRevenue = gyms.reduce((acc, g) => {
+    const planKey = (g.plan || 'pro').toLowerCase();
+    const amount = planPriceMap[planKey] || 34999;
+    return acc + amount;
+  }, 0);
   const [liveCalories, setLiveCalories] = useState(0);
   const [passFlipped, setPassFlipped] = useState(false);
   const [telemetry, setTelemetry] = useState(null);
@@ -262,7 +279,7 @@ export default function NextGenGymHubView({
           </div>
           <div className="stat-body">
             <span className="stat-label">Platform SaaS Revenue</span>
-            <h2 className="stat-number">₹{(gyms.length * 35000).toLocaleString()} <span className="stat-unit">MRR</span></h2>
+            <h2 className="stat-number">₹{totalSaaSRevenue.toLocaleString()} <span className="stat-unit">MRR</span></h2>
             <div className="stat-footer-text">
               <span>Automated Settlement · 100% Payout Rate</span>
             </div>

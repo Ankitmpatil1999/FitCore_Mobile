@@ -133,18 +133,20 @@ export default function Dashboard({ onLogout }) {
         'Authorization': `Bearer ${token}`
       };
 
-      const [gymsRes, membersRes, vendorsRes, notifsRes] = await Promise.all([
+      const [gymsRes, membersRes, vendorsRes, notifsRes, configRes] = await Promise.all([
         fetch(API_ENDPOINTS.ADMIN_GYMS, { headers }),
         fetch(API_ENDPOINTS.ADMIN_MEMBERS, { headers }),
         fetch(API_ENDPOINTS.ADMIN_VENDORS, { headers }),
-        fetch(API_ENDPOINTS.NOTIFICATIONS, { headers })
+        fetch(API_ENDPOINTS.NOTIFICATIONS, { headers }),
+        fetch(API_ENDPOINTS.ADMIN_CONFIG, { headers })
       ]);
 
-      const [gymsData, membersData, vendorsData, notifsData] = await Promise.all([
+      const [gymsData, membersData, vendorsData, notifsData, configData] = await Promise.all([
         gymsRes.ok ? gymsRes.json() : { success: false, data: [] },
         membersRes.ok ? membersRes.json() : { success: false, data: [] },
         vendorsRes.ok ? vendorsRes.json() : { success: false, data: [] },
-        notifsRes.ok ? notifsRes.json() : { success: false, data: [] }
+        notifsRes.ok ? notifsRes.json() : { success: false, data: [] },
+        configRes.ok ? configRes.json() : { success: false, data: {} }
       ]);
 
       if (gymsData.success && Array.isArray(gymsData.data)) {
@@ -158,6 +160,9 @@ export default function Dashboard({ onLogout }) {
       }
       if (notifsData.success && Array.isArray(notifsData.data)) {
         setNotifications(notifsData.data);
+      }
+      if (configData.success && configData.data?.packages) {
+        setPlans(configData.data.packages);
       }
 
       setIsLoading(false);
@@ -187,6 +192,7 @@ export default function Dashboard({ onLogout }) {
             members={members} 
             trainers={trainers}
             classes={classes}
+            plans={plans}
             selectedGymId={selectedGymId}
             setSelectedGymId={setSelectedGymId}
             setTab={setActiveTab} 

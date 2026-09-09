@@ -17,76 +17,18 @@ import {
   PlusIcon
 } from '../common/Icons';
 
-const DEFAULT_CITIES = [
-  'Mumbai', 'Delhi NCR', 'Bengaluru', 'Pune', 'Hyderabad', 
-  'Chennai', 'Nagpur', 'Ahmedabad', 'Kolkata', 'Jaipur', 
-  'Chandigarh', 'Lucknow', 'Indore', 'Surat', 'Kochi', 'Goa'
-];
-
-const DEFAULT_PACKAGES = [
-  {
-    id: 'starter',
-    name: 'Starter Club',
-    price: '₹14,999 / yr',
-    capacity: '150 Members',
-    badge: 'Standard',
-    features: ['Basic Member Check-in', 'Manual Turnstile Entry', 'Daily Attendance Logs', 'Standard Reports']
-  },
-  {
-    id: 'pro',
-    name: 'Pro Studio',
-    price: '₹34,999 / yr',
-    capacity: '600 Members',
-    badge: 'Popular',
-    recommended: true,
-    features: ['Smart NFC Turnstile Sync', 'Live Floor Occupancy Gauge', 'Trainer Scheduling & Classes', 'Real-time Calorie Radar', 'Broadcast Push Alerts']
-  },
-  {
-    id: 'enterprise',
-    name: 'Enterprise VIP Flagship',
-    price: '₹69,999 / yr',
-    capacity: 'Unlimited',
-    badge: 'All-Inclusive',
-    features: ['Unlimited Members & Gates', 'Supplement Store POS Integration', 'Multi-Gate Turnstile Access', 'Priority KYC Approvals', 'Dedicated Account Manager']
-  }
-];
-
-const DEFAULT_ACTIVITIES = [
-  { id: 'gym', label: 'Gym / Fitness' },
-  { id: 'yoga', label: 'Yoga' },
-  { id: 'dance', label: 'Dance & Zumba' },
-  { id: 'crossfit', label: 'CrossFit' },
-  { id: 'boxing', label: 'Boxing / MMA' },
-  { id: 'swimming', label: 'Swimming' }
-];
-
-const DEFAULT_AMENITIES = [
-  { id: 'turnstile', label: 'NFC Smart Turnstiles' },
-  { id: 'cardio', label: 'Cardio Cinema Theatre' },
-  { id: 'strength', label: 'Heavy Olympic Strength Zone' },
-  { id: 'spa', label: 'Spa, Steam & Recovery Bath' },
-  { id: 'protein', label: 'Protein & Nutrition Bar' },
-  { id: 'yoga', label: 'AC Yoga & Pilates Studio' },
-  { id: 'shower', label: 'Luxury Shower & Locker Suites' },
-  { id: 'wifi', label: 'High-Speed Gym WiFi' }
-];
-
-const DEFAULT_PERMISSIONS = [
-  { key: 'canRegisterMembers', label: 'Member Onboarding & KYC', desc: 'Allow gym to register and edit member profiles' },
-  { key: 'canUseTurnstiles', label: 'NFC Turnstile Scanner Sync', desc: 'Enable automated QR/NFC gate check-in' },
-  { key: 'canAccessStore', label: 'Supplement & Gear POS Store', desc: 'Sell MuscleZone/FitGear partner supplements' },
-  { key: 'canManageTrainers', label: 'Trainer Portal & Commissions', desc: 'Schedule trainer classes and calculate payroll' },
-  { key: 'canBroadcastAlerts', label: 'Push Broadcast Notifications', desc: 'Send real-time alerts to club members' },
-  { key: 'canViewBiometrics', label: 'Live Biometrics Radar', desc: 'Track live calorie and BPM heart rate HUD' }
-];
-
 export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], onRefresh, onInspectGym }) {
-  // Dynamic API Configuration
-  const [packagesList, setPackagesList] = useState(DEFAULT_PACKAGES);
-  const [citiesList, setCitiesList] = useState(DEFAULT_CITIES);
-  const [activityTypesList, setActivityTypesList] = useState(DEFAULT_ACTIVITIES);
-  const [amenitiesList, setAmenitiesList] = useState(DEFAULT_AMENITIES);
-  const [permissionsList, setPermissionsList] = useState(DEFAULT_PERMISSIONS);
+  // Dynamic API Configuration (Loaded directly from Database)
+  const [packagesList, setPackagesList] = useState([]);
+  const [citiesList, setCitiesList] = useState([]);
+  const [activityTypesList, setActivityTypesList] = useState([]);
+  const [amenitiesList, setAmenitiesList] = useState([]);
+  const [permissionsList, setPermissionsList] = useState([]);
+
+  // Super Admin SaaS Pricing Editor Modal State
+  const [showPricingModal, setShowPricingModal] = useState(false);
+  const [editingPackages, setEditingPackages] = useState([]);
+  const [isSavingPricing, setIsSavingPricing] = useState(false);
 
   // Filters & State
   const [searchTerm, setSearchTerm] = useState('');
@@ -143,37 +85,70 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
     canViewBiometrics: true
   });
 
-  // Wizard Step 4: Owner & Credentials
+  // Wizard Step 4: Franchise Owner Portal Account
   const [ownerName, setOwnerName] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [ownerPassword, setOwnerPassword] = useState('FitCore@' + Math.floor(1000 + Math.random() * 9000));
 
   // Dynamic Config Fetch via Backend API
-  useEffect(() => {
-    const fetchApiConfig = async () => {
-      try {
-        const token = localStorage.getItem('fitcore_token');
-        const response = await fetch(API_ENDPOINTS.ADMIN_CONFIG, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': token ? `Bearer ${token}` : ''
-          }
-        });
-        const data = await response.json();
-        if (data.success && data.data) {
-          if (data.data.packages) setPackagesList(data.data.packages);
-          if (data.data.cities) setCitiesList(data.data.cities);
-          if (data.data.activityTypes) setActivityTypesList(data.data.activityTypes);
-          if (data.data.amenities) setAmenitiesList(data.data.amenities);
-          if (data.data.permissionsList) setPermissionsList(data.data.permissionsList);
+  const fetchApiConfig = async () => {
+    try {
+      const token = localStorage.getItem('fitcore_token');
+      const response = await fetch(API_ENDPOINTS.ADMIN_CONFIG, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
         }
-      } catch (err) {
-        console.warn('API config fetch failed, using built-in system standards.');
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        if (data.data.packages) {
+          setPackagesList(data.data.packages);
+          setEditingPackages(data.data.packages);
+        }
+        if (data.data.cities) setCitiesList(data.data.cities);
+        if (data.data.activityTypes) setActivityTypesList(data.data.activityTypes);
+        if (data.data.amenities) setAmenitiesList(data.data.amenities);
+        if (data.data.permissionsList) setPermissionsList(data.data.permissionsList);
       }
-    };
+    } catch (err) {
+      console.error('API config fetch failed:', err);
+    }
+  };
+
+  useEffect(() => {
     fetchApiConfig();
   }, []);
+
+  const handleSaveSaaSPricing = async (e) => {
+    e.preventDefault();
+    setIsSavingPricing(true);
+    try {
+      const token = localStorage.getItem('fitcore_token');
+      const res = await fetch(API_ENDPOINTS.ADMIN_CONFIG, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({ packages: editingPackages })
+      });
+      const data = await res.json();
+      setIsSavingPricing(false);
+      if (res.ok && data.success) {
+        setPackagesList(data.data.packages || editingPackages);
+        showToast('SaaS Subscription pricing updated in Database successfully! ✓', 'success');
+        setShowPricingModal(false);
+        if (typeof onRefresh === 'function') onRefresh();
+      } else {
+        showToast(data.error || 'Failed to update SaaS pricing in database.', 'error');
+      }
+    } catch (err) {
+      setIsSavingPricing(false);
+      showToast('Network error updating SaaS pricing.', 'error');
+    }
+  };
 
   const showToast = (message, type = 'success') => {
     setToastNotification({ message, type });
@@ -594,6 +569,20 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
           ]}
           style={{ minWidth: '175px' }}
         />
+
+        {/* Manage SaaS Pricing & Tiers Action Button */}
+        <button 
+          className="wizard-back-btn" 
+          style={{ whiteSpace: 'nowrap', padding: '10px 16px', borderRadius: '14px', fontSize: '13px', display: 'inline-flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.85)', borderColor: '#cbd5e1' }}
+          onClick={() => {
+            setEditingPackages(JSON.parse(JSON.stringify(packagesList)));
+            setShowPricingModal(true);
+          }}
+          title="Super Admin: Edit monthly / yearly SaaS subscription amount charged to gyms"
+        >
+          <SettingsIcon size={14} color="#475569" />
+          <span>SaaS Pricing & Plans</span>
+        </button>
 
         {/* Onboard New Franchise Action Button */}
         <button 
@@ -1660,6 +1649,127 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Super Admin SaaS Subscription Pricing & Tiers Management Modal */}
+      {showPricingModal && (
+        <div className="modal-backdrop-luxury">
+          <div className="luxury-wizard-box" style={{ maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="wizard-modal-header">
+              <div className="wizard-title-group">
+                <span className="step-count-pill" style={{ background: '#ecfdf5', color: '#059669', borderColor: '#a7f3d0' }}>
+                  Super Admin Console
+                </span>
+                <h3 className="wizard-headline">Manage SaaS Franchise Subscription Pricing</h3>
+                <p className="wizard-sub-info">
+                  Configure the monthly/yearly platform fee charged to gyms and franchises stored directly in MongoDB.
+                </p>
+              </div>
+              <button className="wizard-close-btn" onClick={() => setShowPricingModal(false)}>✕</button>
+            </div>
+
+            <form onSubmit={handleSaveSaaSPricing} className="wizard-form-flow" style={{ padding: '24px 28px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
+                {editingPackages.map((pkg, idx) => (
+                  <div key={pkg.id || idx} className="luxury-plan-card selected" style={{ padding: '18px', cursor: 'default' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span className="plan-badge-pill" style={{ textTransform: 'uppercase' }}>{pkg.badge || pkg.id}</span>
+                      <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '700' }}>Tier #{idx + 1}</span>
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label" style={{ fontSize: '12px' }}>Tier / Package Name</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        value={pkg.name} 
+                        onChange={(e) => {
+                          const updated = [...editingPackages];
+                          updated[idx].name = e.target.value;
+                          setEditingPackages(updated);
+                        }}
+                        required 
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label" style={{ fontSize: '12px' }}>Price Display Tag</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="e.g. ₹34,999 / yr or ₹2,999 / mo"
+                        value={pkg.price} 
+                        onChange={(e) => {
+                          const updated = [...editingPackages];
+                          updated[idx].price = e.target.value;
+                          setEditingPackages(updated);
+                        }}
+                        required 
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label" style={{ fontSize: '12px' }}>Amount (₹ Numeric)</label>
+                      <input 
+                        type="number" 
+                        className="form-input" 
+                        placeholder="e.g. 34999"
+                        value={pkg.amount || ''} 
+                        onChange={(e) => {
+                          const updated = [...editingPackages];
+                          updated[idx].amount = Number(e.target.value);
+                          setEditingPackages(updated);
+                        }}
+                        required 
+                      />
+                    </div>
+
+                    <div className="form-group" style={{ marginBottom: '12px' }}>
+                      <label className="form-label" style={{ fontSize: '12px' }}>Billing Cycle</label>
+                      <select 
+                        className="form-input"
+                        value={pkg.billingCycle || 'yearly'}
+                        onChange={(e) => {
+                          const updated = [...editingPackages];
+                          updated[idx].billingCycle = e.target.value;
+                          setEditingPackages(updated);
+                        }}
+                      >
+                        <option value="monthly">Monthly</option>
+                        <option value="quarterly">Quarterly (3 Months)</option>
+                        <option value="yearly">Yearly (Annual)</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontSize: '12px' }}>Turnstile Capacity Limit</label>
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="e.g. 600 Members or Unlimited"
+                        value={pkg.capacity} 
+                        onChange={(e) => {
+                          const updated = [...editingPackages];
+                          updated[idx].capacity = e.target.value;
+                          setEditingPackages(updated);
+                        }}
+                        required 
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="wizard-nav-footer" style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                <button type="button" className="wizard-back-btn" onClick={() => setShowPricingModal(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="hub-btn-glow" disabled={isSavingPricing}>
+                  {isSavingPricing ? 'Saving to Database...' : 'Save SaaS Pricing to Database ✓'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
