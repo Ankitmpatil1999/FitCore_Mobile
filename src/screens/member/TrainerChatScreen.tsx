@@ -1,11 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  StatusBar, TextInput, Alert,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  StatusBar,
+  TextInput,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { useAppContext } from '../../context/AppContext';
 import { getTrainerById } from '../../data/mockData';
+import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
+
+const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
+const coachUserImg = require('../../assets/Icons2/user.png');
+const whatsappImg = require('../../assets/Icons2/whatsapp.png');
 
 interface Message {
   id: string;
@@ -14,274 +29,480 @@ interface Message {
   time: string;
 }
 
-const MOCK_MESSAGES: Message[] = [
-  { id: '1', from: 'trainer', text: 'Good morning! How did yesterday\'s chest workout go? Did you complete all sets?', time: '8:05 AM' },
-  { id: '2', from: 'member', text: 'Good morning coach! Yes, completed all sets. The bench press felt great at 60kg!', time: '8:30 AM' },
-  { id: '3', from: 'trainer', text: 'Excellent! Your strength is improving fast 💪 Today we\'re focusing on Back & Biceps. Make sure to warm up properly.', time: '8:35 AM' },
-  { id: '4', from: 'member', text: 'Will do! Should I increase the deadlift weight today?', time: '8:40 AM' },
-  { id: '5', from: 'trainer', text: 'Yes! Go for 85kg today. Focus on form — keep your back straight. See you at 6 AM! 🏋️', time: '8:45 AM' },
+const INITIAL_MESSAGES: Message[] = [
+  {
+    id: '1',
+    from: 'trainer',
+    text: "Good morning Arjun! 💪 How did yesterday's workout go? Did you complete all sets on deadlifts?",
+    time: '08:05 AM',
+  },
+  {
+    id: '2',
+    from: 'member',
+    text: 'Good morning Coach! Yes, completed all sets cleanly at 80kg.',
+    time: '08:30 AM',
+  },
+  {
+    id: '3',
+    from: 'trainer',
+    text: "Great progress! Make sure to hit 140g protein and keep hydration high today. 🥗",
+    time: '08:35 AM',
+  },
+  {
+    id: '4',
+    from: 'member',
+    text: 'Will do! Should we schedule a form check tomorrow?',
+    time: '08:40 AM',
+  },
+  {
+    id: '5',
+    from: 'trainer',
+    text: "Yes, let's do 06:30 AM tomorrow! We will check your squat depth. 🏋️‍♂️",
+    time: '08:45 AM',
+  },
 ];
 
-export default function TrainerChatScreen({ navigation }: any) {
-  const { currentMember } = useAppContext();
-  const trainer = currentMember ? getTrainerById(currentMember.trainerId) : undefined;
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
-  const [input, setInput] = useState('');
-  const [bookingModal, setBookingModal] = useState(false);
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
+import { apiService } from '../../services/api';
 
-  const sendMessage = () => {
-    if (!input.trim()) return;
+export default function TrainerChatScreen({ navigation }: any) {
+  const { currentMember, currentUser } = useAppContext();
+  const [liveTrainer, setLiveTrainer] = useState<any>(currentMember ? getTrainerById(currentMember.trainerId) : undefined);
+
+  useEffect(() => {
+    async function loadTrainer() {
+      try {
+        const userId = currentMember?.id || currentUser?.id;
+        const res: any = await apiService.getMemberProfile(userId);
+        if (res.success && res.data?.trainer) {
+          setLiveTrainer(res.data.trainer);
+        }
+      } catch (e) {
+        console.log('Using cached trainer info');
+      }
+    }
+    loadTrainer();
+  }, [currentMember?.id, currentUser?.id]);
+
+  const trainer = liveTrainer || (currentMember ? getTrainerById(currentMember.trainerId) : undefined) || {
+    name: 'Coach Vikram Rao',
+    specialty: 'Hypertrophy & Strength Coach',
+    phone: '+91 98765 43210',
+    avatar: '🏋️‍♂️',
+  };
+
+  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const sendMessage = (textToSend?: string) => {
+    const content = textToSend || input.trim();
+    if (!content) return;
+
     const now = new Date();
     const time = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     const newMsg: Message = {
       id: Date.now().toString(),
       from: 'member',
-      text: input.trim(),
+      text: content,
       time,
     };
-    setMessages(prev => [...prev, newMsg]);
-    setInput('');
 
-    // Simulate trainer reply
+    setMessages((prev) => [...prev, newMsg]);
+    if (!textToSend) setInput('');
+
     setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 80);
+
+    // Show simulated typing & reply
+    setTimeout(() => {
+      setIsTyping(true);
+    }, 600);
+
+    setTimeout(() => {
+      setIsTyping(false);
       const replies = [
-        'Great question! Keep it up! 💪',
-        'Focus on your form first, weight will follow.',
-        'Make sure to stay hydrated before the workout.',
-        'I\'ll adjust your plan accordingly!',
-        'See you tomorrow at the gym! 🏋️',
+        "Got it! Make sure you maintain full range of motion. Keep your core braced! 🔥",
+        "Great question! I'll review your workout logs and adjust the plan accordingly. 💪",
+        "Focus on slow eccentrics (3 seconds down). That will maximize muscle growth.",
+        "Hydration is key! Drink at least 3.5L water today. See you at the gym! 🏋️",
+        "Confirmed! See you tomorrow at the gym for your session! 🚀",
       ];
-      const reply: Message = {
+      const replyMsg: Message = {
         id: (Date.now() + 1).toString(),
         from: 'trainer',
         text: replies[Math.floor(Math.random() * replies.length)],
         time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages(prev2 => [...prev2, reply]);
-    }, 1200);
+      setMessages((prev) => [...prev, replyMsg]);
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 80);
+    }, 1500);
   };
 
-  const handleBookSession = () => {
-    if (!selectedDate || !selectedTime) {
-      Alert.alert('Required', 'Please enter a date and time.');
-      return;
-    }
-    Alert.alert('Session Booked!', `PT Session booked with ${trainer?.name} on ${selectedDate} at ${selectedTime}.`);
-    setBookingModal(false);
-    setSelectedDate('');
-    setSelectedTime('');
+  const handleCall = () => {
+    Alert.alert('Calling Coach', `Initiating audio call with ${trainer?.name || 'Trainer'}...`);
   };
 
-  if (!trainer) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>💬</Text>
-          <Text style={styles.emptyText}>No trainer assigned yet</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  const handleVideoCall = () => {
+    Alert.alert('Video Call', `Starting 1-on-1 PT video session with ${trainer?.name || 'Trainer'}...`);
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0EA5E9" />
-      <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+      <KeyboardAvoidingView
+        style={styles.root}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        {/* ── WhatsApp-Style Header ── */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={leftArrowIcon}
+              style={{ width: moderateScale(16), height: moderateScale(16), tintColor: '#0F172A' }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
 
-        {/* Chat header */}
-        <View style={styles.chatHeader}>
-          <View style={styles.chatHeaderContent}>
-            <TouchableOpacity style={styles.backBtn} onPress={() => navigation?.goBack?.()} activeOpacity={0.7}>
-              <Text style={styles.backBtnText}>←</Text>
+          <View style={styles.avatarWrapper}>
+            <View style={styles.avatarBox}>
+              <Image
+                source={coachUserImg}
+                style={{ width: moderateScale(20), height: moderateScale(20), tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.onlineDot} />
+          </View>
+
+          <View style={styles.headerInfo}>
+            <Text style={styles.headerName} numberOfLines={1}>
+              {trainer?.name || 'Coach Vikram'}
+            </Text>
+            <Text style={styles.headerStatus}>
+              {isTyping ? 'typing...' : 'Online'}
+            </Text>
+          </View>
+
+          {/* Action Icons */}
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.actionIconBtn}
+              onPress={() => Alert.alert('WhatsApp', `Opening WhatsApp conversation with ${trainer?.name}...`)}
+              activeOpacity={0.7}
+            >
+              <Image
+                source={whatsappImg}
+                style={{ width: moderateScale(22), height: moderateScale(22) }}
+                resizeMode="contain"
+              />
             </TouchableOpacity>
-            <View style={styles.trainerAvatar}>
-              <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
-            </View>
-            <View style={styles.trainerInfo}>
-              <Text style={styles.trainerName}>{trainer.name}</Text>
-              <Text style={styles.trainerStatus}>
-                {trainer.available ? '🟢 Available' : '🟡 Busy'} · {trainer.specialization}
-              </Text>
-            </View>
-            <TouchableOpacity style={styles.bookBtn} onPress={() => setBookingModal(true)} activeOpacity={0.85}>
-              <Text style={styles.bookBtnText}>📅 Book PT</Text>
+
+            <TouchableOpacity style={styles.actionIconBtn} onPress={handleVideoCall} activeOpacity={0.7}>
+              <Icon name="videocam-outline" size={moderateScale(20)} color="#0F172A" />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionIconBtn} onPress={handleCall} activeOpacity={0.7}>
+              <Icon name="call-outline" size={moderateScale(18)} color="#0F172A" />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Messages */}
+        {/* ── WhatsApp-Style Messages Wall ── */}
         <ScrollView
+          ref={scrollViewRef}
           contentContainerStyle={styles.messagesScroll}
           showsVerticalScrollIndicator={false}
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: false })}
         >
+          {/* Date separator */}
           <View style={styles.dateSeparator}>
-            <Text style={styles.dateSeparatorText}>Today</Text>
+            <Text style={styles.dateSeparatorText}>TODAY</Text>
           </View>
 
-          {messages.map(msg => (
-            <View
-              key={msg.id}
-              style={[
-                styles.messageRow,
-                msg.from === 'member' ? styles.messageRowRight : styles.messageRowLeft,
-              ]}
-            >
-              {msg.from === 'trainer' && (
-                <View style={styles.msgAvatar}>
-                  <Text style={styles.msgAvatarText}>{trainer.avatar}</Text>
+          {messages.map((msg) => {
+            const isMember = msg.from === 'member';
+            return (
+              <View
+                key={msg.id}
+                style={[
+                  styles.messageRow,
+                  isMember ? styles.messageRowRight : styles.messageRowLeft,
+                ]}
+              >
+                <View
+                  style={[
+                    styles.messageBubble,
+                    isMember ? styles.bubbleMember : styles.bubbleTrainer,
+                  ]}
+                >
+                  <Text style={[styles.messageText, isMember && styles.messageTextMember]}>
+                    {msg.text}
+                  </Text>
+                  <View style={styles.metaRow}>
+                    <Text style={[styles.timeText, isMember && styles.timeTextMember]}>
+                      {msg.time}
+                    </Text>
+                    {isMember && (
+                      <Icon
+                        name="checkmark-done"
+                        size={moderateScale(13)}
+                        color="#ECEAFD"
+                        style={{ marginLeft: 3 }}
+                      />
+                    )}
+                  </View>
                 </View>
-              )}
-              <View style={[
-                styles.messageBubble,
-                msg.from === 'member' ? styles.bubbleMember : styles.bubbleTrainer,
-              ]}>
-                <Text style={[styles.messageText, msg.from === 'member' && { color: '#FFFFFF' }]}>
-                  {msg.text}
-                </Text>
-                <Text style={[styles.messageTime, msg.from === 'member' && { color: 'rgba(255,255,255,0.7)' }]}>
-                  {msg.time}
+              </View>
+            );
+          })}
+
+          {/* Typing Indicator */}
+          {isTyping && (
+            <View style={[styles.messageRow, styles.messageRowLeft]}>
+              <View style={[styles.messageBubble, styles.bubbleTrainer, { paddingVertical: 8, paddingHorizontal: 12 }]}>
+                <Text style={{ fontSize: fontScale(12), color: '#64748B', fontStyle: 'italic' }}>
+                  Coach is typing...
                 </Text>
               </View>
             </View>
-          ))}
+          )}
         </ScrollView>
 
-        {/* Input bar */}
-        <View style={styles.inputBarContainer}>
-          <View style={styles.inputBar}>
+        {/* ── WhatsApp-Style Bottom Input Bar ── */}
+        <View style={styles.inputContainer}>
+          <View style={styles.inputPill}>
+            <TouchableOpacity style={styles.attachBtn} activeOpacity={0.7}>
+              <Icon name="happy-outline" size={moderateScale(20)} color="#64748B" />
+            </TouchableOpacity>
+
             <TextInput
-              style={styles.msgInput}
-              placeholder="Message your trainer..."
+              style={styles.textInput}
+              placeholder="Message..."
               placeholderTextColor="#94A3B8"
               value={input}
               onChangeText={setInput}
               multiline
             />
-            <TouchableOpacity style={styles.sendBtn} onPress={sendMessage} activeOpacity={0.85}>
-              <Text style={styles.sendBtnText}>Send</Text>
+
+            <TouchableOpacity style={styles.attachBtn} activeOpacity={0.7}>
+              <Icon name="attach" size={moderateScale(20)} color="#64748B" />
             </TouchableOpacity>
           </View>
+
+          {/* Send / Mic Button */}
+          <TouchableOpacity
+            style={[styles.sendBtn, !input.trim() && styles.micBtn]}
+            onPress={() => (input.trim() ? sendMessage() : sendMessage('👍'))}
+            activeOpacity={0.85}
+          >
+            <Icon
+              name={input.trim() ? 'send' : 'mic'}
+              size={moderateScale(17)}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
         </View>
-
-        {/* Book PT session modal */}
-        {bookingModal && (
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalSheet}>
-              <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>Book PT Session</Text>
-              <Text style={styles.modalSubtitle}>with {trainer.name}</Text>
-
-              <View style={styles.trainerCardModal}>
-                <View style={styles.trainerAvatarModal}>
-                  <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
-                </View>
-                <View>
-                  <Text style={styles.modalTrainerName}>{trainer.name}</Text>
-                  <Text style={styles.modalTrainerSpec}>{trainer.specialization} · {trainer.experience}</Text>
-                  <Text style={styles.modalTrainerTimings}>⏱ Available: {trainer.timings}</Text>
-                </View>
-              </View>
-
-              <Text style={styles.inputLabel}>Preferred Date</Text>
-              <TextInput style={styles.input} placeholder="e.g. 2026-06-25" placeholderTextColor="#94A3B8" value={selectedDate} onChangeText={setSelectedDate} />
-
-              <Text style={styles.inputLabel}>Preferred Time</Text>
-              <View style={styles.timeOptions}>
-                {['6:00 AM', '7:00 AM', '8:00 AM', '5:00 PM', '6:00 PM'].map(t => (
-                  <TouchableOpacity
-                    key={t}
-                    style={[styles.timeChip, selectedTime === t && styles.timeChipActive]}
-                    onPress={() => setSelectedTime(t)}
-                  >
-                    <Text style={[styles.timeChipText, selectedTime === t && { color: '#FFFFFF' }]}>{t}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setBookingModal(false)}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.submitBtn} onPress={handleBookSession}>
-                  <Text style={styles.submitBtnText}>Confirm Booking</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0EA5E9' },
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
-  chatHeader: { backgroundColor: '#0EA5E9' },
-  chatHeaderContent: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 16, gap: 10,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
-  backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  backBtnText: { fontSize: 22, color: '#FFFFFF', fontWeight: '700' },
-  trainerAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  trainerAvatarText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
-  trainerInfo: { flex: 1 },
-  trainerName: { fontSize: 16, fontWeight: '800', color: '#FFFFFF' },
-  trainerStatus: { fontSize: 11, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  bookBtn: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-  bookBtnText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF' },
+  root: {
+    flex: 1,
+    backgroundColor: '#F7F7FD',
+  },
+
+  // ── WhatsApp Header ──
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1),
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECEAFD',
+    gap: moderateScale(8),
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+  },
+  backBtn: {
+    padding: moderateScale(4),
+  },
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatarBox: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(19),
+    backgroundColor: '#6C5CE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    fontSize: fontScale(14),
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: moderateScale(10),
+    height: moderateScale(10),
+    borderRadius: moderateScale(5),
+    backgroundColor: '#00C48C',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  headerInfo: {
+    flex: 1,
+  },
+  headerName: {
+    fontSize: fontScale(15),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  headerStatus: {
+    fontSize: fontScale(11),
+    color: '#00C48C',
+    fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(12),
+  },
+  actionIconBtn: {
+    padding: moderateScale(4),
+  },
+
+  // ── Messages Wall ──
   messagesScroll: {
-    padding: 16, paddingBottom: 8,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+    paddingHorizontal: wp(3.5),
+    paddingVertical: hp(1),
   },
-  dateSeparator: { alignItems: 'center', marginVertical: 12 },
-  dateSeparatorText: { fontSize: 11, color: '#94A3B8', fontWeight: '600', backgroundColor: '#F1F5F9', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 },
-  messageRow: { marginBottom: 12 },
-  messageRowLeft: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
-  messageRowRight: { flexDirection: 'row-reverse', alignItems: 'flex-end' },
-  msgAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  msgAvatarText: { fontSize: 11, fontWeight: '800', color: '#8B5CF6' },
-  messageBubble: { maxWidth: '75%', borderRadius: 18, padding: 12 },
-  bubbleTrainer: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderBottomLeftRadius: 4 },
-  bubbleMember: { backgroundColor: '#0EA5E9', borderBottomRightRadius: 4 },
-  messageText: { fontSize: 14, color: '#0F172A', lineHeight: 20 },
-  messageTime: { fontSize: 10, color: '#94A3B8', marginTop: 5, textAlign: 'right' },
-  inputBarContainer: {
-    backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0',
+  dateSeparator: {
+    alignItems: 'center',
+    marginVertical: hp(1),
   },
-  inputBar: {
-    flexDirection: 'row', alignItems: 'flex-end', padding: 12, gap: 10,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+  dateSeparatorText: {
+    fontSize: fontScale(10),
+    fontWeight: '700',
+    color: '#64748B',
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(3.5),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
   },
-  msgInput: { flex: 1, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10, fontSize: 14, color: '#0F172A', maxHeight: 80 },
-  sendBtn: { backgroundColor: '#0EA5E9', borderRadius: 24, paddingHorizontal: 20, paddingVertical: 12 },
-  sendBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  emptyIcon: { fontSize: 60 },
-  emptyText: { fontSize: 16, color: '#94A3B8' },
-  // Modal
-  modalOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A', textAlign: 'center' },
-  modalSubtitle: { fontSize: 13, color: '#94A3B8', textAlign: 'center', marginBottom: 20 },
-  trainerCardModal: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: '#F8FAFC', borderRadius: 14, padding: 14, marginBottom: 16 },
-  trainerAvatarModal: { width: 52, height: 52, borderRadius: 26, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' },
-  modalTrainerName: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
-  modalTrainerSpec: { fontSize: 12, color: '#475569', marginTop: 2 },
-  modalTrainerTimings: { fontSize: 11, color: '#94A3B8', marginTop: 4 },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: '#0F172A' },
-  timeOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  timeChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: '#F1F5F9', borderWidth: 1, borderColor: '#E2E8F0' },
-  timeChipActive: { backgroundColor: '#0EA5E9', borderColor: '#0EA5E9' },
-  timeChipText: { fontSize: 12, fontWeight: '700', color: '#475569' },
-  modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  cancelBtn: { flex: 1, backgroundColor: '#F1F5F9', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: '#475569' },
-  submitBtn: { flex: 1, backgroundColor: '#0EA5E9', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  submitBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  messageRow: {
+    marginBottom: hp(0.8),
+    flexDirection: 'row',
+  },
+  messageRowLeft: {
+    justifyContent: 'flex-start',
+  },
+  messageRowRight: {
+    justifyContent: 'flex-end',
+  },
+  messageBubble: {
+    maxWidth: '78%',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(14),
+  },
+  bubbleMember: {
+    backgroundColor: '#6C5CE7',
+    borderTopRightRadius: moderateScale(2),
+  },
+  bubbleTrainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: moderateScale(2),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  messageText: {
+    fontSize: fontScale(13.5),
+    color: '#0F172A',
+    lineHeight: fontScale(18),
+  },
+  messageTextMember: {
+    color: '#FFFFFF',
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 2,
+  },
+  timeText: {
+    fontSize: fontScale(9),
+    color: '#94A3B8',
+  },
+  timeTextMember: {
+    color: 'rgba(255, 255, 255, 0.75)',
+  },
+
+  // ── WhatsApp Bottom Bar ──
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: wp(3),
+    paddingVertical: hp(0.8),
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#ECEAFD',
+    gap: moderateScale(8),
+  },
+  inputPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(24),
+    paddingHorizontal: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  attachBtn: {
+    padding: moderateScale(6),
+  },
+  textInput: {
+    flex: 1,
+    fontSize: fontScale(13.5),
+    color: '#0F172A',
+    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(4),
+    maxHeight: hp(10),
+  },
+  sendBtn: {
+    width: moderateScale(42),
+    height: moderateScale(42),
+    borderRadius: moderateScale(21),
+    backgroundColor: '#6C5CE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  micBtn: {
+    backgroundColor: '#6C5CE7',
+  },
 });

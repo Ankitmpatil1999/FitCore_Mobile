@@ -6,36 +6,60 @@ import { enableScreens } from 'react-native-screens';
 
 import { Colors } from './src/theme';
 import { AppProvider, useAppContext } from './src/context/AppContext';
+import SplashScreen from './src/screens/shared/SplashScreen';
+import OnboardingScreen from './src/screens/shared/OnboardingScreen';
 import LoginScreen from './src/screens/shared/LoginScreen';
 import MemberNavigator from './src/navigation/MemberNavigator';
 import OwnerNavigator from './src/navigation/OwnerNavigator';
 import VendorNavigator from './src/navigation/VendorNavigator';
+import TrainerNavigator from './src/navigation/TrainerNavigator';
 
 enableScreens();
 
 // ── Inner component: reads context AFTER AppProvider is mounted ──
 function AppInner() {
-  const { role, isLoggedIn } = useAppContext();
+  const {
+    role,
+    isLoggedIn,
+    isAppReady,
+    hasSeenOnboarding,
+    completeOnboarding,
+    setAppReady,
+  } = useAppContext();
 
+  // Step 1: Splash Screen
+  if (!isAppReady) {
+    return <SplashScreen onFinish={setAppReady} />;
+  }
+
+  // Step 2: Onboarding (only shown once, first launch)
+  if (!hasSeenOnboarding) {
+    return <OnboardingScreen onFinish={completeOnboarding} />;
+  }
+
+  // Step 3: Login / Signup
+  if (!isLoggedIn) {
+    return <LoginScreen />;
+  }
+
+  // Step 4: Main App (role-based navigation)
   return (
     <View style={styles.root}>
       <StatusBar
-        barStyle="light-content"
-        backgroundColor={Colors.bgBase}
+        barStyle="dark-content"
+        backgroundColor="#F7F7FD"
       />
-      {!isLoggedIn ? (
-        <LoginScreen />
-      ) : (
-        <NavigationContainer>
-          {role === 'owner' ? (
-            <OwnerNavigator />
-          ) : role === 'vendor' ? (
-            <VendorNavigator />
-          ) : (
-            <MemberNavigator />
-          )}
-        </NavigationContainer>
-      )}
+      <NavigationContainer>
+        {role === 'owner' ? (
+          <OwnerNavigator />
+        ) : role === 'vendor' ? (
+          <VendorNavigator />
+        ) : role === 'trainer' ? (
+          <TrainerNavigator />
+        ) : (
+          <MemberNavigator />
+        )}
+      </NavigationContainer>
     </View>
   );
 }

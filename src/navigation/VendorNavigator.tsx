@@ -1,7 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StyleSheet, Text } from 'react-native';
-import { LightColors, Typography } from '../theme';
+import { StyleSheet, View } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { Colors, Typography } from '../theme';
 
 import VendorDashboard from '../screens/vendor/VendorDashboard';
 import VendorProductsScreen from '../screens/vendor/VendorProductsScreen';
@@ -11,12 +12,12 @@ import VendorProfileScreen from '../screens/vendor/VendorProfileScreen';
 
 const Tab = createBottomTabNavigator();
 
-const TAB_ICONS: Record<string, string> = {
-  Dashboard: '\u{1F4CA}',   // 📊
-  Products: '\u{1F4E6}',   // 📦
-  Orders: '\u{1F4DD}',   // 📝
-  Analytics: '\u{1F4C8}',   // 📈
-  Settings: '\u{2699}',    // ⚙  (no variation selector to avoid Metro issues)
+const TAB_CONFIG: Record<string, { icon: string; iconOutline: string }> = {
+  Dashboard: { icon: 'stats-chart', iconOutline: 'stats-chart-outline' },
+  Products: { icon: 'cube', iconOutline: 'cube-outline' },
+  Orders: { icon: 'receipt', iconOutline: 'receipt-outline' },
+  Analytics: { icon: 'trending-up', iconOutline: 'trending-up-outline' },
+  Settings: { icon: 'settings', iconOutline: 'settings-outline' },
 };
 
 export default function VendorNavigator() {
@@ -24,15 +25,25 @@ export default function VendorNavigator() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarShowLabel: true,
         tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: '#7C3AED',
-        tabBarInactiveTintColor: LightColors.textMuted,
+        tabBarItemStyle: styles.tabBarItem,
+        tabBarActiveTintColor: '#6C5CE7',
+        tabBarInactiveTintColor: '#94A3B8',
         tabBarLabelStyle: styles.tabBarLabel,
-        tabBarIcon: ({ focused }) => (
-          <Text style={[styles.tabIcon, focused && styles.tabIconFocused]}>
-            {TAB_ICONS[route.name] ?? '\u{1F4CB}'}
-          </Text>
-        ),
+        tabBarIcon: ({ focused }) => {
+          const cfg = TAB_CONFIG[route.name];
+          if (!cfg) return null;
+          return (
+            <View style={styles.iconWrapper}>
+              <Icon
+                name={focused ? cfg.icon : cfg.iconOutline}
+                size={22}
+                color={focused ? '#6C5CE7' : '#94A3B8'}
+              />
+            </View>
+          );
+        },
       })}
     >
       <Tab.Screen name="Dashboard" component={VendorDashboard} />
@@ -48,21 +59,32 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    height: 64,
-    paddingBottom: 8,
-    paddingTop: 6,
+    borderTopColor: '#ECEAFD',
+    height: 76,
+    paddingBottom: 10,
+    paddingTop: 8,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    elevation: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.04,
+    shadowRadius: 10,
+  },
+  tabBarItem: {
+    paddingVertical: 2,
   },
   tabBarLabel: {
-    fontSize: 9,
-    fontWeight: Typography.fontWeightBold,
+    fontSize: 10.5,
+    fontWeight: '600',
+    marginTop: 2,
   },
-  tabIcon: {
-    fontSize: 20,
-    opacity: 0.5,
-  },
-  tabIconFocused: {
-    opacity: 1,
-    fontSize: 22,
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
   },
 });

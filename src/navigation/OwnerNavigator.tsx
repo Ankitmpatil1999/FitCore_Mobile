@@ -2,12 +2,13 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StyleSheet, View, Image } from 'react-native';
-import { LightColors } from '../theme';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { Colors } from '../theme';
 
 import OwnerDashboard from '../screens/owner/OwnerDashboard';
 import MembersScreen from '../screens/owner/MembersScreen';
-import TrainersScreen from '../screens/owner/TrainersScreen';
 import PaymentsScreen from '../screens/owner/PaymentsScreen';
+import TrainersScreen from '../screens/owner/TrainersScreen';
 import ProductStoreScreen from '../screens/owner/ProductStoreScreen';
 import OwnerAnalytics from '../screens/owner/OwnerAnalytics';
 import MembershipPlansScreen from '../screens/owner/MembershipPlansScreen';
@@ -16,49 +17,121 @@ import GymProfileScreen from '../screens/owner/GymProfileScreen';
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-function OwnerTabNavigator() {
-  const TAB_ICONS: Record<string, any> = {
-    Dashboard: require('../assets/Bottom bar/Dashboard.png'),
-    Members: require('../assets/Bottom bar/Member.png'),
-    Trainers: require('../assets/Bottom bar/Trainer.png'),
-    Payments: require('../assets/Bottom bar/Histroy.png'),
-    Profile: require('../assets/Bottom bar/gym.png'),
-  };
+// ── Tab Bar Assets ──
+const dashboardIcon = require('../assets/Bottom bar/Dashboard.png');
+const memberIcon = require('../assets/Bottom bar/Member.png');
+const attendanceIcon = require('../assets/Icons2/qr.png');
+const paymentsIcon = require('../assets/Bottom bar/Histroy.png');
+const profileIcon = require('../assets/Bottom bar/gym.png');
 
+function OwnerTabNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabBarItem,
-        safeAreaInsets: { bottom: 0, top: 0, left: 0, right: 0 },
-        tabBarIcon: ({ focused }) => {
-          const iconSource = TAB_ICONS[route.name];
-          if (!iconSource) return null;
-
-          return (
-            <View style={[
-              styles.iconWrapper,
-              focused ? styles.iconWrapperActive : styles.iconWrapperInactive
-            ]}>
+        tabBarActiveTintColor: '#6C5CE7',
+        tabBarInactiveTintColor: '#94A3B8',
+        tabBarLabelStyle: styles.tabBarLabel,
+      }}
+    >
+      <Tab.Screen
+        name="Dashboard"
+        component={OwnerDashboard}
+        options={{
+          tabBarLabel: 'Dashboard',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
               <Image
-                source={iconSource}
+                source={dashboardIcon}
                 style={[
                   styles.tabIcon,
-                  { opacity: focused ? 1 : 0.65 }
+                  { tintColor: focused ? '#6C5CE7' : '#94A3B8' },
                 ]}
+                resizeMode="contain"
               />
             </View>
-          );
-        },
-      })}
-    >
-      <Tab.Screen name="Dashboard" component={OwnerDashboard} />
-      <Tab.Screen name="Members" component={MembersScreen} />
-      <Tab.Screen name="Trainers" component={TrainersScreen} />
-      <Tab.Screen name="Payments" component={PaymentsScreen} />
-      <Tab.Screen name="Profile" component={GymProfileScreen} />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Members"
+        component={MembersScreen}
+        options={{
+          tabBarLabel: 'Members',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
+              <Image
+                source={memberIcon}
+                style={[
+                  styles.tabIcon,
+                  { tintColor: focused ? '#6C5CE7' : '#94A3B8' },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Attendance"
+        component={OwnerAnalytics}
+        options={{
+          tabBarLabel: 'Attendance',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
+              <Image
+                source={attendanceIcon}
+                style={[
+                  styles.tabIcon,
+                  { tintColor: focused ? '#6C5CE7' : '#94A3B8' },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Finance"
+        component={PaymentsScreen}
+        options={{
+          tabBarLabel: 'Finance',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
+              <Image
+                source={paymentsIcon}
+                style={[
+                  styles.tabIcon,
+                  { tintColor: focused ? '#6C5CE7' : '#94A3B8' },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={GymProfileScreen}
+        options={{
+          tabBarLabel: 'Gym Profile',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
+              <Image
+                source={profileIcon}
+                style={[
+                  styles.tabIcon,
+                  { tintColor: focused ? '#6C5CE7' : '#94A3B8' },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -67,6 +140,9 @@ export default function OwnerNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={OwnerTabNavigator} />
+      <Stack.Screen name="Members" component={MembersScreen} />
+      <Stack.Screen name="Finance" component={PaymentsScreen} />
+      <Stack.Screen name="Trainers" component={TrainersScreen} />
       <Stack.Screen name="Plans" component={MembershipPlansScreen} />
       <Stack.Screen name="Shop" component={ProductStoreScreen} />
       <Stack.Screen name="Analytics" component={OwnerAnalytics} />
@@ -76,44 +152,41 @@ export default function OwnerNavigator() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#000000',
-    borderTopWidth: 0,
-    height: 85,
-    paddingBottom: 15,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#ECEAFD',
+    height: 76,
+    paddingBottom: 10,
+    paddingTop: 8,
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
+    elevation: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.04,
     shadowRadius: 10,
-    elevation: 10,
   },
   tabBarItem: {
-    height: 55,
+    height: 52,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 5,
+  },
+  tabBarLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: 2,
   },
   iconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  iconWrapperActive: {
-    backgroundColor: '#2C65DE',
-  },
-  iconWrapperInactive: {
-    backgroundColor: 'rgba(44, 101, 222, 0.18)',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
   },
   tabIcon: {
-    width: 24,
-    height: 24,
-    resizeMode: 'contain',
+    width: 22,
+    height: 22,
   },
 });

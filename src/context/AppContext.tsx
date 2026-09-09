@@ -3,8 +3,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   USERS, MEMBERS, GYMS,
   getMemberByPhone, getGymById,
-  getVendorStoreByUserId,
-  type User, type Member, type Gym, type Role, type VendorStore,
+  getVendorStoreByUserId, getTrainerByUserId,
+  type User, type Member, type Gym, type Role, type VendorStore, type Trainer,
 } from '../data/mockData';
 
 // ─────────────────────────────────────────────
@@ -16,10 +16,15 @@ interface AppContextValue {
   currentMember: Member | null;
   currentGym: Gym | null;
   currentVendor: VendorStore | null;
+  currentTrainer: Trainer | null;
   role: Role | null;
   isLoggedIn: boolean;
+  isAppReady: boolean;
+  hasSeenOnboarding: boolean;
   login: (phone: string, password: string) => { success: boolean; error?: string };
   logout: () => void;
+  completeOnboarding: () => void;
+  setAppReady: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -29,14 +34,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentMember, setCurrentMember] = useState<Member | null>(null);
   const [currentGym, setCurrentGym] = useState<Gym | null>(null);
   const [currentVendor, setCurrentVendor] = useState<VendorStore | null>(null);
+  const [currentTrainer, setCurrentTrainer] = useState<Trainer | null>(null);
   const [role, setRole] = useState<Role | null>(null);
+  const [isAppReady, setIsAppReady] = useState(false);
+  const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
 
-  // Load saved session on app startup
+  // Load saved session + onboarding state on app startup
   useEffect(() => {
     const loadSession = async () => {
       try {
-        const savedPhone = await AsyncStorage.getItem('user_phone');
-        const savedPassword = await AsyncStorage.getItem('user_password');
+        const [savedPhone, savedPassword, onboardingSeen] = await Promise.all([
+          AsyncStorage.getItem('user_phone'),
+          AsyncStorage.getItem('user_password'),
+          AsyncStorage.getItem('has_seen_onboarding'),
+        ]);
+
+        if (onboardingSeen === 'true') {
+          setHasSeenOnboarding(true);
+        }
+
         if (savedPhone && savedPassword) {
           login(savedPhone, savedPassword);
         }
@@ -73,6 +89,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setRole('member');
       setCurrentMember(null);
       setCurrentVendor(null);
+      setCurrentTrainer(null);
       
       // Save session credentials
       AsyncStorage.setItem('user_phone', phone);
@@ -94,13 +111,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const member = getMemberByPhone(phone);
       setCurrentMember(member ?? null);
       setCurrentVendor(null);
+      setCurrentTrainer(null);
     } else if (user.role === 'vendor') {
       const vendorStore = getVendorStoreByUserId(user.id);
       setCurrentVendor(vendorStore ?? null);
       setCurrentMember(null);
+      setCurrentTrainer(null);
+    } else if (user.role === 'trainer') {
+      const trainerObj = getTrainerByUserId(user.id);
+      setCurrentTrainer(trainerObj ?? null);
+      setCurrentMember(null);
+      setCurrentVendor(null);
     } else {
       setCurrentMember(null);
       setCurrentVendor(null);
+      setCurrentTrainer(null);
     }
 
     // Save session credentials
@@ -119,7 +144,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCurrentMember(null);
     setCurrentGym(null);
     setCurrentVendor(null);
+    setCurrentTrainer(null);
     setRole(null);
+  };
+
+  const completeOnboarding = () => {
+    setHasSeenOnboarding(true);
+    AsyncStorage.setItem('has_seen_onboarding', 'true');
+  };
+
+  const setAppReadyFn = () => {
+    setIsAppReady(true);
   };
 
   return (
@@ -129,10 +164,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         currentMember,
         currentGym,
         currentVendor,
+        currentTrainer,
         role,
         isLoggedIn: !!currentUser,
+        isAppReady,
+        hasSeenOnboarding,
         login,
         logout,
+        completeOnboarding,
+        setAppReady: setAppReadyFn,
       }}
     >
       {children}

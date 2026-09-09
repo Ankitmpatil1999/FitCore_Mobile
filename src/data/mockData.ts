@@ -201,7 +201,7 @@ export const USERS: User[] = [
   {
     id: 'owner_fns',
     name: 'Rahul Barapatre',
-    phone: '9999999999',
+    phone: '9326093115',
     email: 'rahul@fnsfitness.com',
     password: 'Hello@123',
     role: 'owner',
@@ -251,12 +251,32 @@ export const USERS: User[] = [
   {
     id: 'vendor1',
     name: 'Karan Shetty',
-    phone: '9326093115',
+    phone: '8530292487',
     email: 'karan@musclestore.in',
     password: 'Hello@123',
     role: 'vendor',
     gymId: '',
     avatar: 'KS',
+  },
+  {
+    id: 'trainer1',
+    name: 'Vikram Singh',
+    phone: '8180093401',
+    email: 'vikram@fnsfitness.com',
+    password: 'Hello@123',
+    role: 'trainer',
+    gymId: 'g1',
+    avatar: 'VS',
+  },
+  {
+    id: 'trainer2',
+    name: 'Ananya Joshi',
+    phone: '9222333444',
+    email: 'ananya@fnsfitness.com',
+    password: 'Hello@123',
+    role: 'trainer',
+    gymId: 'g1',
+    avatar: 'AJ',
   },
 ];
 
@@ -432,7 +452,7 @@ export const TRAINERS: Trainer[] = [
     available: true,
     assignedMemberIds: ['m1', 'm3', 'm6'],
     certifications: 'ACE Certified, NSCA-CPT',
-    phone: '9111222333',
+    phone: '8180093401',
     joinDate: '2022-04-01',
   },
   {
@@ -1166,7 +1186,7 @@ export const VENDOR_STORES: VendorStore[] = [
     ownerName: 'Karan Shetty',
     category: 'supplement_store',
     gstNumber: '27AABCS1429B1Z0',
-    phone: '9326093115',
+    phone: '8530292487',
     email: 'karan@musclestore.in',
     address: 'Shop 12, Fitness Hub, MG Road',
     city: 'Pune',
@@ -1870,3 +1890,98 @@ export const VENDOR_ANALYTICS = {
     },
   },
 };
+
+// ── TRAINER HELPER FUNCTIONS ──────────────────
+
+export function getTrainerByUserId(userId: string): Trainer | undefined {
+  const numericId = userId.replace('trainer', '');
+  const id = `t${numericId}`;
+  return TRAINERS.find(t => t.id === id || t.id === userId);
+}
+
+export function getTrainerByPhone(phone: string): Trainer | undefined {
+  return TRAINERS.find(t => t.phone === phone);
+}
+
+export function getMembersByTrainer(trainerId: string): Member[] {
+  const cleanId = trainerId.startsWith('trainer') ? 't' + trainerId.replace('trainer', '') : trainerId;
+  const trainer = TRAINERS.find(t => t.id === cleanId || t.id === trainerId);
+  return MEMBERS.filter(m => m.trainerId === cleanId || m.trainerId === trainerId || (trainer && trainer.assignedMemberIds.includes(m.id)));
+}
+
+export interface PTSession {
+  id: string;
+  trainerId: string;
+  memberId: string;
+  memberName: string;
+  date: string;
+  time: string;
+  focus: string;
+  status: 'scheduled' | 'completed' | 'cancelled';
+}
+
+export const PT_SESSIONS: PTSession[] = [
+  { id: 'pt1', trainerId: 't1', memberId: 'm1', memberName: 'Arjun Mehta', date: '2026-06-30', time: '06:00 AM', focus: 'Legs Day Form Correction', status: 'scheduled' },
+  { id: 'pt2', trainerId: 't1', memberId: 'm3', memberName: 'Rahul Desai', date: '2026-06-30', time: '08:00 AM', focus: 'Deadlift Form check', status: 'scheduled' },
+  { id: 'pt3', trainerId: 't1', memberId: 'm6', memberName: 'Ananya Jain', date: '2026-07-01', time: '05:00 PM', focus: 'HIIT Conditioning', status: 'scheduled' },
+];
+
+export function getPTBookingsForTrainer(trainerId: string): PTSession[] {
+  const cleanId = trainerId.startsWith('trainer') ? 't' + trainerId.replace('trainer', '') : trainerId;
+  return PT_SESSIONS.filter(s => s.trainerId === cleanId || s.trainerId === trainerId);
+}
+
+export function addPTBooking(session: Omit<PTSession, 'id' | 'status'>) {
+  const newSession: PTSession = {
+    ...session,
+    id: `pt_${Date.now()}`,
+    status: 'scheduled',
+  };
+  PT_SESSIONS.push(newSession);
+  return newSession;
+}
+
+export function updateWorkoutPlanForMember(memberId: string, days: WorkoutDay[]) {
+  const plan = WORKOUT_PLANS.find(wp => wp.memberId === memberId);
+  if (plan) {
+    plan.days = days;
+    return true;
+  }
+  const member = MEMBERS.find(m => m.id === memberId);
+  if (member) {
+    WORKOUT_PLANS.push({
+      id: `wp_${Date.now()}`,
+      gymId: member.gymId,
+      trainerId: member.trainerId,
+      memberId: memberId,
+      name: 'Custom Assigned Workout Plan',
+      goal: member.goal,
+      days: days,
+    });
+    return true;
+  }
+  return false;
+}
+
+export function updateDietPlanForMember(memberId: string, diet: Omit<DietPlan, 'id' | 'gymId'>) {
+  const existing = DIET_PLANS.find(dp => dp.type === diet.type);
+  if (existing) {
+    existing.meals = diet.meals;
+    existing.totalCalories = diet.totalCalories;
+    existing.totalProtein = diet.totalProtein;
+    existing.waterIntake = diet.waterIntake;
+    return true;
+  } else {
+    DIET_PLANS.push({
+      ...diet,
+      id: `dp_${Date.now()}`,
+      gymId: 'g1',
+    });
+    return true;
+  }
+}
+
+//PLAN ALIAS
+export const PLANS = MEMBERSHIP_PLANS;
+
+

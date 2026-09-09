@@ -137,6 +137,29 @@ coverage/
 .nyc_output/
 jest-results.xml
 
+# Environment & Secrets
+.env
+.env.*
+*.env
+
+# Documentation & Requirements Folders (Prevent leaking PRD/Architecture files)
+01_Requirements/
+02_PRD/
+03_User_Flows/
+04_UI_UX/
+05_Technical_Documentation/
+06_Database/
+07_API/
+08_Web/
+09_Mobile/
+10_Testing/
+11_Deployment/
+12_Maintenance/
+Documents/
+*.pdf
+*.docx
+*.xlsx
+
 # Yarn
 .yarn/*
 !.yarn/patches

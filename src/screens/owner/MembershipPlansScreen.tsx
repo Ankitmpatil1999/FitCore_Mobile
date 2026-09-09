@@ -1,55 +1,112 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  StatusBar, Modal, TextInput, Alert,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  StatusBar,
+  Modal,
+  TextInput,
+  Alert,
+  Image,
+  Animated,
+  Easing,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LightColors, Shadows } from '../../theme';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { Colors, Typography, Radii } from '../../theme';
+import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { MEMBERSHIP_PLANS, MembershipPlan } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 
-const TIER_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  bronze: { bg: '#FEF3C7', text: '#92400E', border: '#FCD34D' },
-  silver: { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1' },
-  gold: { bg: '#FEF9C3', text: '#854D0E', border: '#FDE047' },
-  platinum: { bg: '#EDE9FE', text: '#5B21B6', border: '#A78BFA' },
-};
+// ── Interactive Scale on Press Component ──
+function AnimatedPressable({
+  children,
+  onPress,
+  style,
+}: {
+  children: React.ReactNode;
+  onPress?: () => void;
+  style?: any;
+}) {
+  const scaleValue = useRef(new Animated.Value(1)).current;
 
-const TIER_ICONS: Record<string, string> = {
-  bronze: '🥉', silver: '🥈', gold: '🥇', platinum: '💎',
-};
+  const onPressIn = () => {
+    Animated.spring(scaleValue, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 4,
+    }).start();
+  };
 
-export default function MembershipPlansScreen() {
+  const onPressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 8,
+    }).start();
+  };
+
+  return (
+    <TouchableWithoutFeedback
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={onPress}
+    >
+      <Animated.View style={[{ transform: [{ scale: scaleValue }] }, style]}>
+        {children}
+      </Animated.View>
+    </TouchableWithoutFeedback>
+  );
+}
+
+const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
+
+export default function MembershipPlansScreen({ navigation }: any) {
   const { currentGym } = useAppContext();
   const gymId = currentGym?.id || 'g1';
 
-  const [plans, setPlans] = useState<MembershipPlan[]>(() => MEMBERSHIP_PLANS.filter(p => p.gymId === gymId || !p.gymId || p.gymId === 'gym1'));
+  const [plans, setPlans] = useState<MembershipPlan[]>(() =>
+    MEMBERSHIP_PLANS.filter((p) => p.gymId === gymId || !p.gymId || p.gymId === 'gym1')
+  );
   const [addModal, setAddModal] = useState(false);
   const [editPlan, setEditPlan] = useState<MembershipPlan | null>(null);
 
-  // Form
+  // Form states
   const [fName, setFName] = useState('');
   const [fDuration, setFDuration] = useState('');
   const [fPrice, setFPrice] = useState('');
-  const [fOrigPrice, setFOrigPrice] = useState('');
-  const [fTier, setFTier] = useState<MembershipPlan['tier']>('bronze');
-  const [fFeature, setFFeature] = useState('');
+
+  // ── Entrance Animation ──
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 450,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 450,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+    ]).start();
+  }, []);
 
   const openAdd = () => {
     setEditPlan(null);
-    setFName(''); setFDuration(''); setFPrice(''); setFOrigPrice('');
-    setFTier('bronze'); setFFeature('');
-    setAddModal(true);
-  };
-
-  const openEdit = (plan: MembershipPlan) => {
-    setEditPlan(plan);
-    setFName(plan.name);
-    setFDuration(String(plan.duration));
-    setFPrice(String(plan.price));
-    setFOrigPrice(String(plan.originalPrice));
-    setFTier(plan.tier);
-    setFFeature(plan.features.join(', '));
+    setFName('');
+    setFDuration('');
+    setFPrice('');
     setAddModal(true);
   };
 
@@ -58,244 +115,382 @@ export default function MembershipPlansScreen() {
       Alert.alert('Required', 'Name, duration and price are required.');
       return;
     }
+    const newP: MembershipPlan = {
+      id: editPlan ? editPlan.id : `plan_${Date.now()}`,
+      gymId: gymId,
+      name: fName.trim(),
+      duration: parseInt(fDuration, 10),
+      price: parseFloat(fPrice),
+      originalPrice: parseFloat(fPrice) * 1.25,
+      tier: 'gold',
+      features: ['Full gym access', 'Trainer assistance', 'Locker access', 'Diet consultation'],
+      isActive: true,
+      discount: 20,
+    };
+
     if (editPlan) {
-      setPlans(prev =>
-        prev.map(p =>
-          p.id === editPlan.id
-            ? {
-                ...p,
-                name: fName.trim(),
-                duration: parseInt(fDuration, 10),
-                price: parseInt(fPrice, 10),
-                originalPrice: parseInt(fOrigPrice, 10) || parseInt(fPrice, 10),
-                tier: fTier,
-                features: fFeature.split(',').map(f => f.trim()).filter(Boolean),
-              }
-            : p,
-        ),
-      );
-      Alert.alert('Updated', `${fName} updated!`);
+      setPlans((prev) => prev.map((p) => (p.id === editPlan.id ? newP : p)));
     } else {
-      const newPlan: MembershipPlan = {
-        id: `plan_${Date.now()}`,
-        gymId: gymId,
-        name: fName.trim(),
-        duration: parseInt(fDuration, 10),
-        price: parseInt(fPrice, 10),
-        originalPrice: parseInt(fOrigPrice, 10) || parseInt(fPrice, 10),
-        tier: fTier,
-        features: fFeature.split(',').map(f => f.trim()).filter(Boolean),
-        isActive: true,
-        discount: 0,
-      };
-      setPlans(prev => [...prev, newPlan]);
-      Alert.alert('Created', `${fName} created!`);
+      setPlans((prev) => [newP, ...prev]);
     }
     setAddModal(false);
-  };
-
-  const togglePause = (plan: MembershipPlan) => {
-    setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, isActive: !p.isActive } : p));
-  };
-
-  const deletePlan = (plan: MembershipPlan) => {
-    Alert.alert('Delete Plan', `Delete "${plan.name}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => setPlans(prev => prev.filter(p => p.id !== plan.id)) },
-    ]);
+    Alert.alert('✓ Saved', 'Membership plan updated successfully!');
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
-      <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
+      <Animated.View style={[styles.root, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        {/* ── AMBIENT BACKGROUND GLOWS ── */}
+        <View style={styles.ambientGlowTop} />
+        <View style={styles.ambientGlowRight} />
 
+        {/* ── HEADER ── */}
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View>
-              <Text style={styles.headerSub}>Configure</Text>
-              <Text style={styles.headerTitle}>Membership Plans 📋</Text>
-            </View>
-            <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.85}>
-              <Text style={styles.addBtnText}>+ New Plan</Text>
-            </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={leftArrowIcon}
+              style={{ width: moderateScale(16), height: moderateScale(16), tintColor: '#0F172A' }}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.headerTitle}>Membership Plans</Text>
+            <Text style={styles.headerSub}>{plans.length} Active Gym Packages</Text>
           </View>
+          <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.85}>
+            <Icon name="add" size={moderateScale(18)} color="#FFFFFF" />
+          </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.subLabel}>
-            {plans.filter(p => p.isActive).length} active plans · {plans.length} total
-          </Text>
-
-          {plans.map(plan => {
-            const tc = TIER_COLORS[plan.tier];
-            const discount = plan.originalPrice > plan.price
-              ? Math.round(((plan.originalPrice - plan.price) / plan.originalPrice) * 100)
-              : 0;
-            return (
-              <View key={plan.id} style={[styles.planCard, { borderColor: tc.border, opacity: plan.isActive ? 1 : 0.6 }]}>
-                {/* Tier badge */}
-                <View style={styles.planTop}>
-                  <View style={[styles.tierBadge, { backgroundColor: tc.bg, borderColor: tc.border }]}>
-                    <Text style={styles.tierIcon}>{TIER_ICONS[plan.tier]}</Text>
-                    <Text style={[styles.tierText, { color: tc.text }]}>{plan.tier.toUpperCase()}</Text>
-                  </View>
-                  {!plan.isActive && (
-                    <View style={styles.pausedBadge}>
-                      <Text style={styles.pausedText}>PAUSED</Text>
-                    </View>
-                  )}
-                  {discount > 0 && (
-                    <View style={styles.discountBadge}>
-                      <Text style={styles.discountText}>{discount}% OFF</Text>
-                    </View>
-                  )}
+          {plans.map((p) => (
+            <AnimatedPressable
+              key={p.id}
+              style={styles.planCard}
+              onPress={() => {
+                setEditPlan(p);
+                setFName(p.name);
+                setFDuration(p.duration.toString());
+                setFPrice(p.price.toString());
+                setAddModal(true);
+              }}
+            >
+              <View style={styles.planHeaderRow}>
+                <View>
+                  <Text style={styles.planNameText}>{p.name}</Text>
+                  <Text style={styles.planDurationText}>{p.duration} Months Validity</Text>
                 </View>
-
-                <Text style={styles.planName}>{plan.name}</Text>
-
-                <View style={styles.priceRow}>
-                  <Text style={styles.planPrice}>₹{plan.price.toLocaleString('en-IN')}</Text>
-                  {discount > 0 && (
-                    <Text style={styles.planMRP}>₹{plan.originalPrice.toLocaleString('en-IN')}</Text>
-                  )}
-                  <Text style={styles.planDuration}> / {plan.duration} month{plan.duration > 1 ? 's' : ''}</Text>
-                </View>
-
-                <View style={styles.featureList}>
-                  {plan.features.map((f, i) => (
-                    <Text key={i} style={styles.featureItem}>✅ {f}</Text>
-                  ))}
-                </View>
-
-                <View style={styles.planActions}>
-                  <TouchableOpacity style={[styles.planActionBtn, { backgroundColor: LightColors.cyanBg }]} onPress={() => openEdit(plan)}>
-                    <Text style={[styles.planActionText, { color: LightColors.info }]}>✏️ Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.planActionBtn, { backgroundColor: plan.isActive ? LightColors.warningBg : LightColors.successBg }]} onPress={() => togglePause(plan)}>
-                    <Text style={[styles.planActionText, { color: plan.isActive ? LightColors.warning : LightColors.success }]}>
-                      {plan.isActive ? '⏸ Pause' : '▶️ Resume'}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.planActionBtn, { backgroundColor: LightColors.dangerBg }]} onPress={() => deletePlan(plan)}>
-                    <Text style={[styles.planActionText, { color: LightColors.danger }]}>🗑️ Delete</Text>
-                  </TouchableOpacity>
+                <View style={styles.tierBadge}>
+                  <Text style={styles.tierBadgeText}>{p.tier.toUpperCase()}</Text>
                 </View>
               </View>
-            );
-          })}
+
+              <View style={styles.priceRow}>
+                <Text style={styles.priceVal}>₹{p.price.toLocaleString()}</Text>
+                <Text style={styles.originalPrice}>₹{p.originalPrice.toLocaleString()}</Text>
+                <View style={styles.discountBadge}>
+                  <Text style={styles.discountText}>{p.discount}% OFF</Text>
+                </View>
+              </View>
+
+              {/* Features List */}
+              <View style={styles.featuresList}>
+                {p.features.map((feat, idx) => (
+                  <View key={idx} style={styles.featureItem}>
+                    <Icon name="checkmark-circle" size={moderateScale(15)} color="#00C48C" />
+                    <Text style={styles.featureText}>{feat}</Text>
+                  </View>
+                ))}
+              </View>
+            </AnimatedPressable>
+          ))}
+
+          <View style={{ height: hp(12) }} />
         </ScrollView>
 
-        {/* MODAL */}
-        <Modal visible={addModal} transparent animationType="slide" onRequestClose={() => setAddModal(false)}>
+        {/* ── PLAN MODAL ── */}
+        <Modal visible={addModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
-              <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>{editPlan ? 'Edit Plan' : 'Create New Plan'}</Text>
-              <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{editPlan ? 'Edit Plan' : 'New Membership Plan'}</Text>
+                <TouchableOpacity onPress={() => setAddModal(false)}>
+                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Plan Name *</Text>
-                <TextInput style={styles.input} placeholder="e.g. 6 Month Premium" placeholderTextColor="#94A3B8" value={fName} onChangeText={setFName} />
+                <TextInput
+                  style={styles.modalInput}
+                  value={fName}
+                  onChangeText={setFName}
+                  placeholder="e.g. 6 Month Platinum Pass"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
 
-                <Text style={styles.inputLabel}>Duration (months) *</Text>
-                <TextInput style={styles.input} placeholder="e.g. 6" placeholderTextColor="#94A3B8" value={fDuration} onChangeText={setFDuration} keyboardType="numeric" />
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Duration in Months *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fDuration}
+                  onChangeText={setFDuration}
+                  placeholder="e.g. 6"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="numeric"
+                />
+              </View>
 
+              <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Price (₹) *</Text>
-                <TextInput style={styles.input} placeholder="e.g. 3999" placeholderTextColor="#94A3B8" value={fPrice} onChangeText={setFPrice} keyboardType="numeric" />
+                <TextInput
+                  style={styles.modalInput}
+                  value={fPrice}
+                  onChangeText={setFPrice}
+                  placeholder="e.g. 3999"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="numeric"
+                />
+              </View>
 
-                <Text style={styles.inputLabel}>Original MRP (₹)</Text>
-                <TextInput style={styles.input} placeholder="e.g. 5500" placeholderTextColor="#94A3B8" value={fOrigPrice} onChangeText={setFOrigPrice} keyboardType="numeric" />
-
-                <Text style={styles.inputLabel}>Tier</Text>
-                <View style={styles.tierRow}>
-                  {(['bronze', 'silver', 'gold', 'platinum'] as MembershipPlan['tier'][]).map(t => (
-                    <TouchableOpacity
-                      key={t}
-                      style={[styles.tierChip, fTier === t && styles.tierChipActive]}
-                      onPress={() => setFTier(t)}
-                    >
-                      <Text style={styles.tierChipText}>{TIER_ICONS[t]} {t}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <Text style={styles.inputLabel}>Features (comma-separated)</Text>
-                <TextInput style={[styles.input, { minHeight: 80 }]} placeholder="e.g. Gym access, Trainer, Locker" placeholderTextColor="#94A3B8" value={fFeature} onChangeText={setFFeature} multiline />
-
-                <View style={styles.modalBtnRow}>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setAddModal(false)}>
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.submitBtn} onPress={handleSave}>
-                    <Text style={styles.submitBtnText}>{editPlan ? 'Save Changes' : 'Create Plan'}</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
+              <TouchableOpacity
+                style={styles.submitBtn}
+                onPress={handleSave}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.submitBtnText}>SAVE PACKAGE</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
-  root: { flex: 1, backgroundColor: LightColors.bgBase },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F7F7FD',
+  },
+  root: {
+    flex: 1,
+    backgroundColor: '#F7F7FD',
+  },
+
+  // ── Ambient Glows ──
+  ambientGlowTop: {
+    position: 'absolute',
+    top: -wp(20),
+    right: -wp(10),
+    width: wp(60),
+    height: wp(60),
+    borderRadius: wp(30),
+    backgroundColor: 'rgba(108, 92, 231, 0.06)',
+  },
+  ambientGlowRight: {
+    position: 'absolute',
+    top: hp(25),
+    left: -wp(20),
+    width: wp(50),
+    height: wp(50),
+    borderRadius: wp(25),
+    backgroundColor: 'rgba(56, 189, 248, 0.05)',
+  },
+
   header: {
-    backgroundColor: LightColors.bgSurface,
-    borderBottomWidth: 1,
-    borderBottomColor: LightColors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(5),
+    paddingTop: hp(1),
+    paddingBottom: hp(1.2),
   },
-  headerContent: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+  backBtn: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
   },
-  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary },
-  addBtn: { backgroundColor: LightColors.accentViolet, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: LightColors.accentViolet },
-  addBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  headerTitle: {
+    fontSize: fontScale(19),
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+  },
+  headerSub: {
+    fontSize: fontScale(11),
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 1,
+  },
+  addBtn: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#6C5CE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
   scroll: {
-    padding: 20, gap: 16, paddingBottom: 40,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+    paddingHorizontal: wp(5),
+    paddingTop: hp(0.5),
   },
-  subLabel: {
-    fontSize: 12, color: LightColors.textMuted, fontWeight: '600', marginBottom: 4,
-    width: '90%', maxWidth: 600, alignSelf: 'center',
+
+  planCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(18),
+    marginBottom: hp(1.5),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
   },
-  planCard: { backgroundColor: LightColors.bgSurface, borderRadius: 16, padding: 20, borderWidth: 2, ...Shadows.card },
-  planTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  tierBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
-  tierIcon: { fontSize: 14 },
-  tierText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
-  pausedBadge: { backgroundColor: LightColors.dangerBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  pausedText: { fontSize: 9, fontWeight: '800', color: LightColors.danger },
-  discountBadge: { backgroundColor: LightColors.successBg, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20, marginLeft: 'auto' },
-  discountText: { fontSize: 10, fontWeight: '800', color: LightColors.success },
-  planName: { fontSize: 20, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 8 },
-  priceRow: { flexDirection: 'row', alignItems: 'baseline', marginBottom: 16 },
-  planPrice: { fontSize: 28, fontWeight: '800', color: LightColors.accentViolet },
-  planMRP: { fontSize: 14, color: LightColors.textMuted, textDecorationLine: 'line-through', marginLeft: 8 },
-  planDuration: { fontSize: 13, color: LightColors.textMuted, fontWeight: '600' },
-  featureList: { gap: 6, marginBottom: 20 },
-  featureItem: { fontSize: 13, color: LightColors.textSecondary, fontWeight: '500' },
-  planActions: { flexDirection: 'row', gap: 10 },
-  planActionBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  planActionText: { fontSize: 12, fontWeight: '700' },
+  planHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: hp(1),
+  },
+  planNameText: {
+    fontSize: fontScale(16),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  planDurationText: {
+    fontSize: fontScale(11.5),
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  tierBadge: {
+    backgroundColor: '#F3F2FE',
+    paddingHorizontal: moderateScale(9),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(6),
+  },
+  tierBadgeText: {
+    fontSize: fontScale(10),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+    marginVertical: hp(0.8),
+  },
+  priceVal: {
+    fontSize: fontScale(22),
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  originalPrice: {
+    fontSize: fontScale(14),
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+  },
+  discountBadge: {
+    backgroundColor: 'rgba(0, 196, 140, 0.10)',
+    paddingHorizontal: moderateScale(7),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(4),
+  },
+  discountText: {
+    fontSize: fontScale(10),
+    fontWeight: '700',
+    color: '#00C48C',
+  },
+
+  featuresList: {
+    marginTop: hp(1),
+    borderTopWidth: 1,
+    borderTopColor: '#F3F2FE',
+    paddingTop: hp(1),
+    gap: 6,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  featureText: {
+    fontSize: fontScale(12),
+    color: '#64748B',
+  },
+
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: LightColors.bgSurface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: LightColors.border, alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 20, textAlign: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary, marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
-  tierRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
-  tierChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: LightColors.bgElevated, borderWidth: 1, borderColor: LightColors.border },
-  tierChipActive: { backgroundColor: LightColors.accentViolet, borderColor: LightColors.accentViolet },
-  tierChipText: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary },
-  modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 12 },
-  cancelBtn: { flex: 1, backgroundColor: LightColors.bgElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
-  submitBtn: { flex: 1, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  submitBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: wp(5),
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(24),
+    padding: moderateScale(22),
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp(2),
+  },
+  modalTitle: {
+    fontSize: fontScale(18),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  inputGroup: {
+    marginBottom: hp(1.8),
+  },
+  inputLabel: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(14),
+    height: moderateScale(46),
+    fontSize: fontScale(13.5),
+    color: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  submitBtn: {
+    backgroundColor: '#6C5CE7',
+    borderRadius: moderateScale(14),
+    height: moderateScale(48),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: hp(1),
+  },
+  submitBtnText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
 });

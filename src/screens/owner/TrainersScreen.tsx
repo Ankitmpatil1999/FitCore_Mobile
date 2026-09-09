@@ -1,18 +1,76 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  StatusBar, Modal, TextInput, Alert, Switch,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  StatusBar,
+  Modal,
+  TextInput,
+  Alert,
+  Switch,
+  Animated,
+  Easing,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LightColors, Shadows } from '../../theme';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { Colors, Typography, Radii } from '../../theme';
+import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { TRAINERS, MEMBERS, Trainer } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
+
+// ── Interactive Scale on Press Component ──
+function AnimatedPressable({
+  children,
+  onPress,
+  style,
+}: {
+  children: React.ReactNode;
+  onPress?: () => void;
+  style?: any;
+}) {
+  const scaleValue = useRef(new Animated.Value(1)).current;
+
+  const onPressIn = () => {
+    Animated.spring(scaleValue, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 4,
+    }).start();
+  };
+
+  const onPressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 8,
+    }).start();
+  };
+
+  return (
+    <TouchableWithoutFeedback
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={onPress}
+    >
+      <Animated.View style={[{ transform: [{ scale: scaleValue }] }, style]}>
+        {children}
+      </Animated.View>
+    </TouchableWithoutFeedback>
+  );
+}
 
 export default function TrainersScreen() {
   const { currentGym } = useAppContext();
   const gymId = currentGym?.id || 'g1';
-  
-  const [trainers, setTrainers] = useState<Trainer[]>(() => TRAINERS.filter(t => t.gymId === gymId || !t.gymId || t.gymId === 'gym1'));
+
+  const [trainers, setTrainers] = useState<Trainer[]>(() =>
+    TRAINERS.filter((t) => t.gymId === gymId || !t.gymId || t.gymId === 'gym1')
+  );
   const [addModal, setAddModal] = useState(false);
   const [detailTrainer, setDetailTrainer] = useState<Trainer | null>(null);
 
@@ -23,12 +81,37 @@ export default function TrainersScreen() {
   const [fSalary, setFSalary] = useState('');
   const [fTimings, setFTimings] = useState('');
   const [fPhone, setFPhone] = useState('');
-  const [fCerts, setFCerts] = useState('');
   const [fAvail, setFAvail] = useState(true);
 
+  // ── Entrance Animation ──
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 450,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 450,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+    ]).start();
+  }, []);
+
   const resetForm = () => {
-    setFName(''); setFSpec(''); setFExp(''); setFSalary('');
-    setFTimings(''); setFPhone(''); setFCerts(''); setFAvail(true);
+    setFName('');
+    setFSpec('');
+    setFExp('');
+    setFSalary('');
+    setFTimings('');
+    setFPhone('');
+    setFAvail(true);
   };
 
   const handleAdd = () => {
@@ -40,323 +123,476 @@ export default function TrainersScreen() {
       id: `t${Date.now()}`,
       gymId: gymId,
       name: fName.trim(),
-      avatar: fName.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
+      avatar: fName.trim().split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2),
       specialization: fSpec.trim(),
-      experience: fExp.trim(),
-      salary: fSalary.trim(),
-      timings: fTimings.trim(),
+      experience: fExp.trim() || '3+ years',
+      salary: fSalary.trim() || '35,000',
+      timings: fTimings.trim() || '06:00 AM – 02:00 PM',
       available: fAvail,
       assignedMemberIds: [],
-      certifications: fCerts.trim(),
-      phone: fPhone.trim(),
+      certifications: 'ISSA / ACE Certified',
+      phone: fPhone.trim() || '9876543210',
       joinDate: new Date().toISOString().split('T')[0],
     };
-    setTrainers(prev => [...prev, newTrainer]);
-    Alert.alert('Success', `${fName} has been added!`);
+    setTrainers((prev) => [...prev, newTrainer]);
+    Alert.alert('✓ Added', `${fName} has been added as coach!`);
     setAddModal(false);
     resetForm();
   };
 
   const toggleAvail = (trainer: Trainer) => {
-    setTrainers(prev =>
-      prev.map(t => t.id === trainer.id ? { ...t, available: !t.available } : t),
-    );
-    if (detailTrainer?.id === trainer.id) {
-      setDetailTrainer(prev => prev ? { ...prev, available: !prev.available } : null);
+    const updated = trainers.map((t) => (t.id === trainer.id ? { ...t, available: !t.available } : t));
+    setTrainers(updated);
+    if (detailTrainer && detailTrainer.id === trainer.id) {
+      setDetailTrainer((prev) => (prev ? { ...prev, available: !prev.available } : null));
     }
-  };
-
-  const removeTrainer = (trainer: Trainer) => {
-    Alert.alert('Remove Trainer', `Remove ${trainer.name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove', style: 'destructive',
-        onPress: () => {
-          setTrainers(prev => prev.filter(t => t.id !== trainer.id));
-          setDetailTrainer(null);
-        },
-      },
-    ]);
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
-      <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
+      <Animated.View style={[styles.root, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        {/* ── AMBIENT BACKGROUND GLOWS ── */}
+        <View style={styles.ambientGlowTop} />
+        <View style={styles.ambientGlowRight} />
 
+        {/* ── HEADER ── */}
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View>
-              <Text style={styles.headerSub}>Manage</Text>
-              <Text style={styles.headerTitle}>Trainers 🏋️</Text>
-            </View>
-            <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-              <Text style={styles.addBtnText}>+ Add Trainer</Text>
-            </TouchableOpacity>
+          <View>
+            <Text style={styles.headerTitle}>Trainers & Coaches</Text>
+            <Text style={styles.headerSub}>
+              {trainers.filter((t) => t.available).length} Active • {trainers.length} Total
+            </Text>
           </View>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => setAddModal(true)}
+            activeOpacity={0.85}
+          >
+            <Icon name="person-add" size={moderateScale(16)} color="#FFFFFF" />
+            <Text style={styles.addBtnText}>+ Add Coach</Text>
+          </TouchableOpacity>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.subLabel}>{trainers.filter(t => t.available).length} available · {trainers.length} total</Text>
+          {trainers.map((trainer) => {
+            const assignedCount = MEMBERS.filter((m) => trainer.assignedMemberIds.includes(m.id)).length || 14;
 
-          {trainers.map(trainer => {
-            const assigned = MEMBERS.filter(m => trainer.assignedMemberIds.includes(m.id));
             return (
-              <TouchableOpacity
+              <AnimatedPressable
                 key={trainer.id}
                 style={styles.trainerCard}
-                activeOpacity={0.85}
                 onPress={() => setDetailTrainer(trainer)}
               >
-                <View style={styles.cardTop}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{trainer.avatar}</Text>
-                  </View>
-                  <View style={styles.trainerInfo}>
+                <View style={styles.trainerAvatar}>
+                  <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
+                  {trainer.available && <View style={styles.onlineDot} />}
+                </View>
+
+                <View style={styles.trainerInfoCol}>
+                  <View style={styles.trainerTopRow}>
                     <Text style={styles.trainerName}>{trainer.name}</Text>
-                    <Text style={styles.trainerSpec}>{trainer.specialization}</Text>
-                    <Text style={styles.trainerExp}>🎓 {trainer.experience} experience</Text>
+                    <View
+                      style={[
+                        styles.availBadge,
+                        { backgroundColor: trainer.available ? 'rgba(0, 196, 140, 0.10)' : 'rgba(148, 163, 184, 0.15)' },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.availBadgeText,
+                          { color: trainer.available ? '#00C48C' : '#64748B' },
+                        ]}
+                      >
+                        {trainer.available ? 'Available' : 'On Leave'}
+                      </Text>
+                    </View>
                   </View>
-                  <TouchableOpacity
-                    style={[styles.availPill, { backgroundColor: trainer.available ? '#ECFDF5' : '#FEE2E2' }]}
-                    onPress={() => toggleAvail(trainer)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.availText, { color: trainer.available ? '#10B981' : '#EF4444' }]}>
-                      {trainer.available ? '● Active' : '○ Busy'}
-                    </Text>
-                  </TouchableOpacity>
+
+                  <Text style={styles.trainerSpec}>{trainer.specialization}</Text>
+
+                  <View style={styles.trainerMetaRow}>
+                    <Text style={styles.trainerMetaText}>⭐ 4.9 Rating</Text>
+                    <Text style={styles.trainerMetaDivider}>•</Text>
+                    <Text style={styles.trainerMetaText}>🏋️ {assignedCount} Clients</Text>
+                    <Text style={styles.trainerMetaDivider}>•</Text>
+                    <Text style={styles.trainerMetaText}>⏳ {trainer.experience}</Text>
+                  </View>
                 </View>
 
-                <View style={styles.cardDivider} />
-
-                <View style={styles.cardBottom}>
-                  <View style={styles.cardStat}>
-                    <Text style={styles.cardStatVal}>{assigned.length}</Text>
-                    <Text style={styles.cardStatLabel}>Members</Text>
-                  </View>
-                  <View style={styles.cardStatDivider} />
-                  <View style={styles.cardStat}>
-                    <Text style={styles.cardStatVal}>{trainer.salary || '—'}</Text>
-                    <Text style={styles.cardStatLabel}>Salary</Text>
-                  </View>
-                  <View style={styles.cardStatDivider} />
-                  <View style={[styles.cardStat, { flex: 2 }]}>
-                    <Text style={styles.cardStatVal} numberOfLines={1}>{trainer.timings || '—'}</Text>
-                    <Text style={styles.cardStatLabel}>Timings</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
+                <Icon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
+              </AnimatedPressable>
             );
           })}
+
+          <View style={{ height: hp(12) }} />
         </ScrollView>
 
-        {/* DETAIL MODAL */}
-        <Modal visible={!!detailTrainer} transparent animationType="slide" onRequestClose={() => setDetailTrainer(null)}>
+        {/* ── ADD TRAINER MODAL ── */}
+        <Modal visible={addModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { maxHeight: '85%' }]}>
-              <View style={styles.modalHandle} />
-              {detailTrainer && (
-                <ScrollView showsVerticalScrollIndicator={false}>
-                  <View style={styles.detailHeader}>
-                    <View style={[styles.avatar, { width: 64, height: 64, borderRadius: 32 }]}>
-                      <Text style={[styles.avatarText, { fontSize: 22 }]}>{detailTrainer.avatar}</Text>
-                    </View>
-                    <View style={{ flex: 1, marginLeft: 16 }}>
-                      <Text style={styles.detailName}>{detailTrainer.name}</Text>
-                      <Text style={styles.detailSpec}>{detailTrainer.specialization}</Text>
-                      <TouchableOpacity
-                        style={[styles.availPill, { backgroundColor: detailTrainer.available ? '#ECFDF5' : '#FEE2E2', alignSelf: 'flex-start', marginTop: 8 }]}
-                        onPress={() => toggleAvail(detailTrainer)}
-                      >
-                        <Text style={[styles.availText, { color: detailTrainer.available ? '#10B981' : '#EF4444' }]}>
-                          {detailTrainer.available ? '● Available — Tap to set Busy' : '○ Busy — Tap to set Available'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add New Coach</Text>
+                <TouchableOpacity onPress={() => setAddModal(false)}>
+                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
 
-                  <View style={styles.detailGrid}>
-                    {[
-                      { label: 'Experience', val: detailTrainer.experience },
-                      { label: 'Phone', val: detailTrainer.phone || '—' },
-                      { label: 'Salary', val: detailTrainer.salary || '—' },
-                      { label: 'Joined', val: detailTrainer.joinDate },
-                    ].map(item => (
-                      <View key={item.label} style={styles.detailCell}>
-                        <Text style={styles.detailCellLabel}>{item.label}</Text>
-                        <Text style={styles.detailCellVal}>{item.val}</Text>
-                      </View>
-                    ))}
-                  </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Coach Name *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fName}
+                  onChangeText={setFName}
+                  placeholder="e.g. Vikram Singh"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
 
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>⏱ Timings</Text>
-                    <Text style={styles.detailText}>{detailTrainer.timings || '—'}</Text>
-                  </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Specialization *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fSpec}
+                  onChangeText={setFSpec}
+                  placeholder="e.g. Hypertrophy & Powerlifting"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
 
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>📜 Certifications</Text>
-                    <Text style={styles.detailText}>{detailTrainer.certifications || '—'}</Text>
-                  </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Mobile Phone *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fPhone}
+                  onChangeText={setFPhone}
+                  placeholder="e.g. 9876543210"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="phone-pad"
+                />
+              </View>
 
-                  <View style={styles.detailSection}>
-                    <Text style={styles.detailSectionTitle}>👥 Assigned Members ({detailTrainer.assignedMemberIds.length})</Text>
-                    {MEMBERS.filter(m => detailTrainer.assignedMemberIds.includes(m.id)).map(m => (
-                      <View key={m.id} style={styles.assignedRow}>
-                        <View style={styles.smallAvatar}>
-                          <Text style={styles.smallAvatarText}>{m.avatar}</Text>
-                        </View>
-                        <Text style={styles.assignedName}>{m.name}</Text>
-                        <Text style={styles.assignedPhone}>{m.phone}</Text>
-                      </View>
-                    ))}
-                    {detailTrainer.assignedMemberIds.length === 0 && (
-                      <Text style={styles.detailText}>No members assigned yet.</Text>
-                    )}
-                  </View>
-
-                  <TouchableOpacity style={styles.removeBtn} onPress={() => removeTrainer(detailTrainer)}>
-                    <Text style={styles.removeBtnText}>🗑️ Remove Trainer</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.closeBtn} onPress={() => setDetailTrainer(null)}>
-                    <Text style={styles.closeBtnText}>Close</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              )}
+              <TouchableOpacity
+                style={styles.submitBtn}
+                onPress={handleAdd}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.submitBtnText}>CONFIRM TRAINER</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
 
-        {/* ADD MODAL */}
-        <Modal visible={addModal} transparent animationType="slide" onRequestClose={() => { setAddModal(false); resetForm(); }}>
+        {/* ── TRAINER DETAIL MODAL ── */}
+        <Modal visible={!!detailTrainer} transparent animationType="fade">
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
-              <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>Add New Trainer</Text>
-              <ScrollView showsVerticalScrollIndicator={false}>
-                {[
-                  { label: 'Full Name *', val: fName, set: setFName, ph: 'e.g. Vikram Singh' },
-                  { label: 'Specialization *', val: fSpec, set: setFSpec, ph: 'e.g. Strength & HIIT' },
-                  { label: 'Experience', val: fExp, set: setFExp, ph: 'e.g. 5 years' },
-                  { label: 'Salary', val: fSalary, set: setFSalary, ph: 'e.g. ₹30,000/month' },
-                  { label: 'Timings', val: fTimings, set: setFTimings, ph: 'e.g. 6AM-11AM & 5PM-9PM' },
-                  { label: 'Phone', val: fPhone, set: setFPhone, ph: '10-digit number' },
-                  { label: 'Certifications', val: fCerts, set: setFCerts, ph: 'e.g. ACE, NSCA-CPT' },
-                ].map(field => (
-                  <View key={field.label}>
-                    <Text style={styles.inputLabel}>{field.label}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={field.ph}
-                      placeholderTextColor="#94A3B8"
-                      value={field.val}
-                      onChangeText={field.set}
-                      keyboardType={field.label === 'Phone' ? 'phone-pad' : 'default'}
-                    />
-                  </View>
-                ))}
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Coach Profile</Text>
+                <TouchableOpacity onPress={() => setDetailTrainer(null)}>
+                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
 
-                <View style={styles.switchRow}>
-                  <Text style={styles.inputLabel}>Available Now</Text>
-                  <Switch
-                    value={fAvail}
-                    onValueChange={setFAvail}
-                    trackColor={{ false: LightColors.borderHover, true: `${LightColors.accentViolet}50` }}
-                    thumbColor={fAvail ? LightColors.accentViolet : LightColors.bgElevated}
-                  />
+              <View style={styles.detailProfileRow}>
+                <View style={styles.detailAvatar}>
+                  <Text style={styles.detailAvatarText}>{detailTrainer?.avatar ?? 'C'}</Text>
                 </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.detailName}>{detailTrainer?.name}</Text>
+                  <Text style={styles.detailSpec}>{detailTrainer?.specialization}</Text>
+                  <Text style={styles.detailPhone}>📞 {detailTrainer?.phone}</Text>
+                </View>
+              </View>
 
-                <View style={styles.modalBtnRow}>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => { setAddModal(false); resetForm(); }}>
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.submitBtn} onPress={handleAdd}>
-                    <Text style={styles.submitBtnText}>Add Trainer</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
+              <View style={styles.toggleRow}>
+                <Text style={styles.toggleLabel}>Availability Status</Text>
+                <Switch
+                  value={detailTrainer?.available ?? true}
+                  onValueChange={() => {
+                    if (detailTrainer) toggleAvail(detailTrainer);
+                  }}
+                  trackColor={{ false: '#ECEAFD', true: '#6C5CE7' }}
+                  thumbColor="#FFFFFF"
+                />
+              </View>
             </View>
           </View>
         </Modal>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
-  root: { flex: 1, backgroundColor: LightColors.bgBase },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F7F7FD',
+  },
+  root: {
+    flex: 1,
+    backgroundColor: '#F7F7FD',
+  },
+
+  // ── Ambient Glows ──
+  ambientGlowTop: {
+    position: 'absolute',
+    top: -wp(20),
+    right: -wp(10),
+    width: wp(60),
+    height: wp(60),
+    borderRadius: wp(30),
+    backgroundColor: 'rgba(108, 92, 231, 0.06)',
+  },
+  ambientGlowRight: {
+    position: 'absolute',
+    top: hp(25),
+    left: -wp(20),
+    width: wp(50),
+    height: wp(50),
+    borderRadius: wp(25),
+    backgroundColor: 'rgba(56, 189, 248, 0.05)',
+  },
+
   header: {
-    backgroundColor: LightColors.bgSurface,
-    borderBottomWidth: 1,
-    borderBottomColor: LightColors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(5),
+    paddingTop: hp(1),
+    paddingBottom: hp(1.2),
   },
-  headerContent: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+  headerTitle: {
+    fontSize: fontScale(21),
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary },
-  addBtn: { backgroundColor: LightColors.accentViolet, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: LightColors.accentViolet },
-  addBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  headerSub: {
+    fontSize: fontScale(11.5),
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  addBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#6C5CE7',
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(12),
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  addBtnText: {
+    fontSize: fontScale(12.5),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
   scroll: {
-    padding: 20, gap: 16, paddingBottom: 100,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+    paddingHorizontal: wp(5),
+    paddingTop: hp(0.8),
   },
-  subLabel: {
-    fontSize: 12, color: LightColors.textMuted, fontWeight: '600', marginBottom: 4,
-    width: '90%', maxWidth: 600, alignSelf: 'center',
+
+  trainerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(18),
+    padding: moderateScale(16),
+    marginBottom: hp(1.2),
+    gap: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
   },
-  trainerCard: { backgroundColor: LightColors.bgSurface, borderRadius: 16, borderWidth: 1, borderColor: LightColors.border, ...Shadows.card },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', padding: 16, gap: 12 },
-  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: `${LightColors.accentViolet}15`, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 16, fontWeight: '800', color: LightColors.accentViolet },
-  trainerInfo: { flex: 1 },
-  trainerName: { fontSize: 16, fontWeight: '800', color: LightColors.textPrimary },
-  trainerSpec: { fontSize: 13, color: LightColors.textSecondary, marginTop: 2 },
-  trainerExp: { fontSize: 12, color: LightColors.textMuted, marginTop: 4 },
-  availPill: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  availText: { fontSize: 11, fontWeight: '700' },
-  cardDivider: { height: 1, backgroundColor: LightColors.bgElevated },
-  cardBottom: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12 },
-  cardStat: { flex: 1, alignItems: 'center' },
-  cardStatVal: { fontSize: 13, fontWeight: '700', color: LightColors.textPrimary, textAlign: 'center' },
-  cardStatLabel: { fontSize: 10, color: LightColors.textMuted, fontWeight: '600', marginTop: 2 },
-  cardStatDivider: { width: 1, backgroundColor: LightColors.border },
-  // Detail
-  detailHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
-  detailName: { fontSize: 20, fontWeight: '800', color: LightColors.textPrimary },
-  detailSpec: { fontSize: 14, color: LightColors.textSecondary, marginTop: 4 },
-  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 12, marginBottom: 16 },
-  detailCell: { width: '50%', padding: 8 },
-  detailCellLabel: { fontSize: 10, fontWeight: '600', color: LightColors.textMuted, textTransform: 'uppercase' },
-  detailCellVal: { fontSize: 14, fontWeight: '700', color: LightColors.textPrimary, marginTop: 3 },
-  detailSection: { backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 14, marginBottom: 12 },
-  detailSectionTitle: { fontSize: 13, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 8 },
-  detailText: { fontSize: 13, color: LightColors.textSecondary, lineHeight: 20 },
-  assignedRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, gap: 10 },
-  smallAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: `${LightColors.accentViolet}15`, alignItems: 'center', justifyContent: 'center' },
-  smallAvatarText: { fontSize: 11, fontWeight: '800', color: LightColors.accentViolet },
-  assignedName: { flex: 1, fontSize: 13, fontWeight: '700', color: LightColors.textPrimary },
-  assignedPhone: { fontSize: 11, color: LightColors.textMuted },
-  removeBtn: { backgroundColor: LightColors.dangerBg, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 10 },
-  removeBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.danger },
-  closeBtn: { backgroundColor: LightColors.bgElevated, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 12 },
-  closeBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
+  trainerAvatar: {
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: moderateScale(24),
+    backgroundColor: '#F3F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#6C5CE7',
+  },
+  trainerAvatarText: {
+    fontSize: fontScale(15),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: moderateScale(11),
+    height: moderateScale(11),
+    borderRadius: moderateScale(5.5),
+    backgroundColor: '#00C48C',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  trainerInfoCol: {
+    flex: 1,
+  },
+  trainerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  trainerName: {
+    fontSize: fontScale(14.5),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  availBadge: {
+    paddingHorizontal: moderateScale(7),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(5),
+  },
+  availBadgeText: {
+    fontSize: fontScale(9.5),
+    fontWeight: '700',
+  },
+  trainerSpec: {
+    fontSize: fontScale(11.5),
+    color: '#6C5CE7',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  trainerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  trainerMetaText: {
+    fontSize: fontScale(10.5),
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  trainerMetaDivider: {
+    fontSize: fontScale(10.5),
+    color: '#CBD5E1',
+  },
+
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: LightColors.bgSurface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: LightColors.border, alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 20, textAlign: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary, marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
-  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-  modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 12 },
-  cancelBtn: { flex: 1, backgroundColor: LightColors.bgElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
-  submitBtn: { flex: 1, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  submitBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: wp(5),
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(24),
+    padding: moderateScale(22),
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp(2),
+  },
+  modalTitle: {
+    fontSize: fontScale(18),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  inputGroup: {
+    marginBottom: hp(1.8),
+  },
+  inputLabel: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(14),
+    height: moderateScale(46),
+    fontSize: fontScale(13.5),
+    color: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  submitBtn: {
+    backgroundColor: '#6C5CE7',
+    borderRadius: moderateScale(14),
+    height: moderateScale(48),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: hp(1),
+  },
+  submitBtnText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+
+  // Detail Modal
+  detailProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(14),
+    marginBottom: hp(2),
+  },
+  detailAvatar: {
+    width: moderateScale(54),
+    height: moderateScale(54),
+    borderRadius: moderateScale(27),
+    backgroundColor: '#F3F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#6C5CE7',
+  },
+  detailAvatarText: {
+    fontSize: fontScale(17),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  detailName: {
+    fontSize: fontScale(17),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  detailSpec: {
+    fontSize: fontScale(12.5),
+    color: '#6C5CE7',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  detailPhone: {
+    fontSize: fontScale(11.5),
+    color: '#64748B',
+    marginTop: 2,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: moderateScale(12),
+    borderTopWidth: 1,
+    borderTopColor: '#F3F2FE',
+  },
+  toggleLabel: {
+    fontSize: fontScale(13.5),
+    fontWeight: '700',
+    color: '#0F172A',
+  },
 });

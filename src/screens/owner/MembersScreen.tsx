@@ -1,489 +1,702 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  StatusBar, TextInput, Modal, Alert, Switch,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  StatusBar,
+  TextInput,
+  Modal,
+  Alert,
+  Image,
+  Animated,
+  Easing,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LightColors, Shadows } from '../../theme';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { Colors, Typography, Radii } from '../../theme';
+import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import {
-  MEMBERS, MEMBERSHIP_PLANS, TRAINERS, Member, MemberStatus,
-  getPlanById, getTrainerById, getDaysRemaining,
+  MEMBERS,
+  MEMBERSHIP_PLANS,
+  TRAINERS,
+  Member,
+  MemberStatus,
+  getPlanById,
+  getTrainerById,
+  getDaysRemaining,
 } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 
-type FilterType = 'all' | 'active' | 'expired' | 'frozen';
+// ── Interactive Scale on Press Component ──
+function AnimatedPressable({
+  children,
+  onPress,
+  style,
+}: {
+  children: React.ReactNode;
+  onPress?: () => void;
+  style?: any;
+}) {
+  const scaleValue = useRef(new Animated.Value(1)).current;
 
-export default function MembersScreen() {
+  const onPressIn = () => {
+    Animated.spring(scaleValue, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 4,
+    }).start();
+  };
+
+  const onPressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 8,
+    }).start();
+  };
+
+  return (
+    <TouchableWithoutFeedback
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={onPress}
+    >
+      <Animated.View style={[{ transform: [{ scale: scaleValue }] }, style]}>
+        {children}
+      </Animated.View>
+    </TouchableWithoutFeedback>
+  );
+}
+
+const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
+const whatsappIconImg = require('../../assets/Icons2/whatsapp.png');
+
+type FilterType = 'all' | 'active' | 'expiring' | 'expired' | 'leads';
+
+export default function MembersScreen({ navigation }: any) {
   const { currentGym } = useAppContext();
   const gymId = currentGym?.id || 'g1';
 
-  const [members, setMembers] = useState<Member[]>(() => MEMBERS.filter(m => m.gymId === gymId || !m.gymId || m.gymId === 'gym1'));
+  const [members, setMembers] = useState<Member[]>(() =>
+    MEMBERS.filter((m) => m.gymId === gymId || !m.gymId || m.gymId === 'gym1')
+  );
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
   const [addModal, setAddModal] = useState(false);
   const [detailMember, setDetailMember] = useState<Member | null>(null);
 
-  // Form state
+  // Form states
   const [fName, setFName] = useState('');
   const [fPhone, setFPhone] = useState('');
-  const [fEmail, setFEmail] = useState('');
-  const [fAge, setFAge] = useState('');
-  const [fHeight, setFHeight] = useState('');
-  const [fWeight, setFWeight] = useState('');
-  const [fGoal, setFGoal] = useState<Member['goal']>('general_fitness');
-  const [fMedical, setFMedical] = useState('');
-  const [fEmContact, setFEmContact] = useState('');
-  const [fPlanId, setFPlanId] = useState('plan1');
+  const [fPlanId, setFPlanId] = useState('plan3');
 
-  const filtered = members.filter(m => {
-    const matchFilter = filter === 'all' || m.status === filter;
+  // ── Entrance Animation ──
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 450,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 450,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+    ]).start();
+  }, []);
+
+  const filtered = members.filter((m) => {
+    const daysLeft = getDaysRemaining(m.expiryDate);
+    let matchFilter = true;
+    if (filter === 'active') matchFilter = m.status === 'active' && daysLeft > 15;
+    else if (filter === 'expiring') matchFilter = m.status === 'active' && daysLeft <= 15;
+    else if (filter === 'expired') matchFilter = m.status === 'expired' || daysLeft <= 0;
+    else if (filter === 'leads') matchFilter = m.status === 'frozen';
+
     const matchSearch =
-      m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.phone.includes(search);
+      m.name.toLowerCase().includes(search.toLowerCase()) || m.phone.includes(search);
     return matchFilter && matchSearch;
   });
 
   const handleAdd = () => {
     if (!fName.trim() || !fPhone.trim()) {
-      Alert.alert('Required', 'Name and phone are required.');
+      Alert.alert('Required', 'Name and mobile number are required.');
       return;
     }
-    const heightN = parseFloat(fHeight) || 170;
-    const weightN = parseFloat(fWeight) || 70;
-    const bmi = parseFloat((weightN / ((heightN / 100) ** 2)).toFixed(1));
     const newMember: Member = {
       id: `m${Date.now()}`,
       userId: `u${Date.now()}`,
       gymId: gymId,
       name: fName.trim(),
       phone: fPhone.trim(),
-      email: fEmail.trim(),
-      avatar: fName.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
-      age: parseInt(fAge, 10) || 25,
-      height: heightN,
-      weight: weightN,
-      bmi,
-      goal: fGoal,
-      medicalIssues: fMedical.trim() || 'None',
-      emergencyContact: fEmContact.trim(),
-      emergencyPhone: '',
+      email: `${fName.toLowerCase().replace(' ', '')}@gmail.com`,
+      avatar: fName.slice(0, 2).toUpperCase(),
+      age: 26,
+      height: 175,
+      weight: 72,
+      bmi: 23.5,
+      goal: 'general_fitness',
+      medicalIssues: 'None',
+      emergencyContact: 'Family',
+      emergencyPhone: '9876543210',
       planId: fPlanId,
       status: 'active',
       joinDate: new Date().toISOString().split('T')[0],
-      expiryDate: (() => {
-        const plan = getPlanById(fPlanId);
-        const d = new Date();
-        d.setMonth(d.getMonth() + (plan?.duration ?? 1));
-        return d.toISOString().split('T')[0];
-      })(),
+      expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       trainerId: 't1',
       photo: '',
     };
-    setMembers(prev => [newMember, ...prev]);
-    Alert.alert('Success', `${fName} added successfully!`);
+    setMembers((prev) => [newMember, ...prev]);
+    Alert.alert('✓ Enrolled', `${fName} has been enrolled successfully!`);
+    setFName('');
+    setFPhone('');
     setAddModal(false);
-    resetForm();
-  };
-
-  const resetForm = () => {
-    setFName(''); setFPhone(''); setFEmail(''); setFAge('');
-    setFHeight(''); setFWeight(''); setFGoal('general_fitness');
-    setFMedical(''); setFEmContact(''); setFPlanId('plan1');
-  };
-
-  const toggleFreeze = (m: Member) => {
-    setMembers(prev =>
-      prev.map(x =>
-        x.id === m.id
-          ? { ...x, status: x.status === 'frozen' ? 'active' : 'frozen' }
-          : x,
-      ),
-    );
-    setDetailMember(null);
-  };
-
-  const removeMember = (m: Member) => {
-    Alert.alert('Remove Member', `Remove ${m.name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove', style: 'destructive',
-        onPress: () => {
-          setMembers(prev => prev.filter(x => x.id !== m.id));
-          setDetailMember(null);
-        },
-      },
-    ]);
-  };
-
-  const statusColor = (s: MemberStatus) => {
-    if (s === 'active') return { bg: LightColors.successBg, text: LightColors.success };
-    if (s === 'expired') return { bg: LightColors.dangerBg, text: LightColors.danger };
-    return { bg: LightColors.warningBg, text: LightColors.warning };
-  };
-
-  const goalLabel = (g: Member['goal']) => {
-    const map: Record<Member['goal'], string> = {
-      fat_loss: 'Fat Loss',
-      weight_gain: 'Weight Gain',
-      muscle_building: 'Muscle Building',
-      general_fitness: 'General Fitness',
-    };
-    return map[g];
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
-      <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
+      <Animated.View style={[styles.root, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        {/* ── AMBIENT BACKGROUND GLOWS ── */}
+        <View style={styles.ambientGlowTop} />
+        <View style={styles.ambientGlowRight} />
 
-        {/* HEADER */}
+        {/* ── HEADER ── */}
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View>
-              <Text style={styles.headerSub}>Manage</Text>
-              <Text style={styles.headerTitle}>Members 👥</Text>
-            </View>
-            <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-              <Text style={styles.addBtnText}>+ Add Member</Text>
-            </TouchableOpacity>
+          <View>
+            <Text style={styles.headerTitle}>Members Directory</Text>
+            <Text style={styles.headerSub}>Total Enrolled: {members.length} Members</Text>
           </View>
+          <TouchableOpacity
+            style={styles.addMemberHeaderBtn}
+            onPress={() => setAddModal(true)}
+            activeOpacity={0.85}
+          >
+            <Icon name="person-add" size={moderateScale(16)} color="#FFFFFF" />
+            <Text style={styles.addMemberHeaderText}>Add</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* SEARCH */}
+        {/* ── SEARCH BAR ── */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>🔍</Text>
+          <Icon name="search-outline" size={moderateScale(18)} color="#94A3B8" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name or phone..."
+            placeholder="Search member name or phone..."
             placeholderTextColor="#94A3B8"
             value={search}
             onChangeText={setSearch}
           />
-        </View>
-
-        {/* FILTER TABS */}
-        <View style={styles.filterRow}>
-          {(['all', 'active', 'expired', 'frozen'] as FilterType[]).map(f => (
-            <TouchableOpacity
-              key={f}
-              style={[styles.filterTab, filter === f && styles.filterTabActive]}
-              onPress={() => setFilter(f)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterTabText, filter === f && styles.filterTabTextActive]}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </Text>
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')}>
+              <Icon name="close-circle" size={moderateScale(16)} color="#94A3B8" />
             </TouchableOpacity>
-          ))}
+          )}
         </View>
 
-        <Text style={styles.countLabel}>{filtered.length} members</Text>
-
-        {/* MEMBER LIST */}
-        <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-          {filtered.length === 0 && (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyIcon}>👤</Text>
-              <Text style={styles.emptyText}>No members found</Text>
-            </View>
-          )}
-          {filtered.map(m => {
-            const plan = getPlanById(m.planId);
-            const daysLeft = getDaysRemaining(m.expiryDate);
-            const sc = statusColor(m.status);
+        {/* ── FILTER PILLS ── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterScroll}
+          contentContainerStyle={{ paddingHorizontal: wp(5), gap: moderateScale(8) }}
+        >
+          {(['all', 'active', 'expiring', 'expired', 'leads'] as FilterType[]).map((ft) => {
+            const isActive = filter === ft;
+            const labels: Record<FilterType, string> = {
+              all: `All (${members.length})`,
+              active: 'Active',
+              expiring: 'Expiring Soon',
+              expired: 'Expired',
+              leads: 'Leads',
+            };
             return (
               <TouchableOpacity
-                key={m.id}
-                style={styles.memberCard}
-                activeOpacity={0.85}
-                onPress={() => setDetailMember(m)}
+                key={ft}
+                style={[styles.filterPill, isActive && styles.filterPillActive]}
+                onPress={() => setFilter(ft)}
+                activeOpacity={0.75}
               >
-                <View style={styles.cardLeft}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>{m.avatar}</Text>
-                  </View>
-                </View>
-                <View style={styles.cardMid}>
-                  <Text style={styles.memberName}>{m.name}</Text>
-                  <Text style={styles.memberPhone}>{m.phone}</Text>
-                  <Text style={styles.memberPlan}>{plan?.name ?? 'No Plan'}</Text>
-                  <Text style={[styles.memberDays, daysLeft <= 7 && { color: '#EF4444' }]}>
-                    {daysLeft > 0 ? `${daysLeft} days left` : 'Expired'}
-                  </Text>
-                </View>
-                <View style={styles.cardRight}>
-                  <View style={[styles.statusPill, { backgroundColor: sc.bg }]}>
-                    <Text style={[styles.statusText, { color: sc.text }]}>
-                      {m.status.toUpperCase()}
-                    </Text>
-                  </View>
-                  <Text style={styles.goalChip}>{goalLabel(m.goal)}</Text>
-                </View>
+                <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                  {labels[ft]}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
 
-        {/* ── MEMBER DETAIL MODAL ── */}
-        <Modal visible={!!detailMember} transparent animationType="slide" onRequestClose={() => setDetailMember(null)}>
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalSheet}>
-              <View style={styles.modalHandle} />
-              {detailMember && (() => {
-                const plan = getPlanById(detailMember.planId);
-                const trainer = getTrainerById(detailMember.trainerId);
-                const daysLeft = getDaysRemaining(detailMember.expiryDate);
-                const sc = statusColor(detailMember.status);
-                return (
-                  <ScrollView showsVerticalScrollIndicator={false}>
-                    {/* Avatar header */}
-                    <View style={styles.detailAvatarRow}>
-                      <View style={[styles.avatar, { width: 64, height: 64, borderRadius: 32 }]}>
-                        <Text style={[styles.avatarText, { fontSize: 22 }]}>{detailMember.avatar}</Text>
-                      </View>
-                      <View style={{ flex: 1, marginLeft: 16 }}>
-                        <Text style={styles.detailName}>{detailMember.name}</Text>
-                        <Text style={styles.detailPhone}>📞 {detailMember.phone}</Text>
-                        <View style={[styles.statusPill, { backgroundColor: sc.bg, alignSelf: 'flex-start', marginTop: 6 }]}>
-                          <Text style={[styles.statusText, { color: sc.text }]}>{detailMember.status.toUpperCase()}</Text>
+        {/* ── MEMBER LIST ── */}
+        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {filtered.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Icon name="people-outline" size={moderateScale(42)} color="#94A3B8" />
+              <Text style={styles.emptyTitle}>No Members Found</Text>
+              <Text style={styles.emptySub}>Try searching with another name or filter criteria.</Text>
+            </View>
+          ) : (
+            filtered.map((m) => {
+              const plan = getPlanById(m.planId);
+              const daysLeft = getDaysRemaining(m.expiryDate);
+              const isExpired = m.status === 'expired' || daysLeft <= 0;
+              const isExpiring = m.status === 'active' && daysLeft <= 15;
+
+              return (
+                <AnimatedPressable
+                  key={m.id}
+                  style={styles.memberCard}
+                  onPress={() => setDetailMember(m)}
+                >
+                  <View style={styles.memberAvatar}>
+                    <Text style={styles.memberAvatarText}>{m.avatar || 'M'}</Text>
+                  </View>
+
+                  <View style={styles.memberInfoCol}>
+                    <View style={styles.memberNameRow}>
+                      <Text style={styles.memberName}>{m.name}</Text>
+                      {isExpired ? (
+                        <View style={[styles.statusBadge, { backgroundColor: 'rgba(255, 77, 109, 0.10)' }]}>
+                          <Text style={[styles.statusBadgeText, { color: '#FF4D6D' }]}>Expired</Text>
                         </View>
-                      </View>
+                      ) : isExpiring ? (
+                        <View style={[styles.statusBadge, { backgroundColor: 'rgba(255, 153, 0, 0.10)' }]}>
+                          <Text style={[styles.statusBadgeText, { color: '#FF9900' }]}>{daysLeft}d left</Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.statusBadge, { backgroundColor: 'rgba(0, 196, 140, 0.10)' }]}>
+                          <Text style={[styles.statusBadgeText, { color: '#00C48C' }]}>Active</Text>
+                        </View>
+                      )}
                     </View>
 
-                    {/* Info grid */}
-                    <View style={styles.detailGrid}>
-                      <DetailItem label="Age" value={`${detailMember.age} yrs`} />
-                      <DetailItem label="Height" value={`${detailMember.height} cm`} />
-                      <DetailItem label="Weight" value={`${detailMember.weight} kg`} />
-                      <DetailItem label="BMI" value={`${detailMember.bmi}`} />
-                      <DetailItem label="Goal" value={goalLabel(detailMember.goal)} />
-                      <DetailItem label="Email" value={detailMember.email || '—'} />
-                    </View>
+                    <Text style={styles.memberPlanSub}>
+                      {plan?.name ?? 'Standard Pass'} • {m.phone}
+                    </Text>
+                  </View>
 
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailSectionTitle}>Membership</Text>
-                      <Text style={styles.detailRow}>📋 Plan: {plan?.name ?? '—'}</Text>
-                      <Text style={styles.detailRow}>📅 Joined: {detailMember.joinDate}</Text>
-                      <Text style={styles.detailRow}>⏰ Expires: {detailMember.expiryDate}</Text>
-                      <Text style={[styles.detailRow, daysLeft <= 7 && { color: '#EF4444' }]}>
-                        ⏳ {daysLeft > 0 ? `${daysLeft} days remaining` : 'Expired'}
-                      </Text>
-                    </View>
+                  <Icon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
+                </AnimatedPressable>
+              );
+            })
+          )}
 
-                    <View style={styles.detailSection}>
-                      <Text style={styles.detailSectionTitle}>Trainer & Health</Text>
-                      <Text style={styles.detailRow}>🏋️ Trainer: {trainer?.name ?? '—'}</Text>
-                      <Text style={styles.detailRow}>🏥 Medical: {detailMember.medicalIssues}</Text>
-                      <Text style={styles.detailRow}>🆘 Emergency: {detailMember.emergencyContact}</Text>
-                    </View>
+          <View style={{ height: hp(12) }} />
+        </ScrollView>
 
-                    {/* Actions */}
-                    <View style={styles.actionRow}>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: LightColors.warningBg }]} onPress={() => toggleFreeze(detailMember)}>
-                        <Text style={[styles.actionBtnText, { color: LightColors.warning }]}>
-                          {detailMember.status === 'frozen' ? '▶️ Unfreeze' : '❄️ Freeze'}
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: LightColors.successBg }]}>
-                        <Text style={[styles.actionBtnText, { color: LightColors.success }]}>🔄 Renew</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionBtn, { backgroundColor: LightColors.dangerBg }]} onPress={() => removeMember(detailMember)}>
-                        <Text style={[styles.actionBtnText, { color: LightColors.danger }]}>🗑️ Remove</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity style={styles.closeBtn} onPress={() => setDetailMember(null)}>
-                      <Text style={styles.closeBtnText}>Close</Text>
-                    </TouchableOpacity>
-                  </ScrollView>
-                );
-              })()}
-            </View>
-          </View>
-        </Modal>
-
-        {/* ── ADD MEMBER MODAL ── */}
-        <Modal visible={addModal} transparent animationType="slide" onRequestClose={() => { setAddModal(false); resetForm(); }}>
+        {/* ── ENROLL MEMBER MODAL ── */}
+        <Modal visible={addModal} transparent animationType="slide">
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
-              <View style={styles.modalHandle} />
-              <Text style={styles.modalTitle}>Add New Member</Text>
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <FormField label="Full Name *" placeholder="John Doe" value={fName} onChange={setFName} />
-                <FormField label="Mobile Number *" placeholder="10-digit phone" value={fPhone} onChange={setFPhone} keyboard="phone-pad" />
-                <FormField label="Email" placeholder="email@example.com" value={fEmail} onChange={setFEmail} keyboard="email-address" />
-                <FormField label="Age" placeholder="e.g. 25" value={fAge} onChange={setFAge} keyboard="numeric" />
-                <FormField label="Height (cm)" placeholder="e.g. 175" value={fHeight} onChange={setFHeight} keyboard="numeric" />
-                <FormField label="Weight (kg)" placeholder="e.g. 70" value={fWeight} onChange={setFWeight} keyboard="numeric" />
-                <FormField label="Medical Issues" placeholder="None / details" value={fMedical} onChange={setFMedical} />
-                <FormField label="Emergency Contact Name" placeholder="e.g. Suresh" value={fEmContact} onChange={setFEmContact} />
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Enroll New Member</Text>
+                <TouchableOpacity onPress={() => setAddModal(false)}>
+                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
 
-                <Text style={styles.inputLabel}>Membership Plan</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                  {MEMBERSHIP_PLANS.map(p => (
-                    <TouchableOpacity
-                      key={p.id}
-                      style={[styles.planChip, fPlanId === p.id && styles.planChipActive]}
-                      onPress={() => setFPlanId(p.id)}
-                    >
-                      <Text style={[styles.planChipText, fPlanId === p.id && { color: '#FFFFFF' }]}>
-                        {p.name} — ₹{p.price}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Full Name *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fName}
+                  onChangeText={setFName}
+                  placeholder="e.g. Rahul Sharma"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
 
-                <Text style={styles.inputLabel}>Goal</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-                  {(['fat_loss', 'weight_gain', 'muscle_building', 'general_fitness'] as Member['goal'][]).map(g => (
-                    <TouchableOpacity
-                      key={g}
-                      style={[styles.planChip, fGoal === g && styles.planChipActive]}
-                      onPress={() => setFGoal(g)}
-                    >
-                      <Text style={[styles.planChipText, fGoal === g && { color: '#FFFFFF' }]}>
-                        {g.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Mobile Phone *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fPhone}
+                  onChangeText={setFPhone}
+                  placeholder="e.g. 9876543210"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="phone-pad"
+                />
+              </View>
 
-                <View style={styles.modalBtnRow}>
-                  <TouchableOpacity style={styles.cancelBtn} onPress={() => { setAddModal(false); resetForm(); }}>
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.submitBtn} onPress={handleAdd}>
-                    <Text style={styles.submitBtnText}>Add Member</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
+              <TouchableOpacity
+                style={styles.submitBtn}
+                onPress={handleAdd}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.submitBtnText}>CONFIRM ENROLLMENT</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
-      </View>
+
+        {/* ── MEMBER DETAIL SHEET ── */}
+        <Modal visible={!!detailMember} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Member Details</Text>
+                <TouchableOpacity onPress={() => setDetailMember(null)}>
+                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.detailProfileRow}>
+                <View style={styles.detailAvatar}>
+                  <Text style={styles.detailAvatarText}>{detailMember?.avatar ?? 'M'}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.detailName}>{detailMember?.name}</Text>
+                  <Text style={styles.detailPhone}>{detailMember?.phone}</Text>
+                  <Text style={styles.detailEmail}>{detailMember?.email}</Text>
+                </View>
+              </View>
+
+              <View style={styles.detailActionRow}>
+                <TouchableOpacity
+                  style={[styles.quickActionBtn, { backgroundColor: '#25D366' }]}
+                  onPress={() => Alert.alert('WhatsApp', `Sending reminder message to ${detailMember?.name}`)}
+                  activeOpacity={0.85}
+                >
+                  <Image source={whatsappIconImg} style={{ width: moderateScale(18), height: moderateScale(18), tintColor: '#FFFFFF' }} resizeMode="contain" />
+                  <Text style={styles.quickActionBtnText}>WhatsApp</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.quickActionBtn, { backgroundColor: '#6C5CE7' }]}
+                  onPress={() => Alert.alert('Calling...', `Dialing ${detailMember?.phone}`)}
+                  activeOpacity={0.85}
+                >
+                  <Icon name="call" size={moderateScale(16)} color="#FFFFFF" />
+                  <Text style={styles.quickActionBtnText}>Call</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      </Animated.View>
     </SafeAreaView>
   );
 }
 
-function DetailItem({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={detailItemStyles.box}>
-      <Text style={detailItemStyles.label}>{label}</Text>
-      <Text style={detailItemStyles.value}>{value}</Text>
-    </View>
-  );
-}
-const detailItemStyles = StyleSheet.create({
-  box: { width: '50%', paddingVertical: 8, paddingHorizontal: 4 },
-  label: { fontSize: 10, fontWeight: '600', color: LightColors.textMuted, textTransform: 'uppercase' },
-  value: { fontSize: 14, fontWeight: '700', color: LightColors.textPrimary, marginTop: 3 },
-});
-
-function FormField({
-  label, placeholder, value, onChange, keyboard,
-}: {
-  label: string; placeholder: string; value: string;
-  onChange: (v: string) => void;
-  keyboard?: 'default' | 'phone-pad' | 'email-address' | 'numeric';
-}) {
-  return (
-    <>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <TextInput
-        style={styles.input}
-        placeholder={placeholder}
-        placeholderTextColor="#94A3B8"
-        value={value}
-        onChangeText={onChange}
-        keyboardType={keyboard ?? 'default'}
-        autoCapitalize={keyboard === 'email-address' ? 'none' : 'words'}
-      />
-    </>
-  );
-}
-
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
-  root: { flex: 1, backgroundColor: LightColors.bgBase },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F7F7FD',
+  },
+  root: {
+    flex: 1,
+    backgroundColor: '#F7F7FD',
+  },
+
+  // ── Ambient Glows ──
+  ambientGlowTop: {
+    position: 'absolute',
+    top: -wp(20),
+    right: -wp(10),
+    width: wp(60),
+    height: wp(60),
+    borderRadius: wp(30),
+    backgroundColor: 'rgba(108, 92, 231, 0.06)',
+  },
+  ambientGlowRight: {
+    position: 'absolute',
+    top: hp(25),
+    left: -wp(20),
+    width: wp(50),
+    height: wp(50),
+    borderRadius: wp(25),
+    backgroundColor: 'rgba(56, 189, 248, 0.05)',
+  },
+
   header: {
-    backgroundColor: LightColors.bgSurface,
-    borderBottomWidth: 1,
-    borderBottomColor: LightColors.border,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(5),
+    paddingTop: hp(1),
+    paddingBottom: hp(1.2),
   },
-  headerContent: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+  headerTitle: {
+    fontSize: fontScale(21),
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary },
-  addBtn: { backgroundColor: LightColors.accentViolet, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: LightColors.accentViolet },
-  addBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+  headerSub: {
+    fontSize: fontScale(11.5),
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  addMemberHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#6C5CE7',
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(12),
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+  },
+  addMemberHeaderText: {
+    fontSize: fontScale(12.5),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+
   searchContainer: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: LightColors.bgSurface,
-    marginHorizontal: 16, marginTop: 16, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: LightColors.border,
-    width: '90%', maxWidth: 600, alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(14),
+    paddingHorizontal: moderateScale(14),
+    marginHorizontal: wp(5),
+    height: moderateScale(44),
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    marginBottom: hp(1.2),
   },
-  searchIcon: { fontSize: 16, marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 14, color: LightColors.textPrimary },
-  filterRow: {
-    flexDirection: 'row', paddingHorizontal: 16, marginTop: 12, gap: 8,
-    width: '90%', maxWidth: 600, alignSelf: 'center',
+  searchInput: {
+    flex: 1,
+    fontSize: fontScale(13),
+    color: '#0F172A',
   },
-  filterTab: { flex: 1, paddingVertical: 8, borderRadius: 20, backgroundColor: LightColors.bgElevated, alignItems: 'center' },
-  filterTabActive: { backgroundColor: LightColors.accentViolet },
-  filterTabText: { fontSize: 11, fontWeight: '700', color: LightColors.textMuted },
-  filterTabTextActive: { color: '#FFFFFF' },
-  countLabel: {
-    fontSize: 12, color: LightColors.textMuted, fontWeight: '600', paddingHorizontal: 16, marginTop: 10, marginBottom: 4,
-    width: '90%', maxWidth: 600, alignSelf: 'center',
+
+  filterScroll: {
+    maxHeight: moderateScale(42),
+    marginBottom: hp(1.5),
   },
-  list: {
-    padding: 16, gap: 12, paddingBottom: 100,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+  filterPill: {
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(10),
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
   },
-  memberCard: { flexDirection: 'row', backgroundColor: LightColors.bgSurface, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: LightColors.border, gap: 12, ...Shadows.card },
-  cardLeft: {},
-  cardMid: { flex: 1, gap: 3 },
-  cardRight: { alignItems: 'flex-end', gap: 8 },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: `${LightColors.accentViolet}15`, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 15, fontWeight: '800', color: LightColors.accentViolet },
-  memberName: { fontSize: 15, fontWeight: '700', color: LightColors.textPrimary },
-  memberPhone: { fontSize: 12, color: LightColors.textMuted },
-  memberPlan: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '600' },
-  memberDays: { fontSize: 12, color: LightColors.success, fontWeight: '600' },
-  statusPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  statusText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.3 },
-  goalChip: { fontSize: 10, fontWeight: '600', color: LightColors.accentViolet, backgroundColor: `${LightColors.accentViolet}15`, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  emptyState: { alignItems: 'center', padding: 40 },
-  emptyIcon: { fontSize: 48, marginBottom: 12 },
-  emptyText: { fontSize: 14, color: LightColors.textMuted, fontWeight: '500' },
+  filterPillActive: {
+    backgroundColor: '#6C5CE7',
+    borderColor: '#6C5CE7',
+  },
+  filterPillText: {
+    fontSize: fontScale(11.5),
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+
+  scroll: {
+    paddingHorizontal: wp(5),
+  },
+  memberCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(18),
+    padding: moderateScale(16),
+    marginBottom: hp(1.2),
+    gap: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+  },
+  memberAvatar: {
+    width: moderateScale(42),
+    height: moderateScale(42),
+    borderRadius: moderateScale(21),
+    backgroundColor: '#F3F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#6C5CE7',
+  },
+  memberAvatarText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  memberInfoCol: {
+    flex: 1,
+  },
+  memberNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 3,
+  },
+  memberName: {
+    fontSize: fontScale(14.5),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  memberPlanSub: {
+    fontSize: fontScale(11.5),
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  statusBadge: {
+    paddingHorizontal: moderateScale(7),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(5),
+  },
+  statusBadgeText: {
+    fontSize: fontScale(9.5),
+    fontWeight: '700',
+  },
+
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(32),
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    marginTop: hp(4),
+  },
+  emptyTitle: {
+    fontSize: fontScale(16),
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 10,
+  },
+  emptySub: {
+    fontSize: fontScale(12),
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
   // Modal
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(15,23,42,0.5)', justifyContent: 'flex-end' },
-  modalSheet: { backgroundColor: LightColors.bgSurface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, width: '100%', maxWidth: 600, alignSelf: 'center' },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: LightColors.border, alignSelf: 'center', marginBottom: 20 },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 20, textAlign: 'center' },
-  inputLabel: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary, marginBottom: 6, marginTop: 12 },
-  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
-  modalBtnRow: { flexDirection: 'row', gap: 12, marginTop: 24, marginBottom: 12 },
-  cancelBtn: { flex: 1, backgroundColor: LightColors.bgElevated, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  cancelBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
-  submitBtn: { flex: 1, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  submitBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-  planChip: { paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, backgroundColor: LightColors.bgElevated, marginRight: 8, borderWidth: 1, borderColor: LightColors.border },
-  planChipActive: { backgroundColor: LightColors.accentViolet, borderColor: LightColors.accentViolet },
-  planChipText: { fontSize: 12, fontWeight: '700', color: LightColors.textSecondary },
-  // Detail modal
-  detailAvatarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  detailName: { fontSize: 18, fontWeight: '800', color: LightColors.textPrimary },
-  detailPhone: { fontSize: 13, color: LightColors.textSecondary, marginTop: 4 },
-  detailGrid: { flexDirection: 'row', flexWrap: 'wrap', backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 12, marginBottom: 16 },
-  detailSection: { backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 14, marginBottom: 16 },
-  detailSectionTitle: { fontSize: 13, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 10 },
-  detailRow: { fontSize: 13, color: LightColors.textSecondary, fontWeight: '500', marginBottom: 6 },
-  actionRow: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  actionBtn: { flex: 1, padding: 12, borderRadius: 10, alignItems: 'center' },
-  actionBtnText: { fontSize: 12, fontWeight: '700', color: LightColors.textPrimary },
-  closeBtn: { backgroundColor: LightColors.bgElevated, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginBottom: 12 },
-  closeBtnText: { fontSize: 14, fontWeight: '700', color: LightColors.textSecondary },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    justifyContent: 'center',
+    paddingHorizontal: wp(5),
+  },
+  modalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(24),
+    padding: moderateScale(22),
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp(2),
+  },
+  modalTitle: {
+    fontSize: fontScale(18),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  inputGroup: {
+    marginBottom: hp(1.8),
+  },
+  inputLabel: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  modalInput: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(14),
+    height: moderateScale(46),
+    fontSize: fontScale(13.5),
+    color: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  submitBtn: {
+    backgroundColor: '#6C5CE7',
+    borderRadius: moderateScale(14),
+    height: moderateScale(48),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: hp(1),
+  },
+  submitBtnText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+
+  // Detail Modal
+  detailProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(14),
+    marginBottom: hp(2),
+  },
+  detailAvatar: {
+    width: moderateScale(54),
+    height: moderateScale(54),
+    borderRadius: moderateScale(27),
+    backgroundColor: '#F3F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#6C5CE7',
+  },
+  detailAvatarText: {
+    fontSize: fontScale(17),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  detailName: {
+    fontSize: fontScale(17),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  detailPhone: {
+    fontSize: fontScale(12.5),
+    color: '#64748B',
+    marginTop: 2,
+  },
+  detailEmail: {
+    fontSize: fontScale(11.5),
+    color: '#94A3B8',
+  },
+  detailActionRow: {
+    flexDirection: 'row',
+    gap: moderateScale(12),
+  },
+  quickActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
+  },
+  quickActionBtnText: {
+    fontSize: fontScale(13),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });

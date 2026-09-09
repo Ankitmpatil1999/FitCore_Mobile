@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar,
@@ -6,13 +6,39 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
 import { TRAINERS, FACILITIES } from '../../data/mockData';
+import { apiService } from '../../services/api';
 
 export default function MyGymScreen() {
-  const { currentGym } = useAppContext();
-  const gym = currentGym;
+  const { currentGym, currentMember, currentUser } = useAppContext();
+  const [liveGym, setLiveGym] = useState<any>(currentGym);
+
+  useEffect(() => {
+    async function loadGym() {
+      try {
+        const userId = currentMember?.id || currentUser?.id;
+        const res: any = await apiService.getMemberProfile(userId);
+        if (res.success && res.data?.gym) {
+          setLiveGym(res.data.gym);
+        }
+      } catch (err) {
+        console.log('Using local cached gym info');
+      }
+    }
+    loadGym();
+  }, [currentMember?.id, currentUser?.id]);
+
+  const gym = liveGym || currentGym || {
+    name: 'FitCore Elite Fitness Club',
+    tagline: 'Transform Your Body & Mind with State-of-the-Art Facilities',
+    isOpen: true,
+    rating: 4.9,
+    openTime: '06:00 AM',
+    closeTime: '10:00 PM',
+  };
   const gymFacilityIds = gym?.facilities?.map((f: any) =>
     typeof f === 'string' ? f : f.id,
-  ) ?? [];
+  ) ?? ['fac_1', 'fac_2', 'fac_3', 'fac_4'];
+
   const gymFacilities = FACILITIES.filter(f => gymFacilityIds.includes(f.id));
 
   const [photoIdx, setPhotoIdx] = useState(0);

@@ -2,70 +2,153 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StyleSheet, View, Image } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme';
 
 import DashboardScreen from '../screens/member/DashboardScreen';
-import CheckInScreen from '../screens/member/ScannerProfileScreen';
 import WorkoutScreen from '../screens/member/WorkoutScreen';
+import CheckInScreen from '../screens/member/ScannerProfileScreen';
+import ProgressScreen from '../screens/member/ProgressScreen';
+import ProfileScreen from '../screens/member/ProfileScreen';
+
+// Stack screens
+import ExerciseDetailScreen from '../screens/member/ExerciseDetailScreen';
+import ActiveWorkoutScreen from '../screens/member/ActiveWorkoutScreen';
 import DietScreen from '../screens/member/DietScreen';
 import MyGymScreen from '../screens/member/MyGymScreen';
 import MembershipScreen from '../screens/member/MembershipScreen';
-import ProgressScreen from '../screens/member/ProgressScreen';
 import ShopScreen from '../screens/member/ShopScreen';
 import TrainerChatScreen from '../screens/member/TrainerChatScreen';
 import NotificationsScreen from '../screens/member/NotificationsScreen';
-import ProfileScreen from '../screens/member/ProfileScreen';
+import ClassesScreen from '../screens/member/ClassesScreen';
+import CartCheckoutScreen from '../screens/member/CartCheckoutScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-function MemberTabNavigator() {
-  const TAB_ICONS: Record<string, any> = {
-    Home: require('../assets/Bottom bar/home.png'),
-    Workout: require('../assets/Bottom bar/search.png'),
-    Diet: require('../assets/Bottom bar/plan.png'),
-    Shop: require('../assets/Bottom bar/protien.png'),
-    Progress: require('../assets/Bottom bar/bar-graph.png'),
-  };
+// ── Tab Bar Assets ──
+const homeIcon = require('../assets/Bottom bar/home.png');
+const barbellIcon = require('../assets/Icons2/barbell.png');
+const proteinCenterIcon = require('../assets/Bottom bar/protien.png');
+const progressIcon = require('../assets/Icons2/bar-chart.png');
+const meIcon = require('../assets/Icons2/user.png');
 
+function MemberTabNavigator() {
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      initialRouteName="Home"
+      screenOptions={{
         headerShown: false,
-        tabBarShowLabel: false, // Remove names under icons
+        tabBarShowLabel: true,
         tabBarStyle: styles.tabBar,
         tabBarItemStyle: styles.tabBarItem,
-        safeAreaInsets: { bottom: 0, top: 0, left: 0, right: 0 }, // Disable automatic safe area padding
-        tabBarIcon: ({ focused }) => {
-          const iconSource = TAB_ICONS[route.name];
-          if (!iconSource) return null;
-
-          const isCenter = route.name === 'Diet';
-
-          return (
-            <View style={[
-              styles.iconWrapper,
-              focused ? styles.iconWrapperActive : styles.iconWrapperInactive
-            ]}>
+        tabBarActiveTintColor: '#6C5CE7',
+        tabBarInactiveTintColor: '#94A3B8',
+        tabBarLabelStyle: styles.tabBarLabel,
+      }}
+    >
+      {/* 1. Home Tab */}
+      <Tab.Screen
+        name="Home"
+        component={DashboardScreen}
+        options={{
+          tabBarLabel: 'Home',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
               <Image
-                source={iconSource}
+                source={homeIcon}
                 style={[
                   styles.tabIcon,
-                  isCenter ? styles.centerTabIcon : styles.normalTabIcon,
-                  { opacity: focused ? 1 : 0.65 }
+                  { tintColor: focused ? '#6C5CE7' : '#94A3B8' },
                 ]}
+                resizeMode="contain"
               />
             </View>
-          );
-        },
-      })}
-    >
-      {/* Main 5 visible tabs */}
-      <Tab.Screen name="Home" component={DashboardScreen} />
-      <Tab.Screen name="Workout" component={WorkoutScreen} />
-      <Tab.Screen name="Diet" component={DietScreen} />
-      <Tab.Screen name="Shop" component={ShopScreen} />
-      <Tab.Screen name="Progress" component={ProgressScreen} />
+          ),
+        }}
+      />
+
+      {/* 2. Workout Tab */}
+      <Tab.Screen
+        name="Workout"
+        component={WorkoutScreen}
+        options={{
+          tabBarLabel: 'Workout',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
+              <Image
+                source={barbellIcon}
+                style={[
+                  styles.tabIcon,
+                  { tintColor: focused ? '#6C5CE7' : '#94A3B8' },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
+          ),
+        }}
+      />
+
+      {/* 3. Center Floating Store & Supplements Tab */}
+      <Tab.Screen
+        name="StoreTab"
+        component={ShopScreen}
+        options={{
+          tabBarLabel: () => null,
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.centerPlusButton}>
+              <Image
+                source={proteinCenterIcon}
+                style={{ width: 24, height: 24, tintColor: '#FFFFFF' }}
+                resizeMode="contain"
+              />
+            </View>
+          ),
+        }}
+      />
+
+
+      {/* 4. Progress Tab */}
+      <Tab.Screen
+        name="Progress"
+        component={ProgressScreen}
+        options={{
+          tabBarLabel: 'Progress',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
+              <Image
+                source={progressIcon}
+                style={[
+                  styles.tabIcon,
+                  { tintColor: focused ? '#6C5CE7' : '#94A3B8' },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
+          ),
+        }}
+      />
+
+      {/* 5. Me Tab */}
+      <Tab.Screen
+        name="Me"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: 'Me',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
+              <Image
+                source={meIcon}
+                style={[
+                  styles.tabIcon,
+                  { tintColor: focused ? '#6C5CE7' : '#94A3B8' },
+                ]}
+                resizeMode="contain"
+              />
+            </View>
+          ),
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -74,62 +157,74 @@ export default function MemberNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MemberTabNavigator} />
+      <Stack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} />
+      <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
       <Stack.Screen name="Check-In" component={CheckInScreen} />
       <Stack.Screen name="My Gym" component={MyGymScreen} />
       <Stack.Screen name="Membership" component={MembershipScreen} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="Diet" component={DietScreen} />
+      <Stack.Screen name="Shop" component={ShopScreen} />
       <Stack.Screen name="Trainer Chat" component={TrainerChatScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Classes" component={ClassesScreen} />
+      <Stack.Screen name="Book Slot" component={ClassesScreen} />
+      <Stack.Screen name="CartCheckout" component={CartCheckoutScreen} />
     </Stack.Navigator>
   );
 }
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#000000', // Solid black
-    borderTopWidth: 0,
-    height: 85, // Generous height to accommodate home indicator
-    paddingBottom: 15, // Space for home swipe line
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#ECEAFD',
+    height: 76,
+    paddingBottom: 10,
+    paddingTop: 8,
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    elevation: 10,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.4,
+    elevation: 8,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.05,
     shadowRadius: 10,
   },
   tabBarItem: {
-    height: 55, // Fixed height for vertical centering in the active zone
+    height: 52,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 5, // Center within the top section of the bar
+  },
+  tabBarLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: 2,
   },
   iconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  iconWrapperActive: {
-    backgroundColor: '#2C65DE',
-  },
-  iconWrapperInactive: {
-    backgroundColor: 'rgba(44, 101, 222, 0.18)',
-  },
-  tabIcon: {
-    resizeMode: 'contain',
-  },
-  normalTabIcon: {
-    width: 24,
-    height: 24,
-  },
-  centerTabIcon: {
+    justifyContent: 'center',
     width: 32,
     height: 32,
+  },
+  tabIcon: {
+    width: 22,
+    height: 22,
+  },
+  centerPlusButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#6C5CE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+    elevation: 6,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
   },
 });

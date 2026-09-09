@@ -1,261 +1,383 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  StatusBar, TextInput, Alert, Switch,
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  StatusBar,
+  Alert,
+  Switch,
+  Animated,
+  Easing,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LightColors, Shadows } from '../../theme';
-import { GYMS, FACILITIES, Gym } from '../../data/mockData';
+import Icon from 'react-native-vector-icons/Ionicons';
+import { Colors, Typography, Radii } from '../../theme';
+import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
+import { GYMS, FACILITIES } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 
+// ── Interactive Scale on Press Component ──
+function AnimatedPressable({
+  children,
+  onPress,
+  style,
+}: {
+  children: React.ReactNode;
+  onPress?: () => void;
+  style?: any;
+}) {
+  const scaleValue = useRef(new Animated.Value(1)).current;
 
+  const onPressIn = () => {
+    Animated.spring(scaleValue, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 4,
+    }).start();
+  };
 
-const SUBSCRIPTION_PLANS = [
-  { id: 'basic', name: 'Basic', price: '₹999/month', features: ['Up to 100 members', 'Basic reports', 'QR check-in'] },
-  { id: 'standard', name: 'Standard', price: '₹2,499/month', features: ['Up to 500 members', 'Advanced analytics', 'QR + NFC check-in', 'SMS notifications'] },
-  { id: 'premium', name: 'Premium', price: '₹4,999/month', features: ['Unlimited members', 'Full analytics suite', 'All check-in modes', 'Priority support', 'E-commerce store'] },
-];
+  const onPressOut = () => {
+    Animated.spring(scaleValue, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 8,
+    }).start();
+  };
 
-export default function GymProfileScreen() {
+  return (
+    <TouchableWithoutFeedback
+      onPressIn={onPressIn}
+      onPressOut={onPressOut}
+      onPress={onPress}
+    >
+      <Animated.View style={[{ transform: [{ scale: scaleValue }] }, style]}>
+        {children}
+      </Animated.View>
+    </TouchableWithoutFeedback>
+  );
+}
+
+interface MenuItem {
+  label: string;
+  icon: string;
+  route?: string;
+  color: string;
+}
+
+interface MenuSection {
+  title: string;
+  items: MenuItem[];
+}
+
+export default function GymProfileScreen({ navigation }: any) {
   const { logout, currentGym } = useAppContext();
   const gym = currentGym || GYMS[0];
 
   const [gymName, setGymName] = useState(gym.name);
-  const [tagline, setTagline] = useState(gym.tagline);
-  const [address, setAddress] = useState(gym.address);
-  const [phone, setPhone] = useState(gym.phone);
-  const [email, setEmail] = useState(gym.email);
-  const [openTime, setOpenTime] = useState(gym.openTime);
-  const [closeTime, setCloseTime] = useState(gym.closeTime);
   const [isOpen, setIsOpen] = useState(gym.isOpen);
-  const [selectedFacilities, setSelectedFacilities] = useState<string[]>(
-    gym.facilities.map((f: any) => (typeof f === 'string' ? f : f.id)),
-  );
-  const [isEditing, setIsEditing] = useState(false);
 
-  const toggleFacility = (fId: string) => {
-    setSelectedFacilities(prev =>
-      prev.includes(fId) ? prev.filter(f => f !== fId) : [...prev, fId],
-    );
+  // ── Entrance Animation ──
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(20)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 450,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 450,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+    ]).start();
+  }, []);
+
+  const menuSections: MenuSection[] = [
+    {
+      title: 'Gym Management',
+      items: [
+        { label: 'Membership Packages', icon: 'pricetags-outline', route: 'Plans', color: '#6C5CE7' },
+        { label: 'Business Reports & Analytics', icon: 'stats-chart-outline', route: 'Analytics', color: '#00C48C' },
+        { label: 'Fitness Store & Products', icon: 'bag-handle-outline', route: 'Shop', color: '#FF9900' },
+      ],
+    },
+    {
+      title: 'Settings & Account',
+      items: [
+        { label: 'Gym Operating Hours', icon: 'time-outline', color: '#38BDF8' },
+        { label: 'Staff & Roles Permission', icon: 'shield-outline', color: '#A855F7' },
+        { label: 'Help & Technical Support', icon: 'help-circle-outline', color: '#6C5CE7' },
+      ],
+    },
+  ];
+
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to log out of the owner portal?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Logout', style: 'destructive', onPress: logout },
+    ]);
   };
-
-  const handleSave = () => {
-    Alert.alert('Saved', 'Gym profile has been updated!');
-    setIsEditing(false);
-  };
-
-  const currentPlan = SUBSCRIPTION_PLANS.find(p => p.id === gym.subscriptionPlan)!;
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor={LightColors.bgSurface} />
-      <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
+      <Animated.View style={[styles.root, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
+        {/* ── AMBIENT BACKGROUND GLOWS ── */}
+        <View style={styles.ambientGlowTop} />
+        <View style={styles.ambientGlowRight} />
 
+        {/* ── HEADER ── */}
         <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View>
-              <Text style={styles.headerSub}>Settings</Text>
-              <Text style={styles.headerTitle}>Gym Profile 🏢</Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.editBtn, isEditing && { backgroundColor: LightColors.success }]}
-              onPress={() => isEditing ? handleSave() : setIsEditing(true)}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.editBtnText}>{isEditing ? '✅ Save' : '✏️ Edit'}</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.headerTitle}>Gym Management</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          {/* ── GYM PROFILE CARD ── */}
+          <View style={styles.profileCard}>
+            <View style={styles.gymLogoBox}>
+              <Icon name="barbell" size={moderateScale(32)} color="#6C5CE7" />
+            </View>
 
-          {/* Gym identity */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Gym Identity</Text>
+            <Text style={styles.gymTitle}>{gymName}</Text>
+            <Text style={styles.gymAddress}>{gym.address || 'FC Road, Pune, MH'}</Text>
 
-            <Text style={styles.fieldLabel}>Gym Name</Text>
-            {isEditing ? (
-              <TextInput style={styles.input} value={gymName} onChangeText={setGymName} />
-            ) : (
-              <Text style={styles.fieldValue}>{gymName}</Text>
-            )}
-
-            <Text style={styles.fieldLabel}>Tagline</Text>
-            {isEditing ? (
-              <TextInput style={styles.input} value={tagline} onChangeText={setTagline} />
-            ) : (
-              <Text style={styles.fieldValue}>{tagline}</Text>
-            )}
-
-            {/* Rating chip */}
-            <View style={styles.ratingRow}>
-              {[1, 2, 3, 4, 5].map(i => (
-                <Text key={i} style={{ fontSize: 20, color: i <= Math.floor(gym.rating) ? '#F59E0B' : '#E2E8F0' }}>★</Text>
-              ))}
-              <Text style={styles.ratingText}>{gym.rating} / 5.0</Text>
+            {/* Status Switcher */}
+            <View style={styles.statusToggleRow}>
+              <View style={styles.statusIndicatorRow}>
+                <View style={[styles.statusDot, { backgroundColor: isOpen ? '#00C48C' : '#FF4D6D' }]} />
+                <Text style={styles.statusLabelText}>
+                  {isOpen ? 'Gym Open Now' : 'Gym Closed'}
+                </Text>
+              </View>
+              <Switch
+                value={isOpen}
+                onValueChange={setIsOpen}
+                trackColor={{ false: '#ECEAFD', true: '#6C5CE7' }}
+                thumbColor="#FFFFFF"
+              />
             </View>
           </View>
 
-          {/* Contact & Hours */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Contact & Hours</Text>
-
-            {[
-              { label: 'Address', val: address, set: setAddress },
-              { label: 'Phone', val: phone, set: setPhone },
-              { label: 'Email', val: email, set: setEmail },
-              { label: 'Opening Time', val: openTime, set: setOpenTime },
-              { label: 'Closing Time', val: closeTime, set: setCloseTime },
-            ].map(f => (
-              <View key={f.label}>
-                <Text style={styles.fieldLabel}>{f.label}</Text>
-                {isEditing ? (
-                  <TextInput style={styles.input} value={f.val} onChangeText={f.set} />
-                ) : (
-                  <Text style={styles.fieldValue}>{f.val}</Text>
-                )}
-              </View>
-            ))}
-
-            <View style={styles.switchRow}>
-              <View>
-                <Text style={styles.fieldLabel}>Currently Open</Text>
-                <Text style={styles.fieldValue}>{isOpen ? '🟢 Open' : '🔴 Closed'}</Text>
-              </View>
-              {isEditing && (
-                <Switch
-                  value={isOpen}
-                  onValueChange={setIsOpen}
-                  trackColor={{ false: LightColors.borderHover, true: `${LightColors.accentViolet}50` }}
-                  thumbColor={isOpen ? LightColors.accentViolet : LightColors.bgElevated}
-                />
-              )}
-            </View>
-          </View>
-
-          {/* Facilities */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Facilities</Text>
-            <View style={styles.facilitiesGrid}>
-              {FACILITIES.map(f => {
-                const isSelected = selectedFacilities.includes(f.id);
-                return (
+          {/* ── MENU SECTIONS ── */}
+          {menuSections.map((sec) => (
+            <View key={sec.title} style={styles.sectionContainer}>
+              <Text style={styles.sectionTitle}>{sec.title}</Text>
+              <View style={styles.menuCard}>
+                {sec.items.map((item, idx) => (
                   <TouchableOpacity
-                    key={f.id}
-                    style={[styles.facilityChip, isSelected && styles.facilityChipActive]}
-                    onPress={() => isEditing && toggleFacility(f.id)}
-                    activeOpacity={isEditing ? 0.7 : 1}
+                    key={item.label}
+                    style={[styles.menuItem, idx < sec.items.length - 1 && styles.menuItemBorder]}
+                    onPress={() => {
+                      if (item.route) navigation.navigate(item.route);
+                      else Alert.alert(item.label, 'Configuration module is available in next update.');
+                    }}
+                    activeOpacity={0.7}
                   >
-                    <Text style={styles.facilityIcon}>{f.icon}</Text>
-                    <Text style={[styles.facilityName, isSelected && styles.facilityNameActive]}>
-                      {f.name}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            {isEditing && (
-              <Text style={styles.editHint}>Tap facilities to toggle them on/off</Text>
-            )}
-          </View>
-
-          {/* Subscription Plan */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>FITCore Subscription</Text>
-            {SUBSCRIPTION_PLANS.map(plan => {
-              const isActive = plan.id === gym.subscriptionPlan;
-              return (
-                <View key={plan.id} style={[styles.subPlanCard, isActive && styles.subPlanCardActive]}>
-                  <View style={styles.subPlanTop}>
-                    <View>
-                      <Text style={styles.subPlanName}>{plan.name}</Text>
-                      <Text style={styles.subPlanPrice}>{plan.price}</Text>
+                    <View style={[styles.menuIconBg, { backgroundColor: item.color + '15' }]}>
+                      <Icon name={item.icon as any} size={moderateScale(20)} color={item.color} />
                     </View>
-                    {isActive && (
-                      <View style={styles.activePlanBadge}>
-                        <Text style={styles.activePlanText}>✅ Current Plan</Text>
-                      </View>
-                    )}
-                  </View>
-                  {plan.features.map((feat, i) => (
-                    <Text key={i} style={styles.subFeature}>✓ {feat}</Text>
-                  ))}
-                  {!isActive && (
-                    <TouchableOpacity style={styles.upgradeBtn} onPress={() => Alert.alert('Upgrade', `Upgrade to ${plan.name} — contact FITCore support.`)}>
-                      <Text style={styles.upgradeBtnText}>Upgrade to {plan.name}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              );
-            })}
-          </View>
+                    <Text style={styles.menuLabelText}>{item.label}</Text>
+                    <Icon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))}
 
-          {/* Danger zone */}
-          <View style={[styles.section, { borderColor: '#FEE2E2', borderWidth: 1 }]}>
-            <Text style={[styles.sectionTitle, { color: '#EF4444' }]}>Account</Text>
-            <TouchableOpacity
-              style={styles.logoutBtn}
-              onPress={() => Alert.alert('Logout', 'Are you sure?', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Logout', style: 'destructive', onPress: logout },
-              ])}
-              activeOpacity={0.85}
-            >
-              <Text style={styles.logoutBtnText}>🚪 Logout</Text>
-            </TouchableOpacity>
-          </View>
+          {/* ── LOGOUT BUTTON ── */}
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
+            <Icon name="log-out-outline" size={moderateScale(18)} color="#FF4D6D" />
+            <Text style={styles.logoutBtnText}>Logout of Owner Account</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: hp(12) }} />
         </ScrollView>
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: LightColors.bgSurface },
-  root: { flex: 1, backgroundColor: LightColors.bgBase },
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F7F7FD',
+  },
+  root: {
+    flex: 1,
+    backgroundColor: '#F7F7FD',
+  },
+
+  // ── Ambient Glows ──
+  ambientGlowTop: {
+    position: 'absolute',
+    top: -wp(20),
+    right: -wp(10),
+    width: wp(60),
+    height: wp(60),
+    borderRadius: wp(30),
+    backgroundColor: 'rgba(108, 92, 231, 0.06)',
+  },
+  ambientGlowRight: {
+    position: 'absolute',
+    top: hp(25),
+    left: -wp(20),
+    width: wp(50),
+    height: wp(50),
+    borderRadius: wp(25),
+    backgroundColor: 'rgba(56, 189, 248, 0.05)',
+  },
+
   header: {
-    backgroundColor: LightColors.bgSurface,
-    borderBottomWidth: 1,
-    borderBottomColor: LightColors.border,
+    paddingHorizontal: wp(5),
+    paddingTop: hp(1),
+    paddingBottom: hp(1.2),
   },
-  headerContent: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 12, paddingBottom: 20,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+  headerTitle: {
+    fontSize: fontScale(21),
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  headerSub: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500' },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: LightColors.textPrimary },
-  editBtn: { backgroundColor: LightColors.accentViolet, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: LightColors.accentViolet },
-  editBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
+
   scroll: {
-    padding: 20, paddingBottom: 100,
-    width: '100%', maxWidth: 600, alignSelf: 'center',
+    paddingHorizontal: wp(5),
+    paddingTop: hp(0.5),
   },
-  section: { backgroundColor: LightColors.bgSurface, borderRadius: 16, padding: 20, marginBottom: 16, ...Shadows.card },
-  sectionTitle: { fontSize: 15, fontWeight: '800', color: LightColors.textPrimary, marginBottom: 16 },
-  fieldLabel: { fontSize: 11, fontWeight: '700', color: LightColors.textMuted, textTransform: 'uppercase', marginBottom: 5, marginTop: 12 },
-  fieldValue: { fontSize: 14, fontWeight: '600', color: LightColors.textPrimary },
-  input: { backgroundColor: LightColors.bgBase, borderWidth: 1, borderColor: LightColors.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, color: LightColors.textPrimary },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 12 },
-  ratingText: { fontSize: 13, fontWeight: '700', color: LightColors.textMuted, marginLeft: 8 },
-  switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-  facilitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  facilityChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, backgroundColor: LightColors.bgElevated, borderWidth: 1, borderColor: LightColors.border },
-  facilityChipActive: { backgroundColor: `${LightColors.accentViolet}15`, borderColor: LightColors.accentViolet },
-  facilityIcon: { fontSize: 16 },
-  facilityName: { fontSize: 12, fontWeight: '600', color: LightColors.textMuted },
-  facilityNameActive: { color: LightColors.accentViolet },
-  editHint: { fontSize: 11, color: LightColors.textMuted, marginTop: 10, fontStyle: 'italic' },
-  subPlanCard: { backgroundColor: LightColors.bgBase, borderRadius: 12, padding: 16, marginBottom: 12, borderWidth: 1, borderColor: LightColors.border },
-  subPlanCardActive: { borderColor: LightColors.accentViolet, backgroundColor: `${LightColors.accentViolet}15` },
-  subPlanTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-  subPlanName: { fontSize: 16, fontWeight: '800', color: LightColors.textPrimary },
-  subPlanPrice: { fontSize: 13, color: LightColors.accentViolet, fontWeight: '700', marginTop: 3 },
-  activePlanBadge: { backgroundColor: LightColors.successBg, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
-  activePlanText: { fontSize: 11, fontWeight: '700', color: LightColors.success },
-  subFeature: { fontSize: 12, color: LightColors.textSecondary, fontWeight: '500', marginBottom: 4 },
-  upgradeBtn: { marginTop: 12, backgroundColor: LightColors.accentViolet, borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
-  upgradeBtnText: { fontSize: 13, fontWeight: '700', color: '#FFFFFF' },
-  logoutBtn: { backgroundColor: LightColors.dangerBg, borderRadius: 12, paddingVertical: 14, alignItems: 'center' },
-  logoutBtnText: { fontSize: 15, fontWeight: '700', color: LightColors.danger },
+
+  profileCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(22),
+    padding: moderateScale(20),
+    alignItems: 'center',
+    marginBottom: hp(2),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+  },
+  gymLogoBox: {
+    width: moderateScale(68),
+    height: moderateScale(68),
+    borderRadius: moderateScale(34),
+    backgroundColor: '#F3F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: hp(1.2),
+    borderWidth: 2,
+    borderColor: '#6C5CE7',
+  },
+  gymTitle: {
+    fontSize: fontScale(18),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  gymAddress: {
+    fontSize: fontScale(12),
+    color: '#64748B',
+    marginTop: 2,
+    marginBottom: hp(1.5),
+  },
+
+  statusToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(14),
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  statusIndicatorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statusDot: {
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+  },
+  statusLabelText: {
+    fontSize: fontScale(13),
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+
+  sectionContainer: {
+    marginBottom: hp(2),
+  },
+  sectionTitle: {
+    fontSize: fontScale(13.5),
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: hp(1),
+  },
+  menuCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(18),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: moderateScale(14),
+    gap: moderateScale(12),
+  },
+  menuItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F2FE',
+  },
+  menuIconBg: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuLabelText: {
+    flex: 1,
+    fontSize: fontScale(13.5),
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+
+  logoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 77, 109, 0.25)',
+    borderRadius: moderateScale(14),
+    paddingVertical: moderateScale(14),
+    marginTop: hp(1),
+  },
+  logoutBtnText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '700',
+    color: '#FF4D6D',
+  },
 });
