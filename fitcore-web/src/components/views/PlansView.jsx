@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
+import { CreditCardIcon } from '../common/Icons';
 
 export default function PlansView({ plans, setPlans }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [pName, setPName] = useState('');
-  const [pDuration, setPDuration] = useState('3 Months');
+  const [pDuration, setPDuration] = useState('1 Month');
   const [pPrice, setPPrice] = useState('');
 
   const handleAddPlan = (e) => {
@@ -24,12 +25,12 @@ export default function PlansView({ plans, setPlans }) {
 
   const resetForm = () => {
     setPName('');
-    setPDuration('3 Months');
+    setPDuration('1 Month');
     setPPrice('');
   };
 
   const handleDeletePlan = (id) => {
-    if (window.confirm('Are you sure you want to delete this membership plan?')) {
+    if (window.confirm('Are you sure you want to remove this plan?')) {
       setPlans(prev => prev.filter(p => p.id !== id));
     }
   };
@@ -41,8 +42,8 @@ export default function PlansView({ plans, setPlans }) {
           <h2>Membership Plans</h2>
           <p className="gym-tagline">Manage gym subscription durations, pricing, and benefits</p>
         </div>
-        <button className="primary-action-btn" onClick={() => setIsModalOpen(true)}>
-          💳 Create New Plan
+        <button className="primary-action-btn" onClick={() => setIsModalOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <CreditCardIcon size={14} color="currentColor" /> Create New Plan
         </button>
       </header>
 

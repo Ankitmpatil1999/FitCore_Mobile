@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CreditCardIcon, FileTextIcon, PlusIcon } from '../common/Icons';
 
 export default function PaymentsView({ members, setMembers, plans }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,8 +76,8 @@ export default function PaymentsView({ members, setMembers, plans }) {
           <h2>Payments & Invoicing Ledger</h2>
           <p className="gym-tagline">Track subscriptions revenue, cash, card, and UPI logs</p>
         </div>
-        <button className="primary-action-btn" onClick={() => setIsModalOpen(true)}>
-          💰 Record New Payment
+        <button className="primary-action-btn" onClick={() => setIsModalOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <PlusIcon size={14} color="currentColor" /> Record New Payment
         </button>
       </header>
 
@@ -149,8 +150,8 @@ export default function PaymentsView({ members, setMembers, plans }) {
                   </span>
                 </td>
                 <td>
-                  <button className="text-action-btn" onClick={() => alert(`Download invoice mock for ${tx.txId} initiated!`)}>
-                    📄 Invoice
+                  <button className="text-action-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }} onClick={() => alert(`Download invoice mock for ${tx.txId} initiated!`)}>
+                    <FileTextIcon size={13} color="currentColor" /> Invoice
                   </button>
                 </td>
               </tr>

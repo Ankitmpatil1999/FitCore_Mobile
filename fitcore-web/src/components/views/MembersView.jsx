@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { PlusIcon } from '../common/Icons';
 
 export default function MembersView({ members, setMembers, trainers, plans }) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -102,8 +103,8 @@ export default function MembersView({ members, setMembers, trainers, plans }) {
           <h2>Members Directory</h2>
           <p className="gym-tagline">Manage client profiles, checkout history, and plans</p>
         </div>
-        <button className="primary-action-btn" onClick={() => setIsAddModalOpen(true)}>
-          ➕ Add New Member
+        <button className="primary-action-btn" onClick={() => setIsAddModalOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <PlusIcon size={15} color="currentColor" /> Add New Member
         </button>
       </header>
 

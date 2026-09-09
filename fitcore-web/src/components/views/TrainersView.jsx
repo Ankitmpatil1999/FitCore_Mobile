@@ -1,42 +1,32 @@
 import React, { useState } from 'react';
+import { PlusIcon } from '../common/Icons';
 
 export default function TrainersView({ trainers, setTrainers, members }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [tName, setTName] = useState('');
-  const [tSpec, setTSpec] = useState('');
-  const [tExp, setTExp] = useState('');
-  const [tSalary, setTSalary] = useState('');
-  const [tStatus, setTStatus] = useState('Available');
+  const [name, setName] = useState('');
+  const [specialization, setSpecialization] = useState('Strength & Powerlifting');
+  const [experience, setExperience] = useState('3 Years');
+  const [salary, setSalary] = useState('₹25,000');
 
-  const handleAddTrainer = (e) => {
+  const handleAdd = (e) => {
     e.preventDefault();
-    if (!tName.trim() || !tSpec.trim()) return;
-
+    if (!name.trim()) return;
     const newTrainer = {
-      id: `t_${Date.now()}`,
-      name: tName.trim(),
-      specialization: tSpec.trim(),
-      experience: tExp.trim() || '1 Year',
+      id: 't_' + Date.now(),
+      name,
+      specialization,
+      experience,
       assignedMembers: 0,
-      salary: tSalary.trim() ? `₹${tSalary.trim()}` : '₹20,000',
-      status: tStatus
+      salary,
+      status: 'Available'
     };
-
     setTrainers(prev => [...prev, newTrainer]);
+    setName('');
     setIsModalOpen(false);
-    resetForm();
   };
 
-  const resetForm = () => {
-    setTName('');
-    setTSpec('');
-    setTExp('');
-    setTSalary('');
-    setTStatus('Available');
-  };
-
-  const handleDeleteTrainer = (id) => {
-    if (window.confirm('Are you sure you want to remove this trainer profile?')) {
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to remove this trainer?')) {
       setTrainers(prev => prev.filter(t => t.id !== id));
     }
   };
@@ -48,8 +38,8 @@ export default function TrainersView({ trainers, setTrainers, members }) {
           <h2>Personal Trainers</h2>
           <p className="gym-tagline">Manage gym fitness coaches, specializations, and availability</p>
         </div>
-        <button className="primary-action-btn" onClick={() => setIsModalOpen(true)}>
-          ➕ Add Trainer Profile
+        <button className="primary-action-btn" onClick={() => setIsModalOpen(true)} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+          <PlusIcon size={15} color="currentColor" /> Add Trainer Profile
         </button>
       </header>
 

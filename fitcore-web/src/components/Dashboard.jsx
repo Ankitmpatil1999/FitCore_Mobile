@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import './SuperAdminDashboard.css';
 import DashboardView from './views/DashboardView.jsx';
 import MembersView from './views/MembersView.jsx';
 import TrainersView from './views/TrainersView.jsx';
@@ -13,273 +14,522 @@ import ReportsView from './views/ReportsView.jsx';
 import SettingsView from './views/SettingsView.jsx';
 import ProfileView from './views/ProfileView.jsx';
 
-import logoIcon from '../assets/Icone.png';
+import { API_ENDPOINTS, API_URL } from '../config/api';
+import {
+  BoltIcon,
+  BuildingIcon,
+  UsersIcon,
+  ShieldCheckIcon,
+  StoreIcon,
+  BellIcon,
+  ServerIcon,
+  DatabaseIcon,
+  LogoutIcon,
+  SearchIcon,
+  LocationPinIcon
+} from './common/Icons';
 
-const INITIAL_MEMBERS = [
-  {
-    id: 'm1',
-    name: 'Ankit Kumar',
-    phone: '8530292487',
-    joinedDate: 'Jan 10, 2026',
-    plan: 'Gold Annual Pass',
-    trainer: 'Vikram Singh',
-    status: 'Active',
-    avatar: 'AK',
-    attendance: [
-      { date: '2026-06-17', checkIn: '08:20 AM', checkOut: '09:45 AM', status: 'Present' },
-      { date: '2026-06-16', checkIn: '08:15 AM', checkOut: '09:30 AM', status: 'Present' },
-      { date: '2026-06-15', checkIn: '08:30 AM', checkOut: '09:50 AM', status: 'Present' }
-    ],
-    payments: [
-      { id: 'TX-9018', date: 'Jan 10, 2026', amount: '₹8,000', method: 'UPI', status: 'Paid' }
-    ],
-    workoutPlan: {
-      Chest: 'Incline Bench Press (4x10), Chest Flyes (3x12)',
-      Back: 'Lat Pulldowns (4x10), Cable Rows (3x12)',
-      Leg: 'Squats (4x8), Leg Extensions (3x15)',
-      Shoulder: 'Overhead Press (4x10), Lateral Raises (3x15)',
-      Cardio: '15 mins Treadmill HIIT'
-    },
-    dietPlan: {
-      Breakfast: 'Oats with milk, scoop of whey, 1 banana',
-      Lunch: '200g Grilled Chicken, Brown Rice, Broccoli',
-      Dinner: 'Baked Salmon or Paneer, Sweet Potato, Salad',
-      Snacks: 'Almonds, Apple, green tea',
-      WaterIntake: '4 Liters'
-    },
-    measurements: { weight: '76 kg', height: '178 cm', chest: '40 in', biceps: '15 in', waist: '32 in' },
-    progress: [
-      { date: 'Jan 10', weight: '79 kg' },
-      { date: 'Mar 15', weight: '77 kg' },
-      { date: 'Jun 10', weight: '76 kg' }
-    ],
-    medicalNotes: 'No major injuries. Mild knee tension during deep squats.',
-    history: 'Registered as premium member. Consistently visits during morning slot.'
-  },
-  {
-    id: 'm2',
-    name: 'Rahul Sharma',
-    phone: '9123456789',
-    joinedDate: 'Feb 15, 2026',
-    plan: 'Silver 6 Months',
-    trainer: 'Ananya Joshi',
-    status: 'Active',
-    avatar: 'RS',
-    attendance: [
-      { date: '2026-06-17', checkIn: '09:10 AM', checkOut: '10:30 AM', status: 'Present' },
-      { date: '2026-06-16', checkIn: '09:05 AM', checkOut: '10:15 AM', status: 'Present' }
-    ],
-    payments: [
-      { id: 'TX-8802', date: 'Feb 15, 2026', amount: '₹4,500', method: 'Card', status: 'Paid' }
-    ],
-    workoutPlan: { Chest: 'Dumbbell Press (4x10)', Back: 'Pullups (4x8)', Leg: 'Leg Press (3x12)', Shoulder: 'Shoulder Press', Cardio: 'Cycling 20 mins' },
-    dietPlan: { Breakfast: '3 Egg Whites, 2 slices Brown Bread', Lunch: 'Dal, Roti, Mixed Veg, Tofu', Dinner: 'Soya Chunks, Rice, Salad', Snacks: 'Roasted Chana', WaterIntake: '3 Liters' },
-    measurements: { weight: '68 kg', height: '172 cm', chest: '37 in', biceps: '13 in', waist: '30 in' },
-    progress: [{ date: 'Feb 15', weight: '71 kg' }, { date: 'May 10', weight: '68 kg' }],
-    medicalNotes: 'Asthmatic. Carry inhaler.',
-    history: 'Renewed membership for another 6 months.'
-  },
-  {
-    id: 'm3',
-    name: 'Neha Singh',
-    phone: '9876543210',
-    joinedDate: 'Jun 17, 2026',
-    plan: 'Basic 3 Months',
-    trainer: 'None',
-    status: 'Active',
-    avatar: 'NS',
-    attendance: [
-      { date: '2026-06-17', checkIn: '06:15 PM', checkOut: '07:30 PM', status: 'Present' }
-    ],
-    payments: [
-      { id: 'TX-9912', date: 'Jun 17, 2026', amount: '₹2,500', method: 'UPI', status: 'Paid' }
-    ],
-    workoutPlan: { Chest: 'Pushups (3x15)', Back: 'Lat Pulldowns', Leg: 'Squats', Shoulder: 'Lateral Raises', Cardio: 'Treadmill Jogging' },
-    dietPlan: { Breakfast: 'Poha, Green Tea', Lunch: 'Salad, Dal, 1 Roti', Dinner: 'Soup, Grilled Paneer', Snacks: 'Fruit Salad', WaterIntake: '3 Liters' },
-    measurements: { weight: '60 kg', height: '165 cm', chest: '34 in', biceps: '11 in', waist: '28 in' },
-    progress: [{ date: 'Jun 17', weight: '60 kg' }],
-    medicalNotes: 'None.',
-    history: 'Joined today. Set target for general fitness and active cardio.'
-  },
-  {
-    id: 'm4',
-    name: 'Amit Verma',
-    phone: '9898989898',
-    joinedDate: 'Mar 05, 2026',
-    plan: 'Gold Annual Pass',
-    trainer: 'Rohit Desai',
-    status: 'Active',
-    avatar: 'AV',
-    attendance: [],
-    payments: [
-      { id: 'TX-9021', date: 'Mar 05, 2026', amount: '₹8,000', method: 'UPI', status: 'Paid' }
-    ],
-    workoutPlan: {},
-    dietPlan: {},
-    measurements: { weight: '88 kg', height: '182 cm' },
-    progress: [],
-    medicalNotes: 'Lower back disk issues. No heavy deadlifts.',
-    history: 'Gold member. Training focuses on posture and back core strength.'
-  },
-  {
-    id: 'm5',
-    name: 'Sanya Gupta',
-    phone: '9567123450',
-    joinedDate: 'May 28, 2026',
-    plan: 'Basic 3 Months',
-    trainer: 'None',
-    status: 'Pending',
-    avatar: 'SG',
-    attendance: [],
-    payments: [
-      { id: 'TX-9014', date: 'May 28, 2026', amount: '₹2,500', method: 'Cash', status: 'Pending' }
-    ],
-    workoutPlan: {},
-    dietPlan: {},
-    measurements: {},
-    progress: [],
-    medicalNotes: 'None',
-    history: 'Pending cash payment check clearance from front desk.'
-  }
-];
+// Super Admin Views
+import NextGenGymHubView from './views/NextGenGymHubView.jsx';
+import SuperAdminDashboardView from './views/SuperAdminDashboardView.jsx';
+import SuperAdminGymsView from './views/SuperAdminGymsView.jsx';
+import SuperAdminMembersView from './views/SuperAdminMembersView.jsx';
+import SuperAdminKycView from './views/SuperAdminKycView.jsx';
+import SuperAdminVendorsView from './views/SuperAdminVendorsView.jsx';
+import FranchiseDetailView from './views/FranchiseDetailView.jsx';
+import GymAdminDashboard from './GymAdminDashboard.jsx';
 
-const INITIAL_TRAINERS = [
-  { id: 't1', name: 'Vikram Singh', specialization: 'Strength & Powerlifting', experience: '7 Years', assignedMembers: 8, salary: '₹35,000', status: 'Available' },
-  { id: 't2', name: 'Ananya Joshi', specialization: 'Yoga & Flexibility', experience: '5 Years', assignedMembers: 12, salary: '₹28,000', status: 'Available' },
-  { id: 't3', name: 'Rohit Desai', specialization: 'HIIT & Cardio', experience: '4 Years', assignedMembers: 5, salary: '₹25,000', status: 'Busy' }
-];
-
-const INITIAL_PLANS = [
-  { id: 'p1', name: 'Basic Pass', duration: '3 Months', price: '₹2,500' },
-  { id: 'p2', name: 'Silver Pass', duration: '6 Months', price: '₹4,500' },
-  { id: 'p3', name: 'Gold Pass', duration: '12 Months', price: '₹8,000' }
-];
-
-const INITIAL_CLASSES = [
-  { id: 'c1', name: 'Power Strength Training', time: '06:00 PM', period: 'PM', trainer: 'Vikram Singh', room: 'Gym Floor A', booked: 14, capacity: 20 },
-  { id: 'c2', name: 'Mindful Vinyasa Yoga', time: '07:30 PM', period: 'PM', trainer: 'Ananya Joshi', room: 'Studio B', booked: 15, capacity: 15 },
-  { id: 'c3', name: 'High Energy HIIT', time: '08:30 PM', period: 'PM', trainer: 'Rohit Desai', room: 'Gym Floor B', booked: 8, capacity: 25 }
-];
-
-const INITIAL_NOTIFICATIONS = [
-  { id: 'n1', title: 'Gym Maintenance Closure', message: 'FitCore floor B will be closed for regular sanitization on Sunday morning between 8 AM to 12 PM.', target: 'All Members', type: 'Push', date: 'Jun 15, 2026' },
-  { id: 'n2', title: 'New Supplement Stock Alert', message: 'Fresh stock of ON Whey and Micronized Creatine is now available at the pick-up counter.', target: 'All Members', type: 'Email', date: 'Jun 12, 2026' }
-];
+const INITIAL_TRAINERS = [];
+const INITIAL_PLANS = [];
+const INITIAL_CLASSES = [];
+const INITIAL_NOTIFICATIONS = [];
 
 export default function Dashboard({ onLogout }) {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  
-  // Central states for the in-memory database
-  const [members, setMembers] = useState(INITIAL_MEMBERS);
+  const storedUser = JSON.parse(localStorage.getItem('fitcore_user') || '{}');
+  const userRole = storedUser.role || 'super_admin';
+
+  // Human-readable role label
+  const roleLabels = {
+    super_admin: 'Super Administrator',
+    admin: 'Administrator',
+    gym_owner: 'Gym Owner',
+    member: 'Member',
+    vendor: 'Vendor',
+  };
+  const roleLabel = roleLabels[userRole] || 'Administrator';
+
+  // Avatar initial from stored user, fallback to first letter of name
+  const avatarInitial = storedUser.avatar || (storedUser.name ? storedUser.name.slice(0,2).toUpperCase() : 'AD');
+
+  // Central states from the database
+  const [gyms, setGyms] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [selectedGymId, setSelectedGymId] = useState('all');
+  const [showGymDropdown, setShowGymDropdown] = useState(false);
+  const gymDropdownRef = React.useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  // Centralized notifications and trainers
   const [trainers, setTrainers] = useState(INITIAL_TRAINERS);
   const [plans, setPlans] = useState(INITIAL_PLANS);
   const [classes, setClasses] = useState(INITIAL_CLASSES);
   const [notifications, setNotifications] = useState(INITIAL_NOTIFICATIONS);
+  const [showNotiDropdown, setShowNotiDropdown] = useState(false);
 
-  const [gymConfig, setGymConfig] = useState({
-    name: 'FITCORE FITNESS CLUB',
-    logo: logoIcon,
+  // Close dropdown on outside click
+  React.useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (gymDropdownRef.current && !gymDropdownRef.current.contains(e.target)) {
+        setShowGymDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Active navigation tab
+  const [activeTab, setActiveTab] = useState('dashboard');
+
+  const [gymConfig] = useState({
+    name: 'FITCORE SYSTEM HUB',
+    logo: '',
     hours: '06:00 AM - 10:00 PM',
-    branches: 'Mumbai (Main), Pune',
+    branches: 'Nagpur Franchises',
     subscription: 'Enterprise Active',
     taxRate: '18% GST',
-    roles: 'Admin, Trainer, Front Desk'
+    roles: roleLabel,
   });
 
-  const [ownerProfile, setOwnerProfile] = useState({
-    name: 'Ankit Kumar',
-    phone: '8530292487',
-    role: 'Gym Owner & Director',
-    email: 'ankit@fitcore.io',
-    address: 'Elite Sector 4, Link Road, Mumbai'
+  const [ownerProfile] = useState({
+    name: storedUser.name || 'FitCore Admin',
+    phone: storedUser.phone || '',
+    role: roleLabel,
+    email: storedUser.email || '',
+    address: 'FitCore Headquarters'
   });
 
-  const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: '🏠' },
-    { id: 'members', label: 'Members', icon: '👥' },
-    { id: 'trainers', label: 'Trainers', icon: '👨‍🏫' },
-    { id: 'plans', label: 'Membership Plans', icon: '💳' },
-    { id: 'attendance', label: 'Attendance', icon: '📅' },
-    { id: 'payments', label: 'Payments', icon: '💰' },
-    { id: 'workouts', label: 'Workout Plans', icon: '🏋️' },
-    { id: 'diets', label: 'Diet Plans', icon: '🥗' },
-    { id: 'classes', label: 'Classes', icon: '📚' },
-    { id: 'notifications', label: 'Notifications', icon: '📢' },
-    { id: 'reports', label: 'Reports', icon: '📊' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
-    { id: 'profile', label: 'Profile', icon: '👤' }
+  // Dynamically generated menus with clean vector SVG icons
+  const superAdminMenu = [
+    { id: 'dashboard', label: 'Studio Command Hub', icon: <BoltIcon size={18} color="currentColor" /> },
+    { id: 'gyms', label: 'Franchise Gyms', icon: <BuildingIcon size={18} color="currentColor" /> },
+    { id: 'members', label: 'Members Network', icon: <UsersIcon size={18} color="currentColor" /> },
+    { id: 'kyc', label: 'KYC Verification', icon: <ShieldCheckIcon size={18} color="currentColor" /> },
+    { id: 'vendors', label: 'Partner Stores', icon: <StoreIcon size={18} color="currentColor" /> },
+    { id: 'notifications', label: 'Broadcast Alerts', icon: <BellIcon size={18} color="currentColor" /> },
   ];
+
+  const menuItems = superAdminMenu;
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      setError('');
+
+      const token = localStorage.getItem('fitcore_token');
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      };
+
+      const [gymsRes, membersRes, vendorsRes, notifsRes] = await Promise.all([
+        fetch(API_ENDPOINTS.ADMIN_GYMS, { headers }),
+        fetch(API_ENDPOINTS.ADMIN_MEMBERS, { headers }),
+        fetch(API_ENDPOINTS.ADMIN_VENDORS, { headers }),
+        fetch(API_ENDPOINTS.NOTIFICATIONS, { headers })
+      ]);
+
+      const [gymsData, membersData, vendorsData, notifsData] = await Promise.all([
+        gymsRes.ok ? gymsRes.json() : { success: false, data: [] },
+        membersRes.ok ? membersRes.json() : { success: false, data: [] },
+        vendorsRes.ok ? vendorsRes.json() : { success: false, data: [] },
+        notifsRes.ok ? notifsRes.json() : { success: false, data: [] }
+      ]);
+
+      if (gymsData.success && Array.isArray(gymsData.data)) {
+        setGyms(gymsData.data);
+      }
+      if (membersData.success && Array.isArray(membersData.data)) {
+        setMembers(membersData.data);
+      }
+      if (vendorsData.success && Array.isArray(vendorsData.data)) {
+        setVendors(vendorsData.data);
+      }
+      if (notifsData.success && Array.isArray(notifsData.data)) {
+        setNotifications(notifsData.data);
+      }
+
+      setIsLoading(false);
+    } catch (err) {
+      console.error('Error fetching admin dashboard data:', err);
+      setError('Failed to connect to the backend server. Please verify the API is running on port 7000.');
+      setIsLoading(false);
+    }
+  };
+
+  React.useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleInspectGym = (gym) => {
+    setInspectedGym(gym);
+    setActiveTab('gym-detail');
+  };
 
   const renderActiveView = () => {
     switch (activeTab) {
       case 'dashboard':
-        return <DashboardView members={members} trainers={trainers} plans={plans} classes={classes} notifications={notifications} gymConfig={gymConfig} setTab={setActiveTab} />;
+        return (
+          <NextGenGymHubView 
+            gyms={gyms} 
+            vendors={vendors} 
+            members={members} 
+            trainers={trainers}
+            classes={classes}
+            selectedGymId={selectedGymId}
+            setSelectedGymId={setSelectedGymId}
+            setTab={setActiveTab} 
+            onRefresh={fetchData} 
+            onInspectGym={handleInspectGym}
+          />
+        );
+      case 'gyms':
+        return (
+          <SuperAdminGymsView 
+            gyms={gyms} 
+            setGyms={setGyms} 
+            members={members} 
+            onRefresh={fetchData} 
+            onInspectGym={handleInspectGym}
+          />
+        );
+      case 'gym-detail':
+        return (
+          <FranchiseDetailView 
+            gym={inspectedGym || gyms[0]} 
+            members={members} 
+            trainers={trainers} 
+            onBack={() => setActiveTab('gyms')} 
+            onEditGym={(gym) => {
+              setActiveTab('gyms');
+            }}
+          />
+        );
       case 'members':
-        return <MembersView members={members} setMembers={setMembers} trainers={trainers} plans={plans} />;
-      case 'trainers':
-        return <TrainersView trainers={trainers} setTrainers={setTrainers} members={members} />;
-      case 'plans':
-        return <PlansView plans={plans} setPlans={setPlans} />;
-      case 'attendance':
-        return <AttendanceView members={members} setMembers={setMembers} />;
-      case 'payments':
-        return <PaymentsView members={members} setMembers={setMembers} plans={plans} />;
-      case 'workouts':
-        return <WorkoutsView members={members} setMembers={setMembers} />;
-      case 'diets':
-        return <DietsView members={members} setMembers={setMembers} />;
-      case 'classes':
-        return <ClassesView classes={classes} setClasses={setClasses} trainers={trainers} />;
+        return <SuperAdminMembersView members={members} setMembers={setMembers} gyms={gyms} plans={plans} />;
+      case 'kyc':
+        return <SuperAdminKycView vendors={vendors} setVendors={setVendors} onRefresh={fetchData} />;
+      case 'vendors':
+        return <SuperAdminVendorsView vendors={vendors} setVendors={setVendors} onRefresh={fetchData} />;
       case 'notifications':
         return <NotificationsView notifications={notifications} setNotifications={setNotifications} members={members} trainers={trainers} />;
-      case 'reports':
-        return <ReportsView members={members} trainers={trainers} plans={plans} />;
-      case 'settings':
-        return <SettingsView gymConfig={gymConfig} setGymConfig={setGymConfig} />;
-      case 'profile':
-        return <ProfileView ownerProfile={ownerProfile} setOwnerProfile={setOwnerProfile} />;
       default:
-        return <DashboardView members={members} trainers={trainers} plans={plans} classes={classes} notifications={notifications} gymConfig={gymConfig} setTab={setActiveTab} />;
+        return (
+          <NextGenGymHubView 
+            gyms={gyms} 
+            vendors={vendors} 
+            members={members} 
+            trainers={trainers}
+            classes={classes}
+            selectedGymId={selectedGymId}
+            setSelectedGymId={setSelectedGymId}
+            setTab={setActiveTab} 
+            onRefresh={fetchData} 
+            onInspectGym={handleInspectGym}
+          />
+        );
     }
   };
 
+  // Role-based access: admin, gym_owner or gym_admin role -> Gym Admin Dashboard only
+  if (userRole === 'admin' || userRole === 'gym_owner' || userRole === 'gym_admin') {
+    return (
+      <GymAdminDashboard
+        user={storedUser}
+        allGyms={gyms}
+        onLogout={onLogout}
+      />
+    );
+  }
+
+  // super_admin role -> Super Admin Dashboard only (no switching)
+
   return (
-    <div className="dashboard-root">
+    <div className="adm-dashboard-root">
       {/* Sidebar navigation */}
-      <aside className="dashboard-sidebar">
-        <div className="sidebar-brand">
-          <img src={gymConfig.logo} alt="FitCore Brand Logo" className="sidebar-logo-img" />
-          <div className="brand-meta">
-            <span className="brand-name">FITCORE</span>
-            <span className="brand-status">ADMIN PANEL</span>
-          </div>
+      <aside className="adm-sidebar">
+        <div className="adm-logo-area">
+          FitCore <span className="adm-logo-dot" />
         </div>
-        
-        <nav className="sidebar-menu">
+
+        <nav className="adm-nav-list">
           {menuItems.map((item) => (
             <button
               key={item.id}
-              className={`sidebar-menu-btn ${activeTab === item.id ? 'active' : ''}`}
+              className={`adm-nav-item ${(activeTab === item.id || (item.id === 'gyms' && activeTab === 'gym-detail')) ? 'active' : ''}`}
               onClick={() => setActiveTab(item.id)}
             >
-              <span className="menu-icon">{item.icon}</span>
-              <span className="menu-label">{item.label}</span>
+              <span className="adm-nav-icon-wrap">{item.icon}</span>
+              <span>{item.label}</span>
             </button>
           ))}
         </nav>
-        
-        <div className="sidebar-footer">
-          <button className="sidebar-menu-btn logout-btn" onClick={onLogout}>
-            <span className="menu-icon">🚪</span>
-            <span className="menu-label">Logout</span>
+
+        <div className="adm-sidebar-divider" />
+
+        <div className="adm-sidebar-footer">
+          <div className="adm-system-badge">
+            <h4>Ecosystem Status</h4>
+            <p style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ServerIcon size={13} color="#10b981" /> Server: Healthy
+            </p>
+            <p style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <DatabaseIcon size={13} color="#10b981" /> MongoDB: Connected
+            </p>
+            <p style={{ marginTop: '4px', fontSize: '9px', opacity: 0.6 }}>Console: v1.2.0</p>
+          </div>
+
+          <button className="adm-nav-item logout-btn" onClick={onLogout} style={{ marginTop: '16px', justifyContent: 'center', backgroundColor: 'var(--adm-accent-sage-light)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <LogoutIcon size={15} color="currentColor" /> Logout
           </button>
         </div>
       </aside>
 
-      {/* Main viewport area */}
-      <main className="dashboard-viewport">
-        {renderActiveView()}
-      </main>
+      {/* Main Viewport Container */}
+      <div className="adm-main-body">
+        {/* Unified Single Top Header */}
+        <header className="adm-header">
+          <div className="adm-header-left">
+            <div className="adm-search-wrap">
+              <span className="adm-search-icon">
+                <SearchIcon size={14} color="#94a3b8" />
+              </span>
+              <input type="text" className="adm-search-input" placeholder="Global system search..." />
+            </div>
+
+            {/* Custom Luxury Franchise Switcher Dropdown */}
+            {(() => {
+              const selectedGym = gyms.find(g => (g.id === selectedGymId || g._id === selectedGymId));
+              return (
+                <div className="custom-franchise-dropdown-wrap" ref={gymDropdownRef}>
+                  <button 
+                    type="button"
+                    className={`custom-franchise-trigger ${showGymDropdown ? 'active' : ''}`}
+                    onClick={() => setShowGymDropdown(!showGymDropdown)}
+                  >
+                    <div className="trigger-icon-box">
+                      <BuildingIcon size={16} color={selectedGymId === 'all' ? '#4f46e5' : '#06b6d4'} />
+                    </div>
+                    <div className="trigger-text-block">
+                      <span className="trigger-sub-label">FRANCHISE LOCATION</span>
+                      <span className="trigger-main-title">
+                        {selectedGym ? selectedGym.name : `All Indian Franchises (${gyms.length} Clubs)`}
+                      </span>
+                    </div>
+                    <span className={`trigger-chevron ${showGymDropdown ? 'rotated' : ''}`}>▾</span>
+                  </button>
+
+                  {showGymDropdown && (
+                    <div className="custom-franchise-menu animate-dropdown-fade">
+                      <div className="franchise-menu-header">
+                        <span>SELECT CLUB LOCATION</span>
+                        <span className="franchise-count-tag">{gyms.length} Clubs</span>
+                      </div>
+
+                      <div className="franchise-options-list">
+                        {/* All Franchises Option */}
+                        <div 
+                          className={`franchise-option-item ${selectedGymId === 'all' ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSelectedGymId('all');
+                            setShowGymDropdown(false);
+                          }}
+                        >
+                          <div className="opt-avatar all-india">
+                            <BuildingIcon size={15} color="#4f46e5" />
+                          </div>
+                          <div className="opt-meta">
+                            <span className="opt-name">All Indian Franchises Network</span>
+                            <span className="opt-sub">Aggregated Pan-India Telemetry ({gyms.length} Clubs)</span>
+                          </div>
+                          {selectedGymId === 'all' && <span className="opt-check">✓</span>}
+                        </div>
+
+                        <div className="franchise-menu-divider" />
+
+                        {/* Individual Gyms */}
+                        {gyms.map((gym) => {
+                          const gymId = gym.id || gym._id;
+                          const isSelected = selectedGymId === gymId;
+                          const initials = (gym.name || 'FC').substring(0, 2).toUpperCase();
+
+                          return (
+                            <div 
+                              key={gymId}
+                              className={`franchise-option-item ${isSelected ? 'selected' : ''}`}
+                              onClick={() => {
+                                setSelectedGymId(gymId);
+                                setShowGymDropdown(false);
+                              }}
+                            >
+                              <div className="opt-avatar gym-avatar">{initials}</div>
+                              <div className="opt-meta">
+                                <span className="opt-name">{gym.name}</span>
+                                <span className="opt-sub" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                  <LocationPinIcon size={11} color="#ef4444" /> {gym.city || 'India'} · {gym.capacity || 250} Cap · <em className="opt-plan">{(gym.plan || 'PRO').toUpperCase()}</em>
+                                </span>
+                              </div>
+                              {isSelected && <span className="opt-check">✓</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="franchise-menu-footer">
+                        <button 
+                          className="franchise-quick-onboard-btn"
+                          onClick={() => {
+                            setActiveTab('gyms');
+                            setShowGymDropdown(false);
+                          }}
+                        >
+                          <span>+ Register New Franchise</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
+          <div className="adm-header-right">
+
+
+            <button className="hub-btn-glow header-onboard-btn" onClick={() => setActiveTab('gyms')}>
+              <span>+ Onboard Franchise</span>
+            </button>
+
+            <div className="adm-clock">
+              📅 {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+            </div>
+            
+            <div style={{ position: 'relative' }}>
+              <div 
+                className="adm-icon-btn" 
+                onClick={() => setShowNotiDropdown(!showNotiDropdown)}
+                style={{ cursor: 'pointer' }}
+              >
+                🔔
+                {notifications.length > 0 && <span className="adm-icon-badge" />}
+              </div>
+
+              {showNotiDropdown && (
+                <div className="adm-noti-dropdown">
+                  <div className="adm-noti-header">
+                    <h4>Broadcast Alerts</h4>
+                    {notifications.length > 0 && (
+                      <button 
+                        className="adm-noti-clear-btn" 
+                        onClick={async () => {
+                          try {
+                            const token = localStorage.getItem('fitcore_token');
+                            const res = await fetch('http://localhost:7000/api/notifications/clear', {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                              }
+                            });
+                            if (res.ok) {
+                              setNotifications([]);
+                              alert('All notifications cleared!');
+                            }
+                          } catch (err) {
+                            alert('Error clearing notifications.');
+                          }
+                        }}
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+                  <div className="adm-noti-list">
+                    {notifications.length === 0 ? (
+                      <div className="adm-noti-empty">
+                        <span style={{ fontSize: '24px' }}>🔔</span>
+                        <span>No new notifications</span>
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <div 
+                          key={n.id} 
+                          className="adm-noti-item"
+                          onClick={() => {
+                            alert(`Notification detail:\nTitle: ${n.title}\nMessage: ${n.message}\nTarget: ${n.target}\nChannel: ${n.type}`);
+                            setShowNotiDropdown(false);
+                          }}
+                        >
+                          <div className="adm-noti-title-row">
+                            <span className="adm-noti-item-title">{n.title}</span>
+                            <span className="adm-noti-item-time">{n.date}</span>
+                          </div>
+                          <p className="adm-noti-item-text">{n.message}</p>
+                          <div className="adm-noti-item-badges">
+                            <span className="adm-badge approved" style={{ fontSize: '8px', padding: '2px 6px' }}>{n.type}</span>
+                            <span className="adm-badge pending" style={{ fontSize: '8px', padding: '2px 6px' }}>{n.target}</span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div className="adm-noti-footer">
+                    <span 
+                      className="adm-noti-viewall-btn" 
+                      onClick={() => { setActiveTab('notifications'); setShowNotiDropdown(false); }}
+                    >
+                      View All Logs
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="adm-profile-badge">
+              <div className="adm-profile-avatar" style={{ background: '#4f46e5', color: '#ffffff', fontWeight: 800 }}>{avatarInitial}</div>
+              <div className="adm-profile-info">
+                <span className="adm-profile-name">{storedUser?.name || 'FitCore Admin'}</span>
+                <span className="adm-profile-role">{roleLabel}</span>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Dynamic viewport area */}
+        <main className="adm-viewport">
+          {isLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--adm-text-sub)' }}>
+              <div className="loader" style={{ border: '4px solid var(--adm-border)', borderTop: '4px solid var(--adm-accent-sage)', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }} />
+              <p style={{ marginTop: '12px', fontWeight: '600' }}>Synchronizing Ecosystem Database...</p>
+              <style>{`
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              `}</style>
+            </div>
+          ) : error ? (
+            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--adm-danger)' }}>
+              <h2>⚠️ Database Sync Failed</h2>
+              <p>{error}</p>
+              <button className="adm-btn primary" onClick={fetchData} style={{ marginTop: '16px' }}>Retry Connection</button>
+            </div>
+          ) : (
+            renderActiveView()
+          )}
+        </main>
+      </div>
     </div>
   );
 }

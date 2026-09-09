@@ -51,7 +51,7 @@ export default function ProfileView({ ownerProfile, setOwnerProfile }) {
             <textarea placeholder="e.g. Registered gym branch street address" style={{ height: '70px' }} value={address} onChange={(e) => setAddress(e.target.value)} />
 
             <button type="submit" className="primary-action-btn" style={{ width: '100%', paddingVertical: '12px' }}>
-              💾 Save Profile Details
+              Save Profile Details
             </button>
           </form>
         </div>

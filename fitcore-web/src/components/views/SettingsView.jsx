@@ -53,7 +53,7 @@ export default function SettingsView({ gymConfig, setGymConfig }) {
             <p className="description-text" style={{ marginTop: '-8px', marginBottom: '16px' }}>Contact FitCore developer support to upgrade licensing limits.</p>
 
             <button type="submit" className="primary-action-btn" style={{ width: '100%', paddingVertical: '12px' }}>
-              💾 Save Settings Changes
+              Save Settings Changes
             </button>
           </form>
         </div>

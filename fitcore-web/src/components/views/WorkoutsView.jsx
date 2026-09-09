@@ -114,7 +114,7 @@ export default function WorkoutsView({ members, setMembers }) {
                   <strong>{m.name}</strong>
                   {m.workoutPlan && Object.keys(m.workoutPlan).length > 0 ? (
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                      ⚡ Chest: {m.workoutPlan.Chest} | Back: {m.workoutPlan.Back}
+                      Chest: {m.workoutPlan.Chest} | Back: {m.workoutPlan.Back}
                     </div>
                   ) : (
                     <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>

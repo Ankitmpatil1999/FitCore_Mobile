@@ -1,10 +1,65 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { 
+  PlusIcon, 
+  CreditCardIcon, 
+  BellIcon, 
+  UsersIcon, 
+  CalendarIcon, 
+  AlertTriangleIcon, 
+  DumbbellIcon 
+} from '../common/Icons';
+
+function TypewriterText({ phrases = [
+  "Good Morning, Ankit ",
+  "Alock Gym Hub Control Center ",
+  "Track Memberships, Revenue & Attendance ",
+  "High Performance Fitness Portal "
+], speed = 75, delayBetween = 2200 }) {
+  const [phraseIndex, setPhraseIndex] = useState(0);
+  const [currentText, setCurrentText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    let timer;
+    const targetPhrase = phrases[phraseIndex];
+
+    if (!isDeleting) {
+      if (currentText.length < targetPhrase.length) {
+        timer = setTimeout(() => {
+          setCurrentText(targetPhrase.substring(0, currentText.length + 1));
+        }, speed);
+      } else {
+        timer = setTimeout(() => {
+          setIsDeleting(true);
+        }, delayBetween);
+      }
+    } else {
+      if (currentText.length > 0) {
+        timer = setTimeout(() => {
+          setCurrentText(targetPhrase.substring(0, currentText.length - 1));
+        }, speed / 2.5);
+      } else {
+        setIsDeleting(false);
+        setPhraseIndex((prev) => (prev + 1) % phrases.length);
+      }
+    }
+
+    return () => clearTimeout(timer);
+  }, [currentText, isDeleting, phraseIndex, phrases, speed, delayBetween]);
+
+  return (
+    <span className="animated-typewriter-wrapper">
+      <span className="typewriter-text">{currentText}</span>
+      <span className="typewriter-cursor" />
+    </span>
+  );
+}
 
 export default function DashboardView({ members, trainers, plans, classes, notifications, gymConfig, setTab }) {
   const [chartPeriod, setChartPeriod] = useState('monthly');
 
   // Dynamic metrics calculation
-  const totalMembers = 1250; // Hardcoded from spec, but can add members.length differences
+  const totalMembers = 1250; 
   const todayAttendance = 320;
   const monthlyRevenue = '₹2,45,000';
   const expiringPlans = 18;
@@ -42,10 +97,17 @@ export default function DashboardView({ members, trainers, plans, classes, notif
 
   return (
     <div className="view-container">
+      {/* Floating Ambient Light Orbs */}
+      <div className="ambient-orb ambient-orb-1" />
+      <div className="ambient-orb ambient-orb-2" />
+      <div className="ambient-orb ambient-orb-3" />
+
       {/* Header bar */}
       <header className="view-header">
         <div className="header-greeting">
-          <h2>Good Morning, Ankit 👋</h2>
+          <h2 style={{ fontSize: '24px' }}>
+            <TypewriterText />
+          </h2>
           <p className="gym-tagline">{gymConfig.name} · {new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
         </div>
       </header>
@@ -53,7 +115,10 @@ export default function DashboardView({ members, trainers, plans, classes, notif
       {/* Grid status cards */}
       <section className="metrics-grid">
         <div className="metric-card">
-          <div className="metric-icon">👥</div>
+          <div className="luxury-card-glow" style={{ background: '#4f46e5' }} />
+          <div className="metric-icon" style={{ background: 'linear-gradient(135deg, #eef2ff, #e0e7ff)' }}>
+            <UsersIcon size={20} color="#4f46e5" />
+          </div>
           <div className="metric-details">
             <span className="metric-label">Total Members</span>
             <h3 className="metric-value">{totalMembers}</h3>
@@ -62,7 +127,10 @@ export default function DashboardView({ members, trainers, plans, classes, notif
         </div>
 
         <div className="metric-card">
-          <div className="metric-icon">📅</div>
+          <div className="luxury-card-glow" style={{ background: '#06b6d4' }} />
+          <div className="metric-icon" style={{ background: 'linear-gradient(135deg, #ecfeff, #cffafe)' }}>
+            <CalendarIcon size={20} color="#06b6d4" />
+          </div>
           <div className="metric-details">
             <span className="metric-label">Today's Attendance</span>
             <h3 className="metric-value">{todayAttendance}</h3>
@@ -71,7 +139,10 @@ export default function DashboardView({ members, trainers, plans, classes, notif
         </div>
 
         <div className="metric-card">
-          <div className="metric-icon">💰</div>
+          <div className="luxury-card-glow" style={{ background: '#10b981' }} />
+          <div className="metric-icon" style={{ background: 'linear-gradient(135deg, #ecfdf5, #d1fae5)' }}>
+            <CreditCardIcon size={20} color="#10b981" />
+          </div>
           <div className="metric-details">
             <span className="metric-label">Revenue (This Month)</span>
             <h3 className="metric-value">{monthlyRevenue}</h3>
@@ -80,7 +151,10 @@ export default function DashboardView({ members, trainers, plans, classes, notif
         </div>
 
         <div className="metric-card">
-          <div className="metric-icon">⚠️</div>
+          <div className="luxury-card-glow" style={{ background: '#f59e0b' }} />
+          <div className="metric-icon" style={{ background: 'linear-gradient(135deg, #fffbeb, #fef3c7)' }}>
+            <AlertTriangleIcon size={20} color="#f59e0b" />
+          </div>
           <div className="metric-details">
             <span className="metric-label">Membership Expiring</span>
             <h3 className="metric-value">{expiringPlans}</h3>
@@ -89,7 +163,10 @@ export default function DashboardView({ members, trainers, plans, classes, notif
         </div>
 
         <div className="metric-card">
-          <div className="metric-icon">🏋️‍♂️</div>
+          <div className="luxury-card-glow" style={{ background: '#6366f1' }} />
+          <div className="metric-icon" style={{ background: 'linear-gradient(135deg, #eef2ff, #c7d2fe)' }}>
+            <DumbbellIcon size={20} color="#6366f1" />
+          </div>
           <div className="metric-details">
             <span className="metric-label">Active Trainers</span>
             <h3 className="metric-value">{trainerCount}</h3>
@@ -98,7 +175,10 @@ export default function DashboardView({ members, trainers, plans, classes, notif
         </div>
 
         <div className="metric-card">
-          <div className="metric-icon">💳</div>
+          <div className="luxury-card-glow" style={{ background: '#ef4444' }} />
+          <div className="metric-icon" style={{ background: 'linear-gradient(135deg, #fef2f2, #fecaca)' }}>
+            <CreditCardIcon size={20} color="#ef4444" />
+          </div>
           <div className="metric-details">
             <span className="metric-label">Pending Payments</span>
             <h3 className="metric-value">{pendingPayments}</h3>
@@ -113,19 +193,19 @@ export default function DashboardView({ members, trainers, plans, classes, notif
         <div className="content-left-col">
           {/* Quick Actions */}
           <div className="content-card quick-actions-card">
-            <h4>Quick Actions</h4>
-            <div className="actions-grid">
-              <button className="action-btn" onClick={() => setTab('members')}>
-                <span className="btn-icon">➕</span> Add Member
+            <h4>⚡ Quick Actions</h4>
+            <div className="actions-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
+              <button className="neon-action-btn neon-purple" onClick={() => setTab('members')}>
+                <PlusIcon size={13} color="#fff" /> Add Member
               </button>
-              <button className="action-btn" onClick={() => setTab('trainers')}>
-                <span className="btn-icon">➕</span> Add Trainer
+              <button className="neon-action-btn neon-emerald" onClick={() => setTab('trainers')}>
+                <PlusIcon size={13} color="#fff" /> Add Trainer
               </button>
-              <button className="action-btn" onClick={() => setTab('plans')}>
-                <span className="btn-icon">💳</span> Create Plan
+              <button className="neon-action-btn neon-amber" onClick={() => setTab('plans')}>
+                <CreditCardIcon size={13} color="#fff" /> Create Plan
               </button>
-              <button className="action-btn" onClick={() => setTab('notifications')}>
-                <span className="btn-icon">📢</span> Send Notification
+              <button className="neon-action-btn neon-rose" onClick={() => setTab('notifications')}>
+                <BellIcon size={13} color="#fff" /> Send Alert
               </button>
             </div>
           </div>
