@@ -153,7 +153,13 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
   useEffect(() => {
     const fetchApiConfig = async () => {
       try {
-        const response = await fetch(API_ENDPOINTS.ADMIN_CONFIG);
+        const token = localStorage.getItem('fitcore_token');
+        const response = await fetch(API_ENDPOINTS.ADMIN_CONFIG, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          }
+        });
         const data = await response.json();
         if (data.success && data.data) {
           if (data.data.packages) setPackagesList(data.data.packages);
