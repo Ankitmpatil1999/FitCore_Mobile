@@ -7,10 +7,22 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Environment & Secrets
+.env
+.env.*
+*.env
+!.env.example
+
+# Build & Dist
 node_modules
 dist
 dist-ssr
 *.local
+
+# Documents & Confidential
+Documents/
+*.pdf
+*.docx
 
 # Editor directories and files
 .vscode/*
@@ -22,3 +34,4 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
