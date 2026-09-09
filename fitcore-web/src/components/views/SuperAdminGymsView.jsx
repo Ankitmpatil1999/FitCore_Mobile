@@ -76,6 +76,9 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
 
   // Wizard Step 3: Subscription Package & Permissions
   const [selectedPlan, setSelectedPlan] = useState('pro');
+  const [customPlanAmount, setCustomPlanAmount] = useState(34999);
+  const [customBillingCycle, setCustomBillingCycle] = useState('yearly');
+  const [customPaymentNotes, setCustomPaymentNotes] = useState('Standard platform onboarding fee');
   const [permissions, setPermissions] = useState({
     canRegisterMembers: true,
     canUseTurnstiles: true,
@@ -383,6 +386,9 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
         floorArea: gymFloorArea,
         amenities: selectedAmenities,
         plan: selectedPlan,
+        subscriptionAmount: Number(customPlanAmount) || 34999,
+        billingCycle: customBillingCycle || 'yearly',
+        subscriptionNotes: customPaymentNotes || '',
         permissions: permissions,
         ownerName: ownerName.trim(),
         ownerPhone: ownerPhone.trim(),
@@ -1072,25 +1078,86 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
                 {/* STEP 3: Subscription Packages & Permissions */}
                 {wizardStep === 3 && (
                   <div className="wizard-step-content">
-                    <label className="form-label">Choose Franchise Subscription Package</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <label className="form-label" style={{ margin: 0 }}>Choose Franchise Subscription Package</label>
+                      <span style={{ fontSize: '12px', color: '#4f46e5', fontWeight: '600' }}>
+                        Selected: {packagesList.find(p => p.id === selectedPlan)?.name || 'Custom Plan'} (₹{Number(customPlanAmount || 0).toLocaleString()} / {customBillingCycle})
+                      </span>
+                    </div>
+
                     <div className="package-cards-grid">
                       {packagesList.map(pkg => (
                         <div 
                           key={pkg.id} 
                           className={`package-card ${selectedPlan === pkg.id ? 'active-pkg' : ''}`}
-                          onClick={() => setSelectedPlan(pkg.id)}
+                          onClick={() => {
+                            setSelectedPlan(pkg.id);
+                            if (pkg.amount) setCustomPlanAmount(pkg.amount);
+                            if (pkg.billingCycle) setCustomBillingCycle(pkg.billingCycle);
+                          }}
                         >
                           {pkg.recommended && <div className="pkg-rec-pill">RECOMMENDED</div>}
                           <h4 className="pkg-name">{pkg.name}</h4>
-                          <div className="pkg-price">{pkg.price}</div>
+                          <div className="pkg-price">{pkg.price || `₹${(pkg.amount || 0).toLocaleString()}`}</div>
                           <span className="pkg-cap">Cap: {pkg.capacity}</span>
                           <ul className="pkg-features-list">
-                            {pkg.features.map((f, i) => (
+                            {(pkg.features || []).map((f, i) => (
                               <li key={i}>✓ {f}</li>
                             ))}
                           </ul>
                         </div>
                       ))}
+                    </div>
+
+                    {/* Custom Super Admin Pricing & Billing Cycle Controls */}
+                    <div className="amenities-selection-box" style={{ marginTop: '18px', background: 'rgba(248, 250, 252, 0.85)', padding: '16px 20px', borderRadius: '16px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                        <span style={{ display: 'inline-flex', padding: '4px', background: '#e0e7ff', borderRadius: '8px', color: '#4f46e5' }}>
+                          <CreditCardIcon size={16} color="#4f46e5" />
+                        </span>
+                        <h4 style={{ margin: 0, fontSize: '13.5px', fontWeight: '700', color: '#1e293b' }}>
+                          Franchise SaaS Fee & Billing Duration (Super Admin Override)
+                        </h4>
+                      </div>
+
+                      <div className="wizard-form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px' }}>
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '12px' }}>Amount to Charge (₹ INR) *</label>
+                          <input 
+                            type="number" 
+                            className="form-input" 
+                            placeholder="e.g. 34999 or 2999" 
+                            value={customPlanAmount} 
+                            onChange={(e) => setCustomPlanAmount(Number(e.target.value))}
+                            required 
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label" style={{ fontSize: '12px' }}>Billing Cycle Duration *</label>
+                          <select 
+                            className="form-input"
+                            value={customBillingCycle}
+                            onChange={(e) => setCustomBillingCycle(e.target.value)}
+                          >
+                            <option value="monthly">Monthly (Billed Every Month)</option>
+                            <option value="quarterly">Quarterly (3 Months)</option>
+                            <option value="half_yearly">Half-Yearly (6 Months)</option>
+                            <option value="yearly">Yearly (Annual License)</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                          <label className="form-label" style={{ fontSize: '12px' }}>Billing Description / Custom Notes</label>
+                          <input 
+                            type="text" 
+                            className="form-input" 
+                            placeholder="e.g. Special inaugural branch discount applied" 
+                            value={customPaymentNotes} 
+                            onChange={(e) => setCustomPaymentNotes(e.target.value)}
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     <div className="permissions-toggle-box">
