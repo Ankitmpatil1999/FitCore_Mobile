@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { PlusIcon } from '../common/Icons';
 
-export default function TrainersView({ trainers, setTrainers, members }) {
+export default function TrainersView({ trainers, setTrainers }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [specialization, setSpecialization] = useState('Strength & Powerlifting');
   const [experience, setExperience] = useState('3 Years');
-  const [salary, setSalary] = useState('₹25,000');
+  const [salary, setSalary] = useState('25000');
+  const [status, setStatus] = useState('Available');
 
-  const handleAdd = (e) => {
+  const handleAddTrainer = (e) => {
     e.preventDefault();
     if (!name.trim()) return;
     const newTrainer = {
@@ -17,15 +18,19 @@ export default function TrainersView({ trainers, setTrainers, members }) {
       specialization,
       experience,
       assignedMembers: 0,
-      salary,
-      status: 'Available'
+      salary: salary.startsWith('₹') ? salary : `₹${salary}`,
+      status
     };
     setTrainers(prev => [...prev, newTrainer]);
     setName('');
+    setSpecialization('Strength & Powerlifting');
+    setExperience('3 Years');
+    setSalary('25000');
+    setStatus('Available');
     setIsModalOpen(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDeleteTrainer = (id) => {
     if (window.confirm('Are you sure you want to remove this trainer?')) {
       setTrainers(prev => prev.filter(t => t.id !== id));
     }
@@ -88,19 +93,19 @@ export default function TrainersView({ trainers, setTrainers, members }) {
             <h3>Add Trainer Profile</h3>
             <form onSubmit={handleAddTrainer} className="modal-form">
               <label>Trainer Full Name</label>
-              <input type="text" placeholder="e.g. Vikram Singh" value={tName} onChange={(e) => setTName(e.target.value)} required />
+              <input type="text" placeholder="e.g. Vikram Singh" value={name} onChange={(e) => setName(e.target.value)} required />
 
               <label>Specialization</label>
-              <input type="text" placeholder="e.g. Strength Conditioning" value={tSpec} onChange={(e) => setTSpec(e.target.value)} required />
+              <input type="text" placeholder="e.g. Strength Conditioning" value={specialization} onChange={(e) => setSpecialization(e.target.value)} required />
 
               <label>Experience Duration</label>
-              <input type="text" placeholder="e.g. 5 Years" value={tExp} onChange={(e) => setTExp(e.target.value)} />
+              <input type="text" placeholder="e.g. 5 Years" value={experience} onChange={(e) => setExperience(e.target.value)} />
 
               <label>Salary (Monthly)</label>
-              <input type="number" placeholder="e.g. 30000" value={tSalary} onChange={(e) => setTSalary(e.target.value)} />
+              <input type="number" placeholder="e.g. 30000" value={salary} onChange={(e) => setSalary(e.target.value)} />
 
               <label>Availability Status</label>
-              <select value={tStatus} onChange={(e) => setTStatus(e.target.value)}>
+              <select value={status} onChange={(e) => setStatus(e.target.value)}>
                 <option value="Available">Available</option>
                 <option value="Busy">Busy</option>
               </select>
