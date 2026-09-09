@@ -26,7 +26,8 @@ import {
   DatabaseIcon,
   LogoutIcon,
   SearchIcon,
-  LocationPinIcon
+  LocationPinIcon,
+  CreditCardIcon
 } from './common/Icons';
 
 // Super Admin Views
@@ -36,6 +37,7 @@ import SuperAdminGymsView from './views/SuperAdminGymsView.jsx';
 import SuperAdminMembersView from './views/SuperAdminMembersView.jsx';
 import SuperAdminKycView from './views/SuperAdminKycView.jsx';
 import SuperAdminVendorsView from './views/SuperAdminVendorsView.jsx';
+import SuperAdminRevenueView from './views/SuperAdminRevenueView.jsx';
 import FranchiseDetailView from './views/FranchiseDetailView.jsx';
 import GymAdminDashboard from './GymAdminDashboard.jsx';
 
@@ -114,6 +116,7 @@ export default function Dashboard({ onLogout }) {
   const superAdminMenu = [
     { id: 'dashboard', label: 'Studio Command Hub', icon: <BoltIcon size={18} color="currentColor" /> },
     { id: 'gyms', label: 'Franchise Gyms', icon: <BuildingIcon size={18} color="currentColor" /> },
+    { id: 'revenue', label: 'Platform SaaS Revenue', icon: <CreditCardIcon size={18} color="currentColor" /> },
     { id: 'members', label: 'Members Network', icon: <UsersIcon size={18} color="currentColor" /> },
     { id: 'kyc', label: 'KYC Verification', icon: <ShieldCheckIcon size={18} color="currentColor" /> },
     { id: 'vendors', label: 'Partner Stores', icon: <StoreIcon size={18} color="currentColor" /> },
@@ -222,6 +225,8 @@ export default function Dashboard({ onLogout }) {
             }}
           />
         );
+      case 'revenue':
+        return <SuperAdminRevenueView gyms={gyms} plans={plans} onRefresh={fetchData} setTab={setActiveTab} />;
       case 'members':
         return <SuperAdminMembersView members={members} setMembers={setMembers} gyms={gyms} plans={plans} />;
       case 'kyc':

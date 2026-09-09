@@ -269,7 +269,7 @@ export default function NextGenGymHubView({
         </div>
 
         {/* Metric 3: Platform Subscription Revenue */}
-        <div className="stat-card glass-card card-rose" style={{ animationDelay: '0.19s' }}>
+        <div className="stat-card glass-card card-rose" style={{ animationDelay: '0.19s', cursor: 'pointer' }} onClick={() => setTab('revenue')} title="Click to view detailed Franchise SaaS Revenue & Invoices">
           <div className="card-shine-beam" />
           <div className="stat-header">
             <span className="stat-icon-badge ember">
