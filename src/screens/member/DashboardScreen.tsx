@@ -273,8 +273,14 @@ export default function DashboardScreen({ navigation }: any) {
           setLiveWeekOverview(attData.weekOverview);
         }
         const todaySession = attData?.todaySession || {};
-        setIsCheckedIn(Boolean(todaySession?.isCheckedIn));
-        setElapsedSeconds(Number(todaySession?.todayTotalSeconds || 0));
+        const inGym = Boolean(todaySession?.isCheckedIn);
+        setIsCheckedIn(inGym);
+        if (inGym) {
+          // Resumes seamlessly from earlier checkout time on the same day
+          setElapsedSeconds(Number(todaySession?.todayTotalSeconds || todaySession?.currentSessionSeconds || 0));
+        } else {
+          setElapsedSeconds(Number(todaySession?.todayCompletedSeconds || 0));
+        }
         if (todaySession?.todayDurationFormatted) {
           setLastSessionDuration(todaySession.todayDurationFormatted);
         }

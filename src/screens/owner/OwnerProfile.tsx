@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AppIcon from '../../components/common/AppIcon';
 import { LightColors, Typography, Spacing, Radii, Shadows } from '../../theme';
+import { useAppContext } from '../../context/AppContext';
+import apiService from '../../services/api';
 
 interface Props {
   onLogout?: () => void;
@@ -19,15 +22,38 @@ interface Props {
 }
 
 export default function OwnerProfile({ onLogout, route }: Props) {
-  const [gymName, setGymName] = useState('FitCore Premium Gym');
-  const [gymAddress, setGymAddress] = useState('Elite Sector 4, Link Road, Mumbai');
-  const [gymPhoto, setGymPhoto] = useState('📸 FitCore Cover Photo Active');
-  
+  const { logout, currentGym, currentUser } = useAppContext();
+  const gymId = currentGym?.id || (currentUser as any)?.gymId || 'g1';
+
+  const [gymName, setGymName] = useState(currentGym?.name || 'FitCore Premium Gym');
+  const [gymAddress, setGymAddress] = useState(currentGym?.address || 'Elite Sector 4, Link Road, Mumbai');
+  const [gymPhone, setGymPhone] = useState(currentGym?.phone || '9820000001');
   const [isSaving, setIsSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const resolveLogout = onLogout || route?.params?.onLogout;
+  const resolveLogout = onLogout || route?.params?.onLogout || logout;
 
-  const handleSaveProfile = () => {
+  useEffect(() => {
+    const loadGym = async () => {
+      try {
+        const res = await apiService.getOwnerOverview(gymId);
+        const data: any = res.data;
+        if (res.success && data?.gym) {
+          const g = data.gym;
+          if (g.name) setGymName(g.name);
+          if (g.address) setGymAddress(g.address);
+          if (g.phone) setGymPhone(g.phone);
+        }
+      } catch (e) {
+        console.log('Error loading gym in OwnerProfile:', e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadGym();
+  }, [gymId]);
+
+  const handleSaveProfile = async () => {
     if (!gymName.trim()) {
       Alert.alert('Form Error', 'Gym Name cannot be empty.');
       return;
@@ -38,10 +64,23 @@ export default function OwnerProfile({ onLogout, route }: Props) {
     }
 
     setIsSaving(true);
-    setTimeout(() => {
+    try {
+      const res = await apiService.updateOwnerGymSettings({
+        gymId,
+        gymName: gymName.trim(),
+        address: gymAddress.trim(),
+        contactPhone: gymPhone.trim(),
+      });
+      if (res.success) {
+        Alert.alert('Profile Saved', 'Gym profile details have been successfully updated in backend!');
+      } else {
+        Alert.alert('Error', res.error || 'Failed to update profile');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Something went wrong');
+    } finally {
       setIsSaving(false);
-      Alert.alert('Profile Saved', 'Gym profile details have been successfully updated!');
-    }, 1200);
+    }
   };
 
   const handleEditPhoto = () => {
@@ -53,7 +92,6 @@ export default function OwnerProfile({ onLogout, route }: Props) {
         {
           text: 'Upload Custom Photo',
           onPress: () => {
-            setGymPhoto('🖼️ Custom Gym Photo Uploaded');
             Alert.alert('Upload Success', 'Cover photo updated.');
           },
         },
@@ -85,7 +123,8 @@ export default function OwnerProfile({ onLogout, route }: Props) {
 
         {/* Cover Photo Box */}
         <View style={styles.photoBox}>
-          <Text style={styles.photoPlaceholderText}>{gymPhoto}</Text>
+          <AppIcon name="image-outline" size={32} color="#6C5CE7" />
+          <Text style={[styles.photoPlaceholderText, { marginTop: 6 }]}>FitCore Gym Cover Banner</Text>
           <TouchableOpacity
             style={styles.uploadBtn}
             activeOpacity={0.8}
@@ -104,6 +143,17 @@ export default function OwnerProfile({ onLogout, route }: Props) {
             onChangeText={setGymName}
             placeholder="e.g. FitCore Elite Gym"
             placeholderTextColor="rgba(15, 23, 42, 0.4)"
+            editable={!isSaving}
+          />
+
+          <Text style={styles.inputLabel}>Contact Phone</Text>
+          <TextInput
+            style={styles.formInput}
+            value={gymPhone}
+            onChangeText={setGymPhone}
+            placeholder="e.g. 9820000001"
+            placeholderTextColor="rgba(15, 23, 42, 0.4)"
+            keyboardType="phone-pad"
             editable={!isSaving}
           />
 
@@ -139,7 +189,8 @@ export default function OwnerProfile({ onLogout, route }: Props) {
           activeOpacity={0.8}
           onPress={handleLogoutPress}
         >
-          <Text style={styles.logoutBtnText}>Sign Out Admin Account 🚪</Text>
+          <AppIcon name="log-out-outline" size={18} color="#FF4D6D" />
+          <Text style={[styles.logoutBtnText, { marginLeft: 8 }]}>Sign Out Admin Account</Text>
         </TouchableOpacity>
       </ScrollView>
       </View>
@@ -260,6 +311,7 @@ const styles = StyleSheet.create({
     backgroundColor: LightColors.dangerBg,
     borderRadius: Radii.md,
     paddingVertical: 14,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     ...Shadows.card,

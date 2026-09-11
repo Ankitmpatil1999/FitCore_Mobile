@@ -15,7 +15,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
+import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
@@ -167,7 +167,7 @@ export default function ProductStoreScreen({ navigation }: any) {
             <Text style={styles.headerSub}>{products.length} Items Listed</Text>
           </View>
           <TouchableOpacity style={styles.addBtn} onPress={() => setAddModal(true)} activeOpacity={0.85}>
-            <Icon name="add" size={moderateScale(18)} color="#FFFFFF" />
+            <AppIcon name="add" size={moderateScale(18)} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -238,7 +238,7 @@ export default function ProductStoreScreen({ navigation }: any) {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Add Product to Store</Text>
                 <TouchableOpacity onPress={() => setAddModal(false)}>
-                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                  <AppIcon name="close" size={moderateScale(22)} color="#0F172A" />
                 </TouchableOpacity>
               </View>
 

@@ -12,7 +12,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
+import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
@@ -84,17 +84,50 @@ const PEAK_HOURS = [
   { label: '9 PM', value: 40, isPeak: false },
 ];
 
-type ReportTab = 'revenue' | 'retention' | 'peakhours';
+import { RefreshControl, ActivityIndicator } from 'react-native';
+import apiService from '../../services/api';
+
+type ReportTab = 'revenue' | 'peakhours' | 'retention';
 
 export default function OwnerAnalytics({ navigation }: any) {
-  const { currentGym } = useAppContext();
+  const { currentGym, currentUser } = useAppContext();
+  const gymId = currentGym?.id || (currentUser as any)?.gymId || 'g1';
+
   const [activeTab, setActiveTab] = useState<ReportTab>('revenue');
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [overview, setOverview] = useState<any>(null);
+  const [peakStats, setPeakStats] = useState<any[]>([]);
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  const fetchAnalytics = async () => {
+    try {
+      const [ovRes, attStatsRes] = await Promise.all([
+        apiService.getOwnerOverview(gymId),
+        apiService.getOwnerAttendanceStats(gymId),
+      ]);
+
+      if (ovRes.success && ovRes.data) {
+        setOverview(ovRes.data);
+      }
+      const attData: any = attStatsRes.data;
+      if (attStatsRes.success && Array.isArray(attData?.hourlyDistribution)) {
+        setPeakStats(attData.hourlyDistribution);
+      }
+
+    } catch (err) {
+      console.log('Error fetching owner analytics:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
+    fetchAnalytics();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -109,10 +142,41 @@ export default function OwnerAnalytics({ navigation }: any) {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [gymId]);
 
-  const maxRevenue = Math.max(...REVENUE_MONTHS.map((m) => m.value));
-  const maxPeak = Math.max(...PEAK_HOURS.map((h) => h.value));
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchAnalytics();
+  };
+
+  const revenueMonthly = overview?.stats?.monthlyRevenue || 385000;
+  const activeMembers = overview?.stats?.activeMembers || overview?.stats?.totalMembers || 240;
+  const occupancyRate = overview?.stats?.occupancyRate || 78;
+
+  const REVENUE_MONTHS = [
+    { label: 'Jan', value: Math.round(revenueMonthly * 0.7) },
+    { label: 'Feb', value: Math.round(revenueMonthly * 0.78) },
+    { label: 'Mar', value: Math.round(revenueMonthly * 0.85) },
+    { label: 'Apr', value: Math.round(revenueMonthly * 0.9) },
+    { label: 'May', value: Math.round(revenueMonthly * 0.95) },
+    { label: 'Jun', value: revenueMonthly },
+  ];
+
+  const PEAK_HOURS = peakStats.length > 0 ? peakStats : [
+    { label: '6 AM', value: 45, isPeak: true },
+    { label: '7 AM', value: 85, isPeak: true },
+    { label: '8 AM', value: 92, isPeak: true },
+    { label: '9 AM', value: 60, isPeak: false },
+    { label: '10 AM', value: 25, isPeak: false },
+    { label: '5 PM', value: 70, isPeak: true },
+    { label: '6 PM', value: 98, isPeak: true },
+    { label: '7 PM', value: 105, isPeak: true },
+    { label: '8 PM', value: 75, isPeak: false },
+    { label: '9 PM', value: 40, isPeak: false },
+  ];
+
+  const maxRevenue = Math.max(...REVENUE_MONTHS.map((m) => m.value)) || 1;
+  const maxPeak = Math.max(...PEAK_HOURS.map((h) => h.value)) || 1;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -137,47 +201,75 @@ export default function OwnerAnalytics({ navigation }: any) {
           </TouchableOpacity>
           <View>
             <Text style={styles.headerTitle}>Business Analytics</Text>
-            <Text style={styles.headerSub}>{currentGym?.name ?? 'FNS Fitness Club'}</Text>
+            <Text style={styles.headerSub}>{currentGym?.name ?? 'FitCore Gym'}</Text>
           </View>
           <View style={{ width: moderateScale(38) }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6C5CE7']} />
+          }
+        >
           {/* ── METRIC CARDS 3-GRID ── */}
           <View style={styles.metricGrid}>
             <View style={styles.metricCard}>
               <Text style={styles.metricLabel}>Monthly Inflow</Text>
-              <Text style={[styles.metricVal, { color: '#00C48C' }]}>₹4.82L</Text>
-              <Text style={styles.metricTrend}>↑ +18.4% MoM</Text>
+              <Text style={[styles.metricVal, { color: '#00C48C' }]}>
+                ₹{(revenueMonthly / 100000).toFixed(2)}L
+              </Text>
+              <Text style={styles.metricTrend}>↑ Active Plan Rates</Text>
             </View>
 
             <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Active Turnout</Text>
-              <Text style={[styles.metricVal, { color: '#6C5CE7' }]}>92.4%</Text>
-              <Text style={styles.metricTrend}>↑ +4.2% streak</Text>
+              <Text style={styles.metricLabel}>Turnout Ratio</Text>
+              <Text style={[styles.metricVal, { color: '#6C5CE7' }]}>{occupancyRate}%</Text>
+              <Text style={styles.metricTrend}>Floor Capacity Usage</Text>
             </View>
 
             <View style={styles.metricCard}>
-              <Text style={styles.metricLabel}>Renewals</Text>
-              <Text style={[styles.metricVal, { color: '#38BDF8' }]}>88.6%</Text>
-              <Text style={styles.metricTrend}>↑ +6.1% retention</Text>
+              <Text style={styles.metricLabel}>Members Active</Text>
+              <Text style={[styles.metricVal, { color: '#38BDF8' }]}>{activeMembers}</Text>
+              <Text style={styles.metricTrend}>Enrolled Database</Text>
             </View>
           </View>
 
           {/* ── REPORT TABS ── */}
           <View style={styles.tabRow}>
-            {(['revenue', 'peakhours', 'retention'] as ReportTab[]).map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
-                onPress={() => setActiveTab(tab)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.tabBtnText, activeTab === tab && styles.tabBtnTextActive]}>
-                  {tab === 'revenue' ? '📈 Revenue' : tab === 'peakhours' ? '⏰ Peak Hours' : '👥 Retention'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {(['revenue', 'peakhours', 'retention'] as ReportTab[]).map((tab) => {
+              const tabIcons: Record<ReportTab, string> = {
+                revenue: 'finance',
+                peakhours: 'time',
+                retention: 'members',
+              };
+              const tabTitles: Record<ReportTab, string> = {
+                revenue: 'Revenue',
+                peakhours: 'Peak Hours',
+                retention: 'Retention',
+              };
+
+              return (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.tabBtn, activeTab === tab && styles.tabBtnActive]}
+                  onPress={() => setActiveTab(tab)}
+                  activeOpacity={0.75}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <AppIcon
+                      name={tabIcons[tab]}
+                      size={moderateScale(15)}
+                      color={activeTab === tab ? '#FFFFFF' : '#64748B'}
+                    />
+                    <Text style={[styles.tabBtnText, activeTab === tab && styles.tabBtnTextActive]}>
+                      {tabTitles[tab]}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* ── REVENUE BAR CHART ── */}

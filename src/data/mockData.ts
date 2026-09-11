@@ -158,6 +158,28 @@ export const GYMS: Gym[] = [
     photos: [],
     subscriptionPlan: 'basic',
   },
+  {
+    id: '6a934afd13a1b16c3767d90f',
+    name: 'Ayushi GYM',
+    tagline: 'Premier Fitness & Health Center',
+    rating: 4.9,
+    address: 'Civil Lines, Nagpur',
+    city: 'Nagpur, Maharashtra',
+    phone: '7894561230',
+    email: 'owner789@fitcore.in',
+    openTime: '05:00 AM',
+    closeTime: '10:00 PM',
+    isOpen: true,
+    ownerId: 'owner_ayushi',
+    facilities: [
+      { id: 'f1', icon: '🅿️', name: 'Parking' },
+      { id: 'f3', icon: '🚴', name: 'Cardio' },
+      { id: 'f4', icon: '🏋️', name: 'CrossFit' },
+      { id: 'f6', icon: '🔒', name: 'Locker' },
+    ],
+    photos: [],
+    subscriptionPlan: 'premium',
+  },
 ];
 
 // ── USERS / MEMBERS ──────────────────────────
@@ -198,6 +220,26 @@ export interface Member {
 }
 
 export const USERS: User[] = [
+  {
+    id: 'owner_ayushi',
+    name: 'Ayushi Gym Owner',
+    phone: '7894561230',
+    email: 'owner789@fitcore.in',
+    password: 'Hello@123',
+    role: 'owner',
+    gymId: '6a934afd13a1b16c3767d90f',
+    avatar: 'AG',
+  },
+  {
+    id: 'owner_ayushi_alt',
+    name: 'Ayushi Singh',
+    phone: '1234567890',
+    email: 'ayushi@gmail.com',
+    password: 'Hello@123',
+    role: 'owner',
+    gymId: '6a934afd13a1b16c3767d90f',
+    avatar: 'AS',
+  },
   {
     id: 'owner_fns',
     name: 'Rahul Barapatre',

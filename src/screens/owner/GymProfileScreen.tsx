@@ -13,7 +13,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
+import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { GYMS, FACILITIES } from '../../data/mockData';
@@ -145,7 +145,7 @@ export default function GymProfileScreen({ navigation }: any) {
           {/* ── GYM PROFILE CARD ── */}
           <View style={styles.profileCard}>
             <View style={styles.gymLogoBox}>
-              <Icon name="barbell" size={moderateScale(32)} color="#6C5CE7" />
+              <AppIcon name="barbell" size={moderateScale(32)} color="#6C5CE7" />
             </View>
 
             <Text style={styles.gymTitle}>{gymName}</Text>
@@ -184,10 +184,10 @@ export default function GymProfileScreen({ navigation }: any) {
                     activeOpacity={0.7}
                   >
                     <View style={[styles.menuIconBg, { backgroundColor: item.color + '15' }]}>
-                      <Icon name={item.icon as any} size={moderateScale(20)} color={item.color} />
+                      <AppIcon name={item.icon as any} size={moderateScale(20)} color={item.color} />
                     </View>
                     <Text style={styles.menuLabelText}>{item.label}</Text>
-                    <Icon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
+                    <AppIcon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -196,7 +196,7 @@ export default function GymProfileScreen({ navigation }: any) {
 
           {/* ── LOGOUT BUTTON ── */}
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
-            <Icon name="log-out-outline" size={moderateScale(18)} color="#FF4D6D" />
+            <AppIcon name="log-out-outline" size={moderateScale(18)} color="#FF4D6D" />
             <Text style={styles.logoutBtnText}>Logout of Owner Account</Text>
           </TouchableOpacity>
 
