@@ -116,6 +116,9 @@ router.delete('/gyms/:id', adminController.deleteGym);
  *         description: Success
  */
 router.get('/members', adminController.getMembers);
+router.post('/members/:id/status', adminController.updateMemberStatus);
+router.get('/transactions', adminController.getTransactions);
+router.post('/transactions', adminController.recordTransaction);
 
 /**
  * @swagger
@@ -215,5 +218,8 @@ router.post('/kyc/:id/approve', adminController.approveKyc);
  *         description: KYC Rejected
  */
 router.post('/kyc/:id/reject', adminController.rejectKyc);
+router.get('/profile', adminController.getProfile);
+router.put('/profile', adminController.updateProfile);
+router.post('/change-password', adminController.changePassword);
 
 module.exports = router;

@@ -107,7 +107,7 @@ prisma.$connect()
   });
 
 // ── AUTH MIDDLEWARE ───────────────────────────────────────
-const { verifyToken, requireRole } = require('./src/middleware/auth');
+const { verifyToken, requireRole, optionalAuth } = require('./src/middleware/auth');
 
 // ── ROUTE IMPORTS ─────────────────────────────────────────
 const authRoutes = require('./src/routes/auth');
@@ -131,10 +131,10 @@ app.use('/api/exercises', exerciseRoutes);
 app.use('/api/products', productRoutes);
 
 // ── PROTECTED ROUTES (JWT required) ──────────────────────
-// Super Admin & Admin — web portal dashboard
+// Super Admin & Admin & Gym Owner config access — web portal dashboard
 app.use('/api/admin',
   verifyToken,
-  requireRole('super_admin', 'admin'),
+  requireRole('super_admin', 'admin', 'gym_owner'),
   adminRoutes
 );
 
@@ -150,8 +150,8 @@ app.use('/api/gym-admin',
   gymOpsRoutes
 );
 
-// Members — self-service APIs (any authenticated user for their own data)
-app.use('/api/members', verifyToken, memberRoutes);
+// Members — self-service APIs (optionalAuth enables seamless mobile sync with memberId or JWT)
+app.use('/api/members', optionalAuth, memberRoutes);
 
 // Vendors — vendor store management
 app.use('/api/vendors', verifyToken, vendorRoutes);
@@ -209,13 +209,28 @@ app.use((err, req, res, next) => {
   res.status(status).json({ success: false, error: message });
 });
 
+// ── AUTO CHECK-OUT BACKGROUND ENGINE ─────────────────────
+const { runAutoCheckOutEngine } = require('./src/controllers/attendanceController');
+
 // ── START SERVER ──────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`🚀 FitCore Server running on http://localhost:${PORT}`);
   console.log(`🔐 Security: Rate limiting ✅ | Auth middleware ✅ | CORS restricted ✅ | NoSQL sanitization ✅`);
+  
+  // Run Auto-Checkout on startup
+  runAutoCheckOutEngine()
+    .then(res => console.log(`⏱️ Auto-Checkout Engine initialized: ${res.count} expired sessions finalized.`))
+    .catch(err => console.error('⚠️ Auto-Checkout startup error:', err.message));
+
+  // Run Auto-Checkout evaluation every 60 seconds (checks Morning 13:00, Afternoon 16:00, Evening 23:00, Night 04:00)
+  setInterval(() => {
+    runAutoCheckOutEngine().catch(err => console.error('⚠️ Auto-Checkout interval error:', err.message));
+  }, 60 * 1000);
+
   if (!process.env.JWT_SECRET) {
     console.warn('⚠️  WARNING: JWT_SECRET not set in .env! Set it before production deployment.');
   }
 });
 
 module.exports = app;
+

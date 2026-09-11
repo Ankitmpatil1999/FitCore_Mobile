@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LightColors, Typography, Spacing, Radii, Shadows } from '../../theme';
+import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 
 interface Supplement {
   id: string;
@@ -86,16 +87,46 @@ const SUPPLEMENTS: Supplement[] = [
   },
 ];
 
+import { apiService } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
+
 export default function SupplementsScreen() {
+  const { currentMember, currentUser } = useAppContext();
   const [cartCount, setCartCount] = useState(0);
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [cartItems, setCartItems] = useState<{ [id: string]: number }>({});
+  const [liveSupplements, setLiveSupplements] = useState<Supplement[]>(SUPPLEMENTS);
 
   const categories = ['All', 'Protein', 'Creatine', 'Pre-Workout', 'Vitamins'];
 
-  const filteredItems = SUPPLEMENTS.filter(item => {
+  useEffect(() => {
+    async function loadProducts() {
+      try {
+        const catQuery = activeCategory !== 'All' ? activeCategory.toLowerCase() : undefined;
+        const res: any = await apiService.getProducts(catQuery);
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const mapped: Supplement[] = res.data.map((p: any) => ({
+            id: p.id || p._id,
+            name: p.name,
+            category: p.category ? (p.category.charAt(0).toUpperCase() + p.category.slice(1)) : 'Protein',
+            icon: p.icon || '🥛',
+            price: `₹${(p.memberPrice || p.price || 1999).toLocaleString()}`,
+            rating: p.rating || 4.8,
+            weight: p.servingOrWeight || '1000g',
+            description: p.description || 'High quality lab-tested gym supplement.',
+          }));
+          setLiveSupplements(mapped);
+        }
+      } catch (err) {
+        console.log('Using default supplement items');
+      }
+    }
+    loadProducts();
+  }, [activeCategory]);
+
+  const filteredItems = liveSupplements.filter(item => {
     if (activeCategory === 'All') return true;
-    return item.category === activeCategory;
+    return item.category.toLowerCase() === activeCategory.toLowerCase();
   });
 
   const handleAddToCart = (item: Supplement) => {
@@ -119,7 +150,17 @@ export default function SupplementsScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm Order',
-          onPress: () => {
+          onPress: async () => {
+            const memberId = currentMember?.id || currentUser?.id;
+            try {
+              await apiService.createOrder({
+                orderId: `SUP-${Date.now().toString().slice(-6)}`,
+                memberId,
+                items: cartItems,
+                deliveryType: 'gym_desk',
+                status: 'confirmed',
+              });
+            } catch (e) {}
             setCartCount(0);
             setCartItems({});
             Alert.alert('Success', 'Order placed successfully! Please pay and collect at the gym counter.');

@@ -15,7 +15,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
+import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import {
@@ -76,30 +76,50 @@ function AnimatedPressable({
 const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 const whatsappIconImg = require('../../assets/Icons2/whatsapp.png');
 
+import { RefreshControl, ActivityIndicator } from 'react-native';
+import apiService from '../../services/api';
+
 type FilterType = 'all' | 'active' | 'expiring' | 'expired' | 'leads';
 
 export default function MembersScreen({ navigation }: any) {
-  const { currentGym } = useAppContext();
-  const gymId = currentGym?.id || 'g1';
+  const { currentGym, currentUser } = useAppContext();
+  const gymId = currentGym?.id || (currentUser as any)?.gymId || 'g1';
 
-  const [members, setMembers] = useState<Member[]>(() =>
-    MEMBERS.filter((m) => m.gymId === gymId || !m.gymId || m.gymId === 'gym1')
-  );
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterType>('all');
   const [search, setSearch] = useState('');
   const [addModal, setAddModal] = useState(false);
-  const [detailMember, setDetailMember] = useState<Member | null>(null);
+  const [detailMember, setDetailMember] = useState<any | null>(null);
 
   // Form states
   const [fName, setFName] = useState('');
   const [fPhone, setFPhone] = useState('');
-  const [fPlanId, setFPlanId] = useState('plan3');
+  const [fEmail, setFEmail] = useState('');
+  const [fPlan, setFPlan] = useState('Pro Membership');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  const fetchMembers = async () => {
+    try {
+      const res = await apiService.getOwnerMembers(gymId);
+      if (res.success && Array.isArray(res.data)) {
+        setMembers(res.data);
+      }
+    } catch (err) {
+      console.log('Error fetching members:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
+    fetchMembers();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -114,55 +134,63 @@ export default function MembersScreen({ navigation }: any) {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [gymId]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchMembers();
+  };
 
   const filtered = members.filter((m) => {
-    const daysLeft = getDaysRemaining(m.expiryDate);
+    const daysLeft = m.expiryDate
+      ? Math.ceil((new Date(m.expiryDate).getTime() - Date.now()) / 86400000)
+      : 999;
+
     let matchFilter = true;
-    if (filter === 'active') matchFilter = m.status === 'active' && daysLeft > 15;
-    else if (filter === 'expiring') matchFilter = m.status === 'active' && daysLeft <= 15;
-    else if (filter === 'expired') matchFilter = m.status === 'expired' || daysLeft <= 0;
-    else if (filter === 'leads') matchFilter = m.status === 'frozen';
+    if (filter === 'active') matchFilter = (m.status === 'active' || !m.status) && daysLeft > 15;
+    else if (filter === 'expiring') matchFilter = daysLeft >= 0 && daysLeft <= 15;
+    else if (filter === 'expired') matchFilter = m.status === 'expired' || daysLeft < 0;
+    else if (filter === 'leads') matchFilter = m.status === 'lead' || m.status === 'trial' || m.status === 'frozen';
 
     const matchSearch =
-      m.name.toLowerCase().includes(search.toLowerCase()) || m.phone.includes(search);
+      (m.name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (m.phone || '').includes(search);
     return matchFilter && matchSearch;
   });
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!fName.trim() || !fPhone.trim()) {
       Alert.alert('Required', 'Name and mobile number are required.');
       return;
     }
-    const newMember: Member = {
-      id: `m${Date.now()}`,
-      userId: `u${Date.now()}`,
-      gymId: gymId,
-      name: fName.trim(),
-      phone: fPhone.trim(),
-      email: `${fName.toLowerCase().replace(' ', '')}@gmail.com`,
-      avatar: fName.slice(0, 2).toUpperCase(),
-      age: 26,
-      height: 175,
-      weight: 72,
-      bmi: 23.5,
-      goal: 'general_fitness',
-      medicalIssues: 'None',
-      emergencyContact: 'Family',
-      emergencyPhone: '9876543210',
-      planId: fPlanId,
-      status: 'active',
-      joinDate: new Date().toISOString().split('T')[0],
-      expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      trainerId: 't1',
-      photo: '',
-    };
-    setMembers((prev) => [newMember, ...prev]);
-    Alert.alert('✓ Enrolled', `${fName} has been enrolled successfully!`);
-    setFName('');
-    setFPhone('');
-    setAddModal(false);
+    setIsSubmitting(true);
+    try {
+      const res = await apiService.createOwnerMember({
+        gymId,
+        gymName: currentGym?.name || 'FitCore Gym',
+        name: fName.trim(),
+        phone: fPhone.trim(),
+        email: fEmail.trim() || `${fName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
+        plan: fPlan,
+        status: 'active',
+      });
+      if (res.success) {
+        Alert.alert('✓ Enrolled', `${fName} has been enrolled successfully!`);
+        setFName('');
+        setFPhone('');
+        setFEmail('');
+        setAddModal(false);
+        fetchMembers();
+      } else {
+        Alert.alert('Error', res.error || 'Could not enroll member.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Something went wrong');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -183,14 +211,14 @@ export default function MembersScreen({ navigation }: any) {
             onPress={() => setAddModal(true)}
             activeOpacity={0.85}
           >
-            <Icon name="person-add" size={moderateScale(16)} color="#FFFFFF" />
+            <AppIcon name="person-add" size={moderateScale(16)} color="#FFFFFF" />
             <Text style={styles.addMemberHeaderText}>Add</Text>
           </TouchableOpacity>
         </View>
 
         {/* ── SEARCH BAR ── */}
         <View style={styles.searchContainer}>
-          <Icon name="search-outline" size={moderateScale(18)} color="#94A3B8" />
+          <AppIcon name="search" size={moderateScale(18)} color="#94A3B8" />
           <TextInput
             style={styles.searchInput}
             placeholder="Search member name or phone..."
@@ -200,7 +228,7 @@ export default function MembersScreen({ navigation }: any) {
           />
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <Icon name="close-circle" size={moderateScale(16)} color="#94A3B8" />
+              <Text style={{ fontSize: 16, color: '#94A3B8', fontWeight: '700' }}>✕</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -237,28 +265,44 @@ export default function MembersScreen({ navigation }: any) {
         </ScrollView>
 
         {/* ── MEMBER LIST ── */}
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {filtered.length === 0 ? (
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6C5CE7']} />
+          }
+        >
+          {loading ? (
+            <View style={{ paddingVertical: hp(6), alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#6C5CE7" />
+              <Text style={{ marginTop: 12, color: '#64748B', fontWeight: '600', fontSize: fontScale(13) }}>
+                Loading live members...
+              </Text>
+            </View>
+          ) : filtered.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Icon name="people-outline" size={moderateScale(42)} color="#94A3B8" />
+              <AppIcon name="members" size={moderateScale(42)} color="#94A3B8" />
               <Text style={styles.emptyTitle}>No Members Found</Text>
               <Text style={styles.emptySub}>Try searching with another name or filter criteria.</Text>
             </View>
           ) : (
             filtered.map((m) => {
-              const plan = getPlanById(m.planId);
-              const daysLeft = getDaysRemaining(m.expiryDate);
-              const isExpired = m.status === 'expired' || daysLeft <= 0;
-              const isExpiring = m.status === 'active' && daysLeft <= 15;
+              const daysLeft = m.expiryDate
+                ? Math.ceil((new Date(m.expiryDate).getTime() - Date.now()) / 86400000)
+                : 999;
+              const isExpired = m.status === 'expired' || daysLeft < 0;
+              const isExpiring = daysLeft >= 0 && daysLeft <= 15;
 
               return (
                 <AnimatedPressable
-                  key={m.id}
+                  key={m._id || m.id}
                   style={styles.memberCard}
                   onPress={() => setDetailMember(m)}
                 >
                   <View style={styles.memberAvatar}>
-                    <Text style={styles.memberAvatarText}>{m.avatar || 'M'}</Text>
+                    <Text style={styles.memberAvatarText}>
+                      {m.name ? m.name.slice(0, 2).toUpperCase() : 'M'}
+                    </Text>
                   </View>
 
                   <View style={styles.memberInfoCol}>
@@ -280,11 +324,11 @@ export default function MembersScreen({ navigation }: any) {
                     </View>
 
                     <Text style={styles.memberPlanSub}>
-                      {plan?.name ?? 'Standard Pass'} • {m.phone}
+                      {m.plan || m.packageName || 'Standard Pass'} • {m.phone}
                     </Text>
                   </View>
 
-                  <Icon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
+                  <Text style={{ fontSize: 18, color: '#94A3B8', fontWeight: '600' }}>›</Text>
                 </AnimatedPressable>
               );
             })
@@ -300,7 +344,7 @@ export default function MembersScreen({ navigation }: any) {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Enroll New Member</Text>
                 <TouchableOpacity onPress={() => setAddModal(false)}>
-                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                  <Text style={{ fontSize: 18, color: '#0F172A', fontWeight: '700' }}>✕</Text>
                 </TouchableOpacity>
               </View>
 
@@ -345,7 +389,7 @@ export default function MembersScreen({ navigation }: any) {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Member Details</Text>
                 <TouchableOpacity onPress={() => setDetailMember(null)}>
-                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                  <Text style={{ fontSize: 18, color: '#0F172A', fontWeight: '700' }}>✕</Text>
                 </TouchableOpacity>
               </View>
 
@@ -375,7 +419,7 @@ export default function MembersScreen({ navigation }: any) {
                   onPress={() => Alert.alert('Calling...', `Dialing ${detailMember?.phone}`)}
                   activeOpacity={0.85}
                 >
-                  <Icon name="call" size={moderateScale(16)} color="#FFFFFF" />
+                  <AppIcon name="user" size={moderateScale(16)} color="#FFFFFF" />
                   <Text style={styles.quickActionBtnText}>Call</Text>
                 </TouchableOpacity>
               </View>

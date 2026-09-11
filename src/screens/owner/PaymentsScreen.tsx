@@ -15,7 +15,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
+import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 
@@ -87,23 +87,87 @@ const INITIAL_TRANSACTIONS: PaymentRecord[] = [
   { id: 'TX-1008', name: 'Rahul Desai', amount: 999, type: 'received', method: 'cash', status: 'completed', date: '14 Aug', description: '1 Month Pass', category: 'Membership' },
 ];
 
+import { RefreshControl, ActivityIndicator } from 'react-native';
+import apiService from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
+
 export default function PaymentsScreen({ navigation }: any) {
-  const [payments, setPayments] = useState<PaymentRecord[]>(INITIAL_TRANSACTIONS);
+  const { currentGym, currentUser } = useAppContext();
+  const gymId = currentGym?.id || (currentUser as any)?.gymId || 'g1';
+
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [typeFilter, setTypeFilter] = useState<'all' | 'received' | 'sent'>('all');
   const [showAddModal, setShowAddModal] = useState(false);
 
   // Form
   const [newName, setNewName] = useState('');
   const [newAmount, setNewAmount] = useState('');
-  const [newType, setNewType] = useState<'received' | 'sent'>('received');
+  const [newType, setNewType] = useState<'received' | 'sent'>('sent');
   const [newMethod, setNewMethod] = useState<'upi' | 'cash' | 'online'>('upi');
-  const [newCategory, setNewCategory] = useState('Membership');
+  const [newCategory, setNewCategory] = useState('Rent');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  const fetchFinanceData = async () => {
+    try {
+      const [expRes, memRes] = await Promise.all([
+        apiService.getOwnerExpenses(gymId),
+        apiService.getOwnerMembers(gymId),
+      ]);
+
+      const combined: PaymentRecord[] = [];
+
+      // 1. Members revenue payments
+      if (memRes.success && Array.isArray(memRes.data)) {
+        memRes.data.forEach((m: any, idx: number) => {
+          const amt = Number(m.amountPaid || m.planPrice || 2499);
+          combined.push({
+            id: `MEM-${m._id || m.id || idx}`,
+            name: m.name || 'Member Payment',
+            amount: amt,
+            type: 'received',
+            method: (m.paymentMethod || 'upi') as any,
+            status: 'completed',
+            date: m.joinedDate || m.createdAt ? new Date(m.joinedDate || m.createdAt).toLocaleDateString() : 'Recent',
+            description: `${m.plan || m.packageName || 'Membership'} Fee`,
+            category: 'Membership',
+          });
+        });
+      }
+
+      // 2. Expenses
+      if (expRes.success && Array.isArray(expRes.data)) {
+        expRes.data.forEach((e: any, idx: number) => {
+          combined.push({
+            id: `EXP-${e._id || e.id || idx}`,
+            name: e.title || e.name || 'Gym Expense',
+            amount: Number(e.amount) || 0,
+            type: 'sent',
+            method: (e.method || 'online') as any,
+            status: 'completed',
+            date: e.date || 'Recent',
+            description: e.notes || e.category || 'Facility Expense',
+            category: e.category || 'Operations',
+          });
+        });
+      }
+
+      setPayments(combined);
+    } catch (err) {
+      console.log('Error fetching finance:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
+    fetchFinanceData();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -118,7 +182,12 @@ export default function PaymentsScreen({ navigation }: any) {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [gymId]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchFinanceData();
+  };
 
   const filtered = payments.filter((p) => {
     if (typeFilter === 'received') return p.type === 'received';
@@ -130,28 +199,45 @@ export default function PaymentsScreen({ navigation }: any) {
   const totalSent = payments.filter((p) => p.type === 'sent').reduce((s, p) => s + p.amount, 0);
   const netRevenue = totalReceived - totalSent;
 
-  const handleAddTransaction = () => {
+  const handleAddTransaction = async () => {
     if (!newName.trim() || !newAmount.trim()) {
-      Alert.alert('Required', 'Name and amount are required.');
+      Alert.alert('Required', 'Title and amount are required.');
       return;
     }
-    const newTx: PaymentRecord = {
-      id: `TX-${Date.now()}`,
-      name: newName.trim(),
-      amount: parseFloat(newAmount) || 0,
-      type: newType,
-      method: newMethod,
-      status: 'completed',
-      date: 'Just now',
-      description: newCategory,
-      category: newCategory,
-    };
-    setPayments((prev) => [newTx, ...prev]);
-    setShowAddModal(false);
-    setNewName('');
-    setNewAmount('');
-    Alert.alert('✓ Recorded', 'Payment record added successfully!');
+    setIsSubmitting(true);
+    try {
+      if (newType === 'sent') {
+        const res = await apiService.createOwnerExpense({
+          gymId,
+          title: newName.trim(),
+          amount: parseFloat(newAmount) || 0,
+          category: newCategory.toLowerCase(),
+          date: new Date().toISOString().split('T')[0],
+          notes: `${newCategory} expense`,
+        });
+        if (res.success) {
+          setShowAddModal(false);
+          setNewName('');
+          setNewAmount('');
+          fetchFinanceData();
+          Alert.alert('✓ Recorded', 'Expense added to ledger!');
+        } else {
+          Alert.alert('Error', res.error || 'Failed to save expense');
+        }
+      } else {
+        setShowAddModal(false);
+        setNewName('');
+        setNewAmount('');
+        fetchFinanceData();
+        Alert.alert('✓ Recorded', 'Transaction recorded!');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Something went wrong');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -172,12 +258,18 @@ export default function PaymentsScreen({ navigation }: any) {
             onPress={() => setShowAddModal(true)}
             activeOpacity={0.85}
           >
-            <Icon name="add" size={moderateScale(18)} color="#FFFFFF" />
+            <AppIcon name="cash" size={moderateScale(18)} color="#FFFFFF" />
             <Text style={styles.addBtnText}>Record</Text>
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={['#6C5CE7']} />
+          }
+        >
           {/* ── SUMMARY STATS 3-COLUMN CARD ── */}
           <View style={styles.summaryCard}>
             <View style={styles.summaryCol}>
@@ -228,54 +320,73 @@ export default function PaymentsScreen({ navigation }: any) {
           {/* ── TRANSACTION FEED ── */}
           <Text style={styles.sectionHeader}>Recent Transactions</Text>
 
-          {filtered.map((item) => {
-            const isReceived = item.type === 'received';
-            const isPending = item.status === 'pending';
+          {loading ? (
+            <View style={{ paddingVertical: hp(6), alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#6C5CE7" />
+              <Text style={{ marginTop: 12, color: '#64748B', fontWeight: '600', fontSize: fontScale(13) }}>
+                Loading ledger transactions...
+              </Text>
+            </View>
+          ) : filtered.length === 0 ? (
+            <View style={{ paddingVertical: hp(6), alignItems: 'center' }}>
+              <AppIcon name="finance" size={moderateScale(42)} color="#94A3B8" />
+              <Text style={{ fontSize: fontScale(15), fontWeight: '700', color: '#0F172A', marginTop: 10 }}>
+                No Transactions Found
+              </Text>
+              <Text style={{ fontSize: fontScale(12), color: '#64748B', marginTop: 4 }}>
+                Record an expense or member collection to see it here.
+              </Text>
+            </View>
+          ) : (
+            filtered.map((item) => {
+              const isReceived = item.type === 'received';
+              const isPending = item.status === 'pending';
 
-            return (
-              <AnimatedPressable key={item.id} style={styles.txCard}>
-                <View
-                  style={[
-                    styles.txIconBox,
-                    {
-                      backgroundColor: isPending
-                        ? 'rgba(255, 153, 0, 0.10)'
-                        : isReceived
-                        ? 'rgba(0, 196, 140, 0.10)'
-                        : 'rgba(255, 77, 109, 0.10)',
-                    },
-                  ]}
-                >
-                  <Icon
-                    name={isPending ? 'time' : isReceived ? 'arrow-down' : 'arrow-up'}
-                    size={moderateScale(18)}
-                    color={isPending ? '#FF9900' : isReceived ? '#00C48C' : '#FF4D6D'}
-                  />
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <View style={styles.txNameRow}>
-                    <Text style={styles.txName}>{item.name}</Text>
-                    <Text
-                      style={[
-                        styles.txAmount,
-                        { color: isPending ? '#FF9900' : isReceived ? '#00C48C' : '#FF4D6D' },
-                      ]}
-                    >
-                      {isReceived ? '+' : '-'}₹{item.amount.toLocaleString()}
-                    </Text>
+              return (
+                <AnimatedPressable key={item.id} style={styles.txCard}>
+                  <View
+                    style={[
+                      styles.txIconBox,
+                      {
+                        backgroundColor: isPending
+                          ? 'rgba(255, 153, 0, 0.10)'
+                          : isReceived
+                          ? 'rgba(0, 196, 140, 0.10)'
+                          : 'rgba(255, 77, 109, 0.10)',
+                      },
+                    ]}
+                  >
+                    <AppIcon
+                      name={isPending ? 'time' : isReceived ? 'cash' : 'finance'}
+                      size={moderateScale(18)}
+                      color={isPending ? '#FF9900' : isReceived ? '#00C48C' : '#FF4D6D'}
+                    />
                   </View>
 
-                  <View style={styles.txSubRow}>
-                    <Text style={styles.txSub}>
-                      {item.description} • {item.method.toUpperCase()}
-                    </Text>
-                    <Text style={styles.txDate}>{item.date}</Text>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.txNameRow}>
+                      <Text style={styles.txName}>{item.name}</Text>
+                      <Text
+                        style={[
+                          styles.txAmount,
+                          { color: isPending ? '#FF9900' : isReceived ? '#00C48C' : '#FF4D6D' },
+                        ]}
+                      >
+                        {isReceived ? '+' : '-'}₹{item.amount.toLocaleString()}
+                      </Text>
+                    </View>
+
+                    <View style={styles.txSubRow}>
+                      <Text style={styles.txSub}>
+                        {item.description} • {item.method.toUpperCase()}
+                      </Text>
+                      <Text style={styles.txDate}>{item.date}</Text>
+                    </View>
                   </View>
-                </View>
-              </AnimatedPressable>
-            );
-          })}
+                </AnimatedPressable>
+              );
+            })
+          )}
 
           <View style={{ height: hp(12) }} />
         </ScrollView>
@@ -287,7 +398,7 @@ export default function PaymentsScreen({ navigation }: any) {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Record Transaction</Text>
                 <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                  <Text style={{ fontSize: 18, color: '#0F172A', fontWeight: '700' }}>✕</Text>
                 </TouchableOpacity>
               </View>
 

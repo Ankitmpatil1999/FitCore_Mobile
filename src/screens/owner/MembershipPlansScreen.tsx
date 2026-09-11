@@ -15,7 +15,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
+import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { MEMBERSHIP_PLANS, MembershipPlan } from '../../data/mockData';
@@ -163,7 +163,7 @@ export default function MembershipPlansScreen({ navigation }: any) {
             <Text style={styles.headerSub}>{plans.length} Active Gym Packages</Text>
           </View>
           <TouchableOpacity style={styles.addBtn} onPress={openAdd} activeOpacity={0.85}>
-            <Icon name="add" size={moderateScale(18)} color="#FFFFFF" />
+            <AppIcon name="add" size={moderateScale(18)} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
 
@@ -202,7 +202,7 @@ export default function MembershipPlansScreen({ navigation }: any) {
               <View style={styles.featuresList}>
                 {p.features.map((feat, idx) => (
                   <View key={idx} style={styles.featureItem}>
-                    <Icon name="checkmark-circle" size={moderateScale(15)} color="#00C48C" />
+                    <AppIcon name="checkmark-circle" size={moderateScale(15)} color="#00C48C" />
                     <Text style={styles.featureText}>{feat}</Text>
                   </View>
                 ))}
@@ -220,7 +220,7 @@ export default function MembershipPlansScreen({ navigation }: any) {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>{editPlan ? 'Edit Plan' : 'New Membership Plan'}</Text>
                 <TouchableOpacity onPress={() => setAddModal(false)}>
-                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                  <AppIcon name="close" size={moderateScale(22)} color="#0F172A" />
                 </TouchableOpacity>
               </View>
 
@@ -468,7 +468,6 @@ const styles = StyleSheet.create({
     fontSize: fontScale(12),
     fontWeight: '700',
     color: '#0F172A',
-    marginBottom: 6,
   },
   modalInput: {
     backgroundColor: '#F8FAFC',

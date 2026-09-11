@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { API_URL } from '../../config/api';
 import CustomSelect from '../common/CustomSelect.jsx';
 import {
   UsersIcon,
@@ -7,14 +8,11 @@ import {
   CheckCircleIcon,
   SearchIcon,
   BoltIcon,
-  ShieldCheckIcon,
-  EditIcon,
-  CreditCardIcon,
   SettingsIcon,
   AlertTriangleIcon
 } from '../common/Icons';
 
-export default function SuperAdminMembersView({ members = [], setMembers, gyms = [], plans = [] }) {
+export default function SuperAdminMembersView({ members = [], setMembers, gyms = [] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGymId, setSelectedGymId] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -43,7 +41,7 @@ export default function SuperAdminMembersView({ members = [], setMembers, gyms =
     return gym ? gym.name : 'All-India Member Pass';
   };
 
-  const handleStatusChange = (memberId, newStatus) => {
+  const handleStatusChange = async (memberId, newStatus) => {
     // Standardize status format (Active, Expired, Pending)
     const formattedStatus = newStatus.charAt(0).toUpperCase() + newStatus.slice(1).toLowerCase();
     if (setMembers) {
@@ -52,21 +50,24 @@ export default function SuperAdminMembersView({ members = [], setMembers, gyms =
     if (selectedMember && (selectedMember.id === memberId || selectedMember._id === memberId)) {
       setSelectedMember(prev => ({ ...prev, status: formattedStatus }));
     }
+
+    try {
+      const token = localStorage.getItem('fitcore_token');
+      await fetch(`${API_URL}/admin/members/${memberId}/status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ status: formattedStatus })
+      });
+    } catch (err) {
+      console.error('Failed to sync member status with backend:', err);
+    }
   };
 
-  // Helper selectors to update query and reset page index
   const handleSearchChange = (e) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleGymChange = (e) => {
-    setSelectedGymId(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleStatusFilterChange = (e) => {
-    setSelectedStatus(e.target.value);
     setCurrentPage(1);
   };
 

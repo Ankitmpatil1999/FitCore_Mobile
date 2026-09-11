@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Image,
@@ -6,6 +6,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
+import { apiService } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
+import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 
 const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 
@@ -55,7 +58,31 @@ const MOCK_NOTIFICATIONS = [
 ];
 
 export default function NotificationsScreen({ navigation }: any) {
+  const { role } = useAppContext();
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+
+  useEffect(() => {
+    async function loadNotifications() {
+      try {
+        const res: any = await apiService.getNotifications(role || 'member');
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const mapped = res.data.map((n: any, idx: number) => ({
+            id: n.id || n._id || String(idx),
+            title: n.title,
+            body: n.message || n.body,
+            time: n.time || 'Recently',
+            read: n.isRead || false,
+            icon: n.icon || 'megaphone',
+            color: n.color || Colors.primaryGreen,
+          }));
+          setNotifications(mapped);
+        }
+      } catch (e) {
+        console.log('Using default notifications list');
+      }
+    }
+    loadNotifications();
+  }, [role]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 

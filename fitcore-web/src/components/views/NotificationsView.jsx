@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { API_ENDPOINTS } from '../../config/api';
 
 export default function NotificationsView({ notifications, setNotifications, members, trainers }) {
   const [notiTitle, setNotiTitle] = useState('');
@@ -16,7 +17,7 @@ export default function NotificationsView({ notifications, setNotifications, mem
       else if (notiTarget === 'All Trainers') targetRole = 'gym_owner';
 
       const token = localStorage.getItem('fitcore_token');
-      const response = await fetch('http://localhost:7000/api/notifications', {
+      const response = await fetch(API_ENDPOINTS.NOTIFICATIONS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -40,6 +41,7 @@ export default function NotificationsView({ notifications, setNotifications, mem
         alert(data.error || 'Failed to dispatch notification.');
       }
     } catch (err) {
+      console.error('Error sending notification:', err);
       alert('Error connecting to notifications API.');
     }
   };

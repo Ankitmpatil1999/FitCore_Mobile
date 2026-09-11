@@ -15,7 +15,15 @@ import {
   CreditCardIcon,
   CheckCircleIcon,
   LogoutIcon,
-  LocationPinIcon
+  LocationPinIcon,
+  EyeIcon,
+  CalendarIcon,
+  ClockIcon,
+  SunIcon,
+  MoonIcon,
+  FireIcon,
+  PhoneIcon,
+  CloseIcon
 } from './common/Icons.jsx';
 
 const API_BASE = 'http://localhost:7000/api/gym-admin';
@@ -149,6 +157,7 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
   const [showSubscribeModal, setShowSubscribeModal] = useState(null); // member obj
   const [showUploadKycModal, setShowUploadKycModal] = useState(false);
   const [showMemberSessionModal, setShowMemberSessionModal] = useState(null); // member attendance timeline obj
+  const [memberTimelineView, setMemberTimelineView] = useState('month'); // 'week' | 'month'
 
   // Notification States & History
   const [notificationForm, setNotificationForm] = useState({ audience: 'all', type: 'announcement', title: '', message: '', mode: 'now', scheduledDate: '' });
@@ -204,8 +213,9 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
 
   // Sync gymId if allGyms changes or fetch from API
   useEffect(() => {
-    if (!gymId && allGyms.length > 0) {
-      setGymId(allGyms[0].id || allGyms[0]._id);
+    const validGymId = user?.gymId || (allGyms.length > 0 ? (allGyms[0].id || allGyms[0]._id) : '');
+    if (validGymId && (!gymId || gymId === 'undefined')) {
+      setGymId(validGymId);
     } else if (!gymId) {
       authFetch('http://localhost:7000/api/admin/gyms')
         .then(res => res.json())
@@ -216,7 +226,7 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
         })
         .catch(() => {});
     }
-  }, [allGyms, gymId]);
+  }, [allGyms, gymId, user]);
 
   // Load Active Branch Data
   const loadBranchData = async () => {
@@ -284,6 +294,86 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
       const data = await res.json();
       if (data.success) setMonthlyReport(data);
     } catch {}
+  };
+
+  const openMemberSessionModal = async (m) => {
+    if (!m) return;
+    const memberId = m.memberId || m.id || m._id || m.userId;
+    const memberPhone = m.memberPhone || m.phone || '';
+    const memberName = m.memberName || m.name || 'Member';
+    
+    // Safely check if member is currently checked in today
+    const liveCheckedInSet = new Set((todayAttendance?.records || [])
+      .filter(r => !r.checkOutTime || r.status === 'CHECKED_IN')
+      .flatMap(r => [String(r.memberId || ''), String(r.memberPhone || '')])
+      .filter(Boolean)
+    );
+    const isIn = Boolean(m.isCurrentlyInside || (memberId && liveCheckedInSet.has(String(memberId))) || (memberPhone && liveCheckedInSet.has(String(memberPhone))));
+
+    const memRosterItem = (todayAttendance?.memberRoster || []).find(r => r.memberId === String(memberId) || r.memberPhone === memberPhone);
+    const matchedMember = (members || []).find(mem => String(mem.id || mem._id || mem.userId) === String(memberId) || (memberPhone && mem.phone === memberPhone));
+
+    const initialData = {
+      memberId,
+      memberName: memberName !== 'Member' ? memberName : (matchedMember?.name || 'Member'),
+      memberPhone: memberPhone || matchedMember?.phone || '',
+      membershipId: m.membershipId || m.plan || matchedMember?.plan || 'Standard Pass',
+      planName: m.planName || m.plan || matchedMember?.plan || 'Standard Pass',
+      planPrice: m.planPrice || matchedMember?.planPrice || 0,
+      planDurationMonths: m.planDurationMonths || m.durationMonths || matchedMember?.durationMonths || 1,
+      planDurationLabel: m.planDurationLabel || `${m.planDurationMonths || m.durationMonths || matchedMember?.durationMonths || 1} Months Pass`,
+      planExpiryDate: m.planExpiryDate || m.expiryDate || matchedMember?.expiryDate || '',
+      joinedDate: m.joinedDate || m.startDate || matchedMember?.joinedDate || matchedMember?.startDate || '',
+      isCurrentlyInside: isIn,
+      totalTimeFormatted: m.totalTimeFormatted || m.todayTotalTimeFormatted || '0m',
+      todayTotalTimeFormatted: m.todayTotalTimeFormatted || m.totalTimeFormatted || '0m',
+      weeklyTimeFormatted: m.weeklyTimeFormatted || '0m',
+      monthlyTimeFormatted: m.monthlyTimeFormatted || '0m',
+      daysAttendedThisMonth: m.daysAttendedThisMonth || (m.attendedDates ? m.attendedDates.length : 0),
+      attendedDates: m.attendedDates || [],
+      weeklyTimeline: m.weeklyTimeline || [],
+      totalVisits: m.totalVisits || 0,
+      sessions: m.sessions || [],
+      shiftBreakdown: m.shiftBreakdown || {}
+    };
+
+    setShowMemberSessionModal(initialData);
+
+    // Fetch full timeline and calendar attended dates from backend
+    if (gymId) {
+      try {
+        const queryParams = new URLSearchParams();
+        queryParams.append('gymId', gymId);
+        if (memberId) queryParams.append('memberId', memberId);
+        if (memberPhone) queryParams.append('phone', memberPhone);
+
+        const res = await authFetch(`${API_BASE}/attendance/timeline?${queryParams.toString()}`);
+        const data = await res.json();
+        if (data.success) {
+          setShowMemberSessionModal(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              ...data,
+              memberName: prev.memberName || data.memberName,
+              memberPhone: prev.memberPhone || data.memberPhone,
+              isCurrentlyInside: data.isCurrentlyInside ?? prev.isCurrentlyInside,
+              attendedDates: data.attendedDates || prev.attendedDates || [],
+              daysAttendedThisMonth: data.daysAttendedThisMonth ?? prev.daysAttendedThisMonth,
+              monthlyTimeFormatted: data.monthlyTimeFormatted || prev.monthlyTimeFormatted,
+              weeklyTimeFormatted: data.weeklyTimeFormatted || prev.weeklyTimeFormatted,
+              weeklyTimeline: data.weeklyTimeline || prev.weeklyTimeline,
+              sessions: data.sessions || prev.sessions,
+              shiftBreakdown: data.shiftBreakdown || prev.shiftBreakdown,
+              totalTimeFormatted: data.totalTimeFormatted || prev.totalTimeFormatted,
+              todayTotalTimeFormatted: data.todayTotalTimeFormatted || prev.todayTotalTimeFormatted
+            };
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching member timeline:', err);
+      }
+    }
   };
 
   const handleCheckIn = async (member) => {
@@ -623,19 +713,39 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
     }
   };
 
-  const handleSendNotification = (e) => {
+  const handleSendNotification = async (e) => {
     e.preventDefault();
+    const title = notificationForm.title || 'Gym Broadcast Notice';
+    const message = notificationForm.message || 'Important update from your gym team.';
+    const audience = notificationForm.audience === 'all' ? 'All Members' : notificationForm.audience === 'active' ? 'Active Members' : 'Expiring Memberships';
+
+    try {
+      await authFetch('http://localhost:7000/api/notifications', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          message,
+          target: 'all',
+          type: 'broadcast',
+          gymId: gymId || null
+        })
+      });
+    } catch (err) {
+      console.warn('Notification sync error:', err);
+    }
+
     const newNoti = {
       id: 'n_' + Date.now(),
-      title: notificationForm.title || 'Gym Notice',
-      audience: notificationForm.audience === 'all' ? 'All Members' : notificationForm.audience === 'active' ? 'Active Members' : 'Expiring Memberships',
+      title,
+      audience,
       sentAt: 'Just now',
       status: 'Delivered',
-      delivered: members.length || 428,
+      delivered: members.length || 1,
       pending: 0
     };
     setNotificationHistory([newNoti, ...notificationHistory]);
-    showToast(`Notification sent to ${newNoti.delivered} members.`);
+    showToast(`Broadcast notification dispatched to ${newNoti.delivered} members.`);
     setShowSendNotificationModal(false);
     setNotificationForm({ audience: 'all', type: 'announcement', title: '', message: '', mode: 'now', scheduledDate: '' });
   };
@@ -845,11 +955,13 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
             {allGyms.length > 0 ? (
               allGyms.map(g => (
                 <option key={g.id || g._id} value={g.id || g._id}>
-                  {g.name} ({g.city || 'India'})
+                  {g.name} ({g.city || 'Nagpur'})
                 </option>
               ))
             ) : (
-              <option value="">{activeGym?.name || 'FitCore Premium Gym'}</option>
+              <option value={gymId || '6a934afd13a1b16c3767d90f'}>
+                {activeGym?.name || 'Ayushi GYM (Nagpur)'}
+              </option>
             )}
           </select>
           <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', display: 'inline-block', flexShrink: 0 }} />
@@ -964,8 +1076,10 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
           {activeTab === 'overview' && (() => {
             const totalMembers = overview?.stats?.totalMembers || members.length || 0;
             const totalTrainers = overview?.stats?.totalTrainers || trainers.length || 0;
-            const todayCheckIns = todayAttendance.stats?.totalVisits ?? overview?.stats?.todayCheckIns ?? 0;
-            const activeNow = todayAttendance.stats?.stillInside ?? 0;
+            const uniqueCheckedInCount = todayAttendance.stats?.totalUniqueMembers ?? (todayAttendance.memberRoster?.length || 0);
+            const todayCheckIns = todayAttendance.stats?.totalLogs ?? (todayAttendance.records?.length || uniqueCheckedInCount || 0);
+            const remainingMembers = Math.max(0, totalMembers - uniqueCheckedInCount);
+            const activeNow = todayAttendance.stats?.stillInside ?? (todayAttendance.memberRoster?.filter(m => m.isCurrentlyInside).length || 0);
             
             // Dynamic Monthly Revenue from Members plans or Overview API
             const calculatedRevenue = members.reduce((sum, m) => sum + (Number(m.planPrice) || Number(m.amountPaid) || 0) + (Number(m.admissionFee) || 0) + (Number(m.trainerFee) || 0), 0);
@@ -1031,17 +1145,21 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
                   </div>
                 </div>
 
-                {/* 2. Check-ins Today */}
+                {/* 2. Checked-In Members Today */}
                 <div className="kpi-stat-card">
                   <div className="kpi-card-top-row">
-                    <span className="kpi-title">Check-ins Today</span>
+                    <span className="kpi-title">Members Checked-In</span>
                     <div className="kpi-icon-avatar green">
                       <BoltIcon size={18} />
                     </div>
                   </div>
-                  <h2 className="kpi-value-num">{todayCheckIns}</h2>
+                  <h2 className="kpi-value-num">
+                    {uniqueCheckedInCount} <span style={{ fontSize: '15px', color: '#94a3b8', fontWeight: 600 }}>/ {totalMembers}</span>
+                  </h2>
                   <div className="kpi-sub-trend-row">
-                    <span className="trend-pill-up">Turnstile Entries</span>
+                    <span className="trend-pill-up" style={{ color: remainingMembers > 0 ? '#d97706' : '#16a34a', background: remainingMembers > 0 ? '#fef3c7' : '#dcfce7' }}>
+                      {remainingMembers > 0 ? `⏳ ${remainingMembers} Remaining` : '🎉 All Present'}
+                    </span>
                     <svg width="40" height="14" viewBox="0 0 40 14" fill="none">
                       <path d="M2 12 Q 10 4, 20 9 T 38 2" stroke="#10b981" strokeWidth="2" fill="none" />
                     </svg>
@@ -1253,47 +1371,117 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
                       <thead>
                         <tr>
                           <th>Member</th>
-                          <th>Check-in Time</th>
                           <th>Status</th>
-                          <th>Access Type</th>
+                          <th>Time Spent Today</th>
+                          <th>Sessions / Shifts</th>
+                          <th>Action</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {liveCheckins.length === 0 ? (
+                        {(!todayAttendance.memberRoster || todayAttendance.memberRoster.length === 0) ? (
                           <tr>
-                            <td colSpan="4" style={{ textAlign: 'center', padding: '24px', color: '#64748b' }}>
-                              No check-ins logged yet today. Use Turnstile to check in members.
+                            <td colSpan="5" style={{ textAlign: 'center', padding: '28px', color: '#64748b' }}>
+                              No member attendance logged yet today.
                             </td>
                           </tr>
                         ) : (
-                          liveCheckins.map((row, i) => (
-                            <tr key={i}>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
-                                  <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#6366f1', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px' }}>
-                                    {(row.memberName || 'M').charAt(0).toUpperCase()}
+                          todayAttendance.memberRoster.slice(0, 5).map((memSummary, i) => {
+                            const matchedMember = members.find(m => String(m.id || m._id || m.userId) === String(memSummary.memberId) || m.phone === memSummary.memberPhone);
+                            const displayName = memSummary.memberName && memSummary.memberName !== 'Member' ? memSummary.memberName : (matchedMember?.name || 'Member');
+                            const initial = displayName.charAt(0).toUpperCase() || 'M';
+
+                            return (
+                              <tr
+                                key={memSummary.memberId || i}
+                                onClick={() => openMemberSessionModal(memSummary)}
+                                style={{ cursor: 'pointer', transition: 'background 0.2s ease' }}
+                                title="Click to view full session timeline breakdown"
+                              >
+                                <td>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontWeight: 700 }}>
+                                    <div style={{
+                                      width: '32px',
+                                      height: '32px',
+                                      borderRadius: '50%',
+                                      background: memSummary.isCurrentlyInside ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                                      color: '#fff',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      fontSize: '12px',
+                                      fontWeight: 800,
+                                      boxShadow: memSummary.isCurrentlyInside ? '0 2px 8px rgba(16, 185, 129, 0.3)' : 'none'
+                                    }}>
+                                      {initial}
+                                    </div>
+                                    <div>
+                                      <div style={{ color: '#0f172a', fontSize: '13.5px', fontWeight: 800 }}>{displayName}</div>
+                                      <div style={{ color: '#64748b', fontSize: '11px', fontWeight: 500 }}>📱 {memSummary.memberPhone || matchedMember?.phone || 'Member Pass'}</div>
+                                    </div>
                                   </div>
-                                  {row.memberName}
-                                </div>
-                              </td>
-                              <td style={{ color: '#64748b' }}>{row.checkInTime ? new Date(row.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '--:--'}</td>
-                              <td>
-                                <span style={{
-                                  fontSize: '11px',
-                                  fontWeight: 800,
-                                  color: row.status === 'CHECKED_IN' ? '#16a34a' : '#475569',
-                                  background: row.status === 'CHECKED_IN' ? '#dcfce7' : '#f1f5f9',
-                                  padding: '2px 8px',
-                                  borderRadius: '6px'
-                                }}>
-                                  {row.status === 'CHECKED_IN' ? '● Inside Gym' : 'Checked Out'}
-                                </span>
-                              </td>
-                              <td>
-                                <span className="access-type-pill nfc">{row.method ? row.method.toUpperCase() : 'TURNSTILE'}</span>
-                              </td>
-                            </tr>
-                          ))
+                                </td>
+                                <td>
+                                  <span style={{
+                                    fontSize: '11px',
+                                    fontWeight: 800,
+                                    color: memSummary.isCurrentlyInside ? '#16a34a' : '#475569',
+                                    background: memSummary.isCurrentlyInside ? '#dcfce7' : '#f1f5f9',
+                                    padding: '3px 8px',
+                                    borderRadius: '6px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}>
+                                    {memSummary.isCurrentlyInside ? '● Live in Gym' : 'Checked Out'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <span style={{
+                                    fontSize: '12px',
+                                    fontWeight: 900,
+                                    color: '#4f46e5',
+                                    background: '#eef2ff',
+                                    padding: '3px 10px',
+                                    borderRadius: '6px',
+                                    display: 'inline-block'
+                                  }}>
+                                    ⏱️ {memSummary.todayTotalTimeFormatted || memSummary.totalTimeFormatted || '0m'}
+                                  </span>
+                                </td>
+                                <td>
+                                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                                    <span style={{
+                                      fontSize: '11px',
+                                      fontWeight: 700,
+                                      color: '#0369a1',
+                                      background: '#e0f2fe',
+                                      padding: '2px 7px',
+                                      borderRadius: '4px'
+                                    }}>
+                                      🎟️ {memSummary.totalVisits || (memSummary.sessions || []).length || 1} {(memSummary.totalVisits || (memSummary.sessions || []).length || 1) === 1 ? 'Visit' : 'Visits'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); openMemberSessionModal(memSummary); }}
+                                    style={{
+                                      background: 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      borderRadius: '6px',
+                                      padding: '4px 10px',
+                                      fontSize: '11px',
+                                      fontWeight: 800,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    View Timeline →
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                     </table>
@@ -1713,10 +1901,10 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
                   <div style={{ marginTop: 'auto', display: 'flex', gap: '10px' }}>
                     <button
                       className="ops-primary-btn"
-                      style={{ width: '100%', padding: '9px 14px', fontSize: '12.5px', borderRadius: '10px' }}
+                      style={{ width: '100%', padding: '9px 14px', fontSize: '12.5px', borderRadius: '10px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
                       onClick={() => showToast('Municipal Shop Act certificate verified against state gazette.')}
                     >
-                      👁️ View & Verify Certificate
+                      <EyeIcon size={14} color="#ffffff" /> View & Verify Certificate
                     </button>
                   </div>
                 </div>
@@ -1856,10 +2044,13 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr', gap: '16px', alignItems: 'start' }}>
-                {/* Left Column: Quick Check-in / Check-out Panel */}
+                {/* Left Column: Member Access Status & Live Monitoring */}
                 <div className="glass-table-card" style={{ padding: '16px 18px' }}>
                   <div style={{ paddingBottom: '12px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 className="card-section-title" style={{ fontSize: '14px' }}>⚡ Quick Turnstile Check-in / Out</h4>
+                    <div>
+                      <h4 className="card-section-title" style={{ fontSize: '14px', margin: '0 0 2px 0' }}>⚡ Member Access Status & Live Turnstile</h4>
+                      <span style={{ fontSize: '11px', color: '#64748b' }}>Self Check-in Managed by Members via Mobile App</span>
+                    </div>
                     <button className="refresh-action-btn" onClick={() => { loadTodayAttendance(); loadAttendanceStats(); }}>↺ Refresh</button>
                   </div>
                   <div style={{ paddingTop: '12px' }}>
@@ -1876,28 +2067,78 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
                           No members found
                         </div>
                       ) : filteredForCheckin.map(m => {
-                        const isIn = checkedInIds.has(String(m.id || m._id));
+                        const isIn = checkedInIds.has(String(m.id || m._id)) || checkedInIds.has(String(m.userId)) || checkedInIds.has(String(m.phone));
+                        const memRosterItem = roster.find(r => r.memberId === String(m.id || m._id || m.userId) || r.memberPhone === m.phone);
+                        const modalData = memRosterItem ? {
+                          ...memRosterItem,
+                          memberName: m.name || memRosterItem.memberName,
+                          memberPhone: m.phone || memRosterItem.memberPhone,
+                          planName: m.plan || memRosterItem.planName || 'Standard Pass',
+                          planPrice: m.planPrice || memRosterItem.planPrice || 0,
+                          planDurationMonths: m.durationMonths || memRosterItem.planDurationMonths || 1,
+                          planExpiryDate: m.expiryDate || memRosterItem.planExpiryDate || '',
+                          joinedDate: m.joinedDate || m.startDate || memRosterItem.joinedDate || '',
+                          isCurrentlyInside: isIn
+                        } : {
+                          memberId: m.id || m._id || m.userId,
+                          memberName: m.name,
+                          memberPhone: m.phone,
+                          membershipId: m.plan || 'Standard Pass',
+                          planName: m.plan || 'Standard Pass',
+                          planPrice: m.planPrice || 0,
+                          planDurationMonths: m.durationMonths || 1,
+                          planExpiryDate: m.expiryDate || '',
+                          joinedDate: m.joinedDate || m.startDate || '',
+                          isCurrentlyInside: isIn,
+                          totalTimeFormatted: '0m',
+                          totalVisits: 0,
+                          sessions: []
+                        };
+
                         return (
-                          <div key={m.id || m._id} className={`member-checkin-row ${isIn ? 'checked-in' : ''}`} style={{ padding: '10px 12px', marginBottom: '8px' }}>
+                          <div key={m.id || m._id} className={`member-checkin-row ${isIn ? 'checked-in' : ''}`} style={{ padding: '10px 12px', marginBottom: '8px', cursor: 'pointer' }} onClick={() => openMemberSessionModal(m)}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                               <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: isIn ? 'linear-gradient(135deg, #059669, #10b981)' : 'linear-gradient(135deg, #4f46e5, #6366f1)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 800, fontSize: '12px', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
                                 {(m.name || 'M').substring(0, 2).toUpperCase()}
                               </div>
                               <div>
                                 <div style={{ fontWeight: 800, fontSize: '13px', color: '#0f172a' }}>{m.name}</div>
-                                <div style={{ fontSize: '11px', color: '#64748b' }}>{m.phone} · {m.plan || 'Standard Pass'}</div>
+                                <div style={{ fontSize: '11px', color: '#64748b' }}>{m.phone} · <span style={{ color: '#4f46e5', fontWeight: 700 }}>{m.plan || 'Standard Pass'}</span></div>
                               </div>
                             </div>
-                            <div style={{ display: 'flex', gap: '6px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {isIn ? (
-                                <button onClick={() => handleCheckOut(m)} className="checkout-btn" style={{ padding: '6px 12px', fontSize: '11.5px' }}>
-                                  🚪 Check Out
-                                </button>
+                                <span style={{ fontSize: '11px', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '3px 8px', borderRadius: '6px' }}>
+                                  ● IN GYM
+                                </span>
                               ) : (
-                                <button onClick={() => handleCheckIn(m)} className="checkin-btn" style={{ padding: '6px 12px', fontSize: '11.5px' }}>
-                                  ✅ Check In
-                                </button>
+                                <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '3px 8px', borderRadius: '6px' }}>
+                                  OUTSIDE
+                                </span>
                               )}
+                              <button
+                                type="button"
+                                className="turnstile-view-btn"
+                                style={{
+                                  background: 'linear-gradient(135deg, #4f46e5, #6366f1)',
+                                  color: '#fff',
+                                  border: 'none',
+                                  padding: '5px 10px',
+                                  borderRadius: '6px',
+                                  fontSize: '11.5px',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '5px'
+                                }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openMemberSessionModal(m);
+                                }}
+                              >
+                                <EyeIcon size={13} color="#ffffff" /> Details
+                              </button>
                             </div>
                           </div>
                         );
@@ -1944,7 +2185,7 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
                             transition: 'all 0.15s ease',
                             boxShadow: '0 1px 4px rgba(0,0,0,0.02)'
                           }}
-                          onClick={() => setShowMemberSessionModal(memSummary)}
+                          onClick={() => openMemberSessionModal(memSummary)}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                             <div style={{
@@ -2218,18 +2459,9 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
                       </div>
                     ))
                   ) : (
-                    [
-                      { name: 'Ankit Patil', phone: '9209282289', lastSeen: 'Over 7 days ago' },
-                      { name: 'Karan Gawande', phone: '1234567899', lastSeen: 'Over 7 days ago' }
-                    ].map((m, i) => (
-                      <div key={i} className="inactive-athlete-card">
-                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '14px' }}>{m.name}</div>
-                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>📱 {m.phone}</div>
-                        <div style={{ fontSize: '12px', color: '#dc2626', fontWeight: 800, marginTop: '6px', background: '#fef2f2', padding: '4px 8px', borderRadius: '6px', display: 'inline-block' }}>
-                          ⏱️ Last seen: {m.lastSeen}
-                        </div>
-                      </div>
-                    ))
+                    <div style={{ gridColumn: '1 / -1', padding: '16px', background: '#f8fafc', borderRadius: '10px', color: '#64748b', fontSize: '13px', textAlign: 'center' }}>
+                      🎉 All registered members are regularly visiting! No inactive athletes detected.
+                    </div>
                   )}
                 </div>
               </div>
@@ -2256,24 +2488,9 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
                         </div>
                       ))
                     ) : (
-                      [
-                        { name: 'Ankit Patil', avgMins: '38 mins/session', count: 36 },
-                        { name: 'Ayushi Sharma', avgMins: '52 mins/session', count: 28 },
-                        { name: 'Rahul Patil', avgMins: '60 mins/session', count: 24 }
-                      ].map((m, i) => (
-                        <div key={i} className={`regular-athlete-rank-card ${i === 0 ? 'top-podium' : ''}`}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span style={{ fontSize: '24px' }}>{['🥇','🥈','🥉'][i]}</span>
-                            <div>
-                              <div style={{ fontWeight: 800, fontSize: '14px', color: '#0f172a' }}>{m.name}</div>
-                              <div style={{ fontSize: '12px', color: '#64748b' }}>⏱️ {m.avgMins}</div>
-                            </div>
-                          </div>
-                          <span style={{ fontWeight: 900, color: '#d97706', fontSize: '16px', background: '#fffbeb', padding: '4px 12px', borderRadius: '20px', border: '1px solid #fde68a' }}>
-                            {m.count} visits
-                          </span>
-                        </div>
-                      ))
+                      <div style={{ padding: '24px 16px', textAlign: 'center', color: '#64748b', fontSize: '13px' }}>
+                        No attendance history found yet for ranking.
+                      </div>
                     )}
                   </div>
                 </div>
@@ -2283,38 +2500,34 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
                   <h4 className="card-section-title" style={{ marginBottom: '16px' }}>📈 Turnstile Footfall (Last 7 Days)</h4>
                   
                   <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', height: '180px', padding: '20px 0 10px 0', borderBottom: '1px solid #e2e8f0' }}>
-                    {((attendanceStats?.dailyFootfall && attendanceStats.dailyFootfall.length > 0)
-                      ? attendanceStats.dailyFootfall
-                      : [
-                          { dayName: 'Mon', count: 142 },
-                          { dayName: 'Tue', count: 168 },
-                          { dayName: 'Wed', count: 185 },
-                          { dayName: 'Thu', count: 174 },
-                          { dayName: 'Fri', count: 196 },
-                          { dayName: 'Sat', count: 210 },
-                          { dayName: 'Sun', count: 115 }
-                        ]
-                    ).map((d, i) => {
-                      const maxCount = Math.max(...(attendanceStats?.dailyFootfall || [142,168,185,174,196,210,115]).map(x => (typeof x === 'object' ? x.count : x)), 1);
-                      const pct = Math.round((d.count / maxCount) * 100);
-                      return (
-                        <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
-                          <span style={{ fontSize: '12px', fontWeight: 800, color: '#4f46e5' }}>{d.count}</span>
-                          <div
-                            style={{
-                              width: '100%',
-                              borderRadius: '8px 8px 0 0',
-                              background: 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)',
-                              height: `${Math.max(pct, 12)}%`,
-                              minHeight: '12px',
-                              transition: 'height 0.5s ease',
-                              boxShadow: '0 2px 6px rgba(79, 70, 229, 0.25)'
-                            }}
-                          />
-                          <span style={{ fontSize: '11.5px', color: '#475569', fontWeight: 700 }}>{d.dayName}</span>
-                        </div>
-                      );
-                    })}
+                    {(() => {
+                      const dayList = (attendanceStats?.dailyFootfall && attendanceStats.dailyFootfall.length > 0)
+                        ? attendanceStats.dailyFootfall
+                        : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => ({ dayName: d, count: 0 }));
+                      const maxCount = Math.max(...dayList.map(x => (typeof x === 'object' ? x.count : Number(x) || 0)), 1);
+
+                      return dayList.map((d, i) => {
+                        const cnt = typeof d === 'object' ? d.count : Number(d) || 0;
+                        const pct = Math.round((cnt / maxCount) * 100);
+                        return (
+                          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '12px', fontWeight: 800, color: '#4f46e5' }}>{cnt}</span>
+                            <div
+                              style={{
+                                width: '100%',
+                                borderRadius: '8px 8px 0 0',
+                                background: 'linear-gradient(180deg, #6366f1 0%, #4f46e5 100%)',
+                                height: `${Math.max(pct, 6)}%`,
+                                minHeight: '6px',
+                                transition: 'height 0.5s ease',
+                                boxShadow: cnt > 0 ? '0 2px 6px rgba(79, 70, 229, 0.25)' : 'none'
+                              }}
+                            />
+                            <span style={{ fontSize: '11.5px', color: '#475569', fontWeight: 700 }}>{d.dayName}</span>
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
                   
                   <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#64748b' }}>
@@ -4367,111 +4580,698 @@ export default function GymAdminDashboard({ user, onLogout, allGyms = [] }) {
           </div>
         </div>
       )}
-      {/* MEMBER DAILY MULTI-SESSION TIMELINE MODAL */}
+      {/* PREMIUM MEMBER DAILY SHIFT & MEMBERSHIP TIMELINE MODAL */}
       {showMemberSessionModal && (
         <div className="admin-modal-backdrop" onClick={() => setShowMemberSessionModal(null)}>
-          <div className="admin-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '580px', padding: '24px' }}>
-            <div className="modal-header-strip" style={{ marginBottom: '16px', borderBottom: '1px solid #e2e8f0', paddingBottom: '12px' }}>
-              <div>
-                <h3 style={{ fontSize: '18px', fontWeight: 900, color: '#0f172a', margin: '0 0 2px 0' }}>
-                  👤 {showMemberSessionModal.memberName}
-                </h3>
-                <span style={{ fontSize: '12px', color: '#64748b' }}>
-                  📅 {new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })} · Plan: <strong>{showMemberSessionModal.membershipId || 'Pro Pass'}</strong>
-                </span>
-              </div>
-              <button className="modal-close-x" onClick={() => setShowMemberSessionModal(null)}>✕</button>
-            </div>
-
-            {/* Daily Summary Box */}
-            <div style={{ background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)', border: '1.5px solid #c7d2fe', borderRadius: '16px', padding: '16px 20px', marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: '11px', fontWeight: 800, color: '#4f46e5', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  TODAY'S SUMMARY
-                </span>
-                <div style={{ fontSize: '24px', fontWeight: 900, color: '#1e1b4b', marginTop: '2px' }}>
-                  ⏱️ {showMemberSessionModal.totalTimeFormatted}
+          <div
+            className="admin-modal-card"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: '680px',
+              width: '95%',
+              padding: '24px 26px',
+              borderRadius: '24px',
+              background: '#ffffff',
+              maxHeight: '92vh',
+              overflowY: 'auto',
+              boxShadow: '0 25px 60px -15px rgba(15, 23, 42, 0.35)',
+              border: '1px solid #e2e8f0'
+            }}
+          >
+            {/* Header with Member Name, Phone & Status */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', paddingBottom: '16px', borderBottom: '1.5px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <div style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '16px',
+                  background: showMemberSessionModal.isCurrentlyInside ? 'linear-gradient(135deg, #10b981, #059669)' : 'linear-gradient(135deg, #6366f1, #4f46e5)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 900,
+                  fontSize: '20px',
+                  boxShadow: showMemberSessionModal.isCurrentlyInside ? '0 8px 20px rgba(16, 185, 129, 0.3)' : '0 8px 20px rgba(99, 102, 241, 0.25)'
+                }}>
+                  {(showMemberSessionModal.memberName || 'M').charAt(0).toUpperCase()}
                 </div>
-                <span style={{ fontSize: '12px', color: '#4338ca', fontWeight: 600 }}>
-                  Total Visits Today: <strong>{showMemberSessionModal.totalVisits}</strong> · Avg: <strong>{showMemberSessionModal.avgVisitMins} mins/visit</strong>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <h3 style={{ fontSize: '20px', fontWeight: 900, color: '#0f172a', margin: 0 }}>
+                      {showMemberSessionModal.memberName}
+                    </h3>
+                    {showMemberSessionModal.isCurrentlyInside ? (
+                      <span style={{ fontSize: '11px', fontWeight: 900, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: '12px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#16a34a' }}></span>
+                        IN GYM NOW
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: '12px' }}>
+                        Checked Out
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '13px', color: '#64748b', marginTop: '3px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <PhoneIcon size={12} color="#64748b" /> {showMemberSessionModal.memberPhone || 'No Mobile Registered'}
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMemberSessionModal(null)}
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '50%',
+                  border: '1.5px solid #e2e8f0',
+                  background: '#f8fafc',
+                  color: '#64748b',
+                  fontSize: '16px',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s'
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 1. Membership Plan Overview Card */}
+            <div style={{
+              background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '16px',
+              padding: '16px 20px',
+              marginBottom: '18px',
+              display: 'grid',
+              gridTemplateColumns: '1.3fr 1fr 1fr',
+              gap: '14px'
+            }}>
+              <div>
+                <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  MEMBERSHIP PLAN
+                </span>
+                <div style={{ fontSize: '15px', fontWeight: 900, color: '#1e1b4b', marginTop: '3px' }}>
+                  {showMemberSessionModal.planName || showMemberSessionModal.membershipId || 'Membership Pass'}
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#6366f1', fontWeight: 700, marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <CreditCardIcon size={12} color="#6366f1" /> {showMemberSessionModal.planDurationLabel || (showMemberSessionModal.planDurationMonths ? `${showMemberSessionModal.planDurationMonths} Months Pass` : 'Standard Pass')}
+                </div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  PAID FEE & JOINED
+                </span>
+                <div style={{ fontSize: '15px', fontWeight: 900, color: '#059669', marginTop: '3px' }}>
+                  ₹{Number(showMemberSessionModal.planPrice || 0).toLocaleString('en-IN')}
+                </div>
+                <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
+                  Joined: {showMemberSessionModal.joinedDate ? new Date(showMemberSessionModal.joinedDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Active Member'}
+                </div>
+              </div>
+
+              <div>
+                <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  EXPIRY DATE
+                </span>
+                <div style={{ fontSize: '14px', fontWeight: 900, color: '#b91c1c', marginTop: '3px' }}>
+                  {showMemberSessionModal.planExpiryDate ? new Date(showMemberSessionModal.planExpiryDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'No Expiry Set'}
+                </div>
+                <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#16a34a', background: '#dcfce7', padding: '2px 7px', borderRadius: '4px', display: 'inline-flex', alignItems: 'center', gap: '3px', marginTop: '3px' }}>
+                  <CheckCircleIcon size={10} color="#16a34a" /> Active Access
                 </span>
               </div>
-              <div style={{ textAlign: 'right' }}>
-                {showMemberSessionModal.isCurrentlyInside ? (
-                  <span style={{ background: '#10b981', color: '#fff', fontWeight: 800, fontSize: '12px', padding: '6px 14px', borderRadius: '20px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                    ● 🟢 IN GYM (LIVE)
-                  </span>
-                ) : (
-                  <span style={{ background: '#64748b', color: '#fff', fontWeight: 700, fontSize: '12px', padding: '6px 14px', borderRadius: '20px' }}>
-                    🔴 CHECKED OUT
-                  </span>
-                )}
+            </div>
+
+            {/* 2. Total Cumulative Time Cards: TODAY, THIS WEEK, THIS MONTH */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px', marginBottom: '20px' }}>
+              {/* Today's Total Time */}
+              <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '14px', padding: '14px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#166534', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <ClockIcon size={12} color="#166534" /> TODAY'S TIME
+                </span>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#14532d', marginTop: '4px' }}>
+                  {showMemberSessionModal.todayTotalTimeFormatted || showMemberSessionModal.totalTimeFormatted || '0m'}
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#15803d', fontWeight: 700, marginTop: '2px' }}>
+                  {(() => {
+                    const sb = showMemberSessionModal.shiftBreakdown || {};
+                    const activeShiftsCount = Object.keys(sb).filter(k => (sb[k]?.visits || 0) > 0).length;
+                    return activeShiftsCount > 0 
+                      ? `${activeShiftsCount} Batch Shift${activeShiftsCount > 1 ? 's' : ''} Today`
+                      : '0 Shifts Today';
+                  })()}
+                </div>
+              </div>
+
+              {/* Weekly Time */}
+              <div style={{ background: '#f5f3ff', border: '1.5px solid #ddd6fe', borderRadius: '14px', padding: '14px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#6b21a8', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <BoltIcon size={12} color="#6b21a8" /> THIS WEEK
+                </span>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#581c87', marginTop: '4px' }}>
+                  {showMemberSessionModal.weeklyTimeFormatted || showMemberSessionModal.totalTimeFormatted || '0m'}
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#7e22ce', fontWeight: 600, marginTop: '2px' }}>
+                  Weekly Gym Duration
+                </div>
+              </div>
+
+              {/* Monthly Time */}
+              <div style={{ background: '#eff6ff', border: '1.5px solid #bfdbfe', borderRadius: '14px', padding: '14px' }}>
+                <span style={{ fontSize: '11px', fontWeight: 800, color: '#1e40af', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <CalendarIcon size={12} color="#1e40af" /> THIS MONTH
+                </span>
+                <div style={{ fontSize: '20px', fontWeight: 900, color: '#1e3a8a', marginTop: '4px' }}>
+                  {showMemberSessionModal.daysAttendedThisMonth || (showMemberSessionModal.attendedDates ? showMemberSessionModal.attendedDates.length : 0)} Days
+                </div>
+                <div style={{ fontSize: '11.5px', color: '#2563eb', fontWeight: 600, marginTop: '2px' }}>
+                  {showMemberSessionModal.monthlyTimeFormatted || showMemberSessionModal.totalTimeFormatted || '0m'} Workout Time
+                </div>
               </div>
             </div>
 
-            {/* Individual Session Cards */}
-            <div style={{ fontSize: '13px', fontWeight: 800, color: '#0f172a', marginBottom: '10px' }}>
-              📋 Individual Visit Sessions ({showMemberSessionModal.sessions?.length || 0})
-            </div>
+            {/* 2.5 ATTENDANCE CALENDAR & TIMELINE TRACKER (WEEKLY VS MONTHLY VIEW) */}
+            <div style={{
+              background: '#ffffff',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '18px',
+              padding: '16px 18px',
+              marginBottom: '18px',
+              boxShadow: '0 4px 14px rgba(15, 23, 42, 0.03)'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                <div>
+                  <span style={{ fontSize: '13.5px', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <CalendarIcon size={15} color="#4f46e5" /> Member Attendance Calendar
+                  </span>
+                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
+                    Tracking active presence, workouts, holidays & rest days
+                  </div>
+                </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', maxHeight: '340px', overflowY: 'auto', paddingRight: '4px' }}>
-              {showMemberSessionModal.sessions?.map((sess, sIdx) => {
-                const isMorning = sess.sessionType === 'MORNING';
-                const isAfternoon = sess.sessionType === 'AFTERNOON';
-                const isEvening = sess.sessionType === 'EVENING';
-                const icon = isMorning ? '🌅' : isAfternoon ? '☀️' : isEvening ? '🌆' : '🌙';
-                const badgeColor = isMorning ? '#d97706' : isAfternoon ? '#0284c7' : isEvening ? '#7c3aed' : '#334155';
-                const badgeBg = isMorning ? '#fef3c7' : isAfternoon ? '#e0f2fe' : isEvening ? '#f3e8ff' : '#f1f5f9';
-
-                return (
-                  <div
-                    key={sIdx}
+                {/* View Switcher Pill (Weekly vs Monthly Calendar) */}
+                <div style={{
+                  display: 'inline-flex',
+                  background: '#f1f5f9',
+                  padding: '3px',
+                  borderRadius: '10px',
+                  border: '1px solid #e2e8f0'
+                }}>
+                  <button
+                    type="button"
+                    onClick={() => setMemberTimelineView('week')}
                     style={{
-                      border: '1.5px solid #e2e8f0',
-                      borderRadius: '14px',
-                      padding: '14px 16px',
-                      background: sess.status === 'CHECKED_IN' ? '#f0fdf4' : '#f8fafc',
-                      borderColor: sess.status === 'CHECKED_IN' ? '#86efac' : '#e2e8f0'
+                      padding: '4px 12px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      fontSize: '11.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      background: memberTimelineView === 'week' ? '#ffffff' : 'transparent',
+                      color: memberTimelineView === 'week' ? '#4f46e5' : '#64748b',
+                      boxShadow: memberTimelineView === 'week' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                      transition: 'all 0.2s ease'
                     }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '12px', fontWeight: 800, color: badgeColor, background: badgeBg, padding: '3px 10px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                        {icon} {sess.sessionType} SESSION
-                      </span>
-                      <strong style={{ fontSize: '13.5px', color: '#0f172a' }}>
-                        ⏳ {sess.duration}
-                      </strong>
-                    </div>
+                    Weekly Strip
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMemberTimelineView('month')}
+                    style={{
+                      padding: '4px 12px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      fontSize: '11.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      background: memberTimelineView === 'month' ? 'linear-gradient(135deg, #6366f1, #4f46e5)' : 'transparent',
+                      color: memberTimelineView === 'month' ? '#ffffff' : '#64748b',
+                      boxShadow: memberTimelineView === 'month' ? '0 2px 8px rgba(99, 102, 241, 0.3)' : 'none',
+                      transition: 'all 0.2s ease',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px'
+                    }}
+                  >
+                    <CalendarIcon size={12} color={memberTimelineView === 'month' ? '#ffffff' : '#64748b'} /> Full Month Calendar
+                  </button>
+                </div>
+              </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12.5px', color: '#334155' }}>
-                      <div>
-                        <span style={{ color: '#64748b' }}>Check-In: </span>
-                        <strong>{new Date(sess.checkInTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</strong>
-                      </div>
-                      <div>
-                        <span style={{ color: '#64748b' }}>Check-Out: </span>
-                        <strong>
-                          {sess.checkOutTime ? new Date(sess.checkOutTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : '--:-- (Active)'}
-                        </strong>
-                      </div>
-                    </div>
+              {/* VIEW A: WEEKLY 7-DAY STRIP */}
+              {memberTimelineView === 'week' ? (
+                <div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '8px' }}>
+                    {(showMemberSessionModal.weeklyTimeline || []).map((item, idx) => {
+                      const isPresent = item.attended;
+                      const isMissed = !item.attended && item.isPast;
+                      const isToday = item.isToday;
 
-                    <div style={{ marginTop: '8px', paddingTop: '8px', borderTop: '1px dashed #e2e8f0', display: 'flex', justifyContent: 'space-between', fontSize: '11.5px', color: '#64748b' }}>
-                      <span>🔥 Calorie Burn: <strong>{sess.caloriesBurned} kcal</strong></span>
-                      <span>Status: <strong style={{ color: sess.status === 'CHECKED_IN' ? '#16a34a' : '#475569' }}>{sess.status === 'CHECKED_IN' ? 'Active Inside' : 'Completed'}</strong></span>
-                    </div>
+                      let bg = isPresent ? '#dcfce7' : isMissed ? '#fee2e2' : '#f8fafc';
+                      let border = isPresent ? '#86efac' : isMissed ? '#fca5a5' : '#e2e8f0';
+                      let textColor = isPresent ? '#15803d' : isMissed ? '#b91c1c' : '#64748b';
+                      let statusText = isPresent ? 'Present' : isMissed ? 'Absent' : isToday ? (isPresent ? 'Present' : 'Today') : 'Upcoming';
+
+                      return (
+                        <div
+                          key={idx}
+                          style={{
+                            background: bg,
+                            border: `1.5px solid ${isToday ? '#6366f1' : border}`,
+                            borderRadius: '12px',
+                            padding: '10px 4px',
+                            textAlign: 'center',
+                            position: 'relative',
+                            boxShadow: isToday ? '0 2px 10px rgba(99, 102, 241, 0.2)' : 'none'
+                          }}
+                        >
+                          {isToday && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '-8px',
+                              left: '50%',
+                              transform: 'translateX(-50%)',
+                              background: '#6366f1',
+                              color: '#fff',
+                              fontSize: '8.5px',
+                              fontWeight: 900,
+                              padding: '1px 5px',
+                              borderRadius: '6px',
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.04em'
+                            }}>
+                              Today
+                            </div>
+                          )}
+                          <div style={{ fontSize: '12px', fontWeight: 900, color: '#0f172a' }}>{item.day}</div>
+                          <div style={{ fontSize: '15px', margin: '4px 0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {isPresent ? <CheckCircleIcon size={16} color="#15803d" /> : isMissed ? <CloseIcon size={16} color="#b91c1c" /> : isToday ? <LocationPinIcon size={16} color="#6366f1" /> : <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#cbd5e1' }} />}
+                          </div>
+                          <div style={{ fontSize: '10px', fontWeight: 800, color: textColor }}>
+                            {statusText}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ) : (
+                /* VIEW B: INTERACTIVE FULL 30-DAY MONTH CALENDAR GRID */
+                <div>
+                  {(() => {
+                    const now = new Date();
+                    const year = now.getFullYear();
+                    const month = now.getMonth(); // 0-indexed
+                    const monthName = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+                    
+                    const firstDayOfMonth = new Date(year, month, 1).getDay(); // 0 = Sun, 1 = Mon ...
+                    // Convert to Monday-start (0 = Mon, 6 = Sun)
+                    const startCol = firstDayOfMonth === 0 ? 6 : firstDayOfMonth - 1;
+                    const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+                    const currentDayNum = now.getDate();
+
+                    const memberJoinedDateStr = showMemberSessionModal.joinedDate 
+                      ? new Date(showMemberSessionModal.joinedDate).toISOString().split('T')[0]
+                      : null;
+
+                    const attendedSet = new Set(showMemberSessionModal.attendedDates || []);
+                    // Add today ONLY if currently active inside gym or attended today
+                    if (showMemberSessionModal.isCurrentlyInside) {
+                      const todayIso = `${year}-${String(month + 1).padStart(2, '0')}-${String(currentDayNum).padStart(2, '0')}`;
+                      attendedSet.add(todayIso);
+                    }
+
+                    // Count summary
+                    let attendedCount = 0;
+                    let absentCount = 0;
+                    let holidayCount = 0;
+
+                    for (let day = 1; day <= totalDaysInMonth; day++) {
+                      const dayOfWeek = new Date(year, month, day).getDay();
+                      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                      const isSun = dayOfWeek === 0;
+                      const isBeforeJoining = memberJoinedDateStr && dateStr < memberJoinedDateStr;
+
+                      if (day <= currentDayNum) {
+                        if (isSun) {
+                          holidayCount++;
+                        } else if (attendedSet.has(dateStr)) {
+                          attendedCount++;
+                        } else if (!isBeforeJoining) {
+                          absentCount++;
+                        }
+                      }
+                    }
+
+                    const calendarDays = [];
+                    // Leading empty slots
+                    for (let i = 0; i < startCol; i++) {
+                      calendarDays.push({ type: 'empty', key: `empty-${i}` });
+                    }
+
+                    // Actual month dates
+                    for (let day = 1; day <= totalDaysInMonth; day++) {
+                      const dayOfWeek = new Date(year, month, day).getDay();
+                      const isSunday = dayOfWeek === 0;
+                      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                      const isPast = day < currentDayNum;
+                      const isToday = day === currentDayNum;
+                      const isFuture = day > currentDayNum;
+                      const isAttended = attendedSet.has(dateStr);
+                      const isBeforeJoining = memberJoinedDateStr && dateStr < memberJoinedDateStr;
+
+                      calendarDays.push({
+                        type: 'day',
+                        dayNum: day,
+                        dateStr,
+                        isSunday,
+                        isPast,
+                        isToday,
+                        isFuture,
+                        isAttended,
+                        isBeforeJoining,
+                        key: `day-${day}`
+                      });
+                    }
+
+                    return (
+                      <div>
+                        {/* Month Title & Legend Row */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', background: '#f8fafc', padding: '8px 12px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 900, color: '#1e1b4b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <CalendarIcon size={14} color="#4f46e5" /> {monthName}
+                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '10.5px', fontWeight: 700 }}>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#15803d' }}>
+                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22c55e' }}></span>
+                              {attendedCount} Present
+                            </span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#b91c1c' }}>
+                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#ef4444' }}></span>
+                              {absentCount} Absent
+                            </span>
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: '#d97706' }}>
+                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }}></span>
+                              {holidayCount} Sunday Off
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* 7 Days of Week Header */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px', textAlign: 'center', marginBottom: '4px' }}>
+                          {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d, i) => (
+                            <div key={i} style={{ fontSize: '11px', fontWeight: 800, color: d === 'Sun' ? '#dc2626' : '#64748b', padding: '4px 0' }}>
+                              {d}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Calendar Grid Matrix */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '5px' }}>
+                          {calendarDays.map((slot) => {
+                            if (slot.type === 'empty') {
+                              return <div key={slot.key} style={{ minHeight: '38px', background: 'transparent' }} />;
+                            }
+
+                            const { dayNum, isSunday, isPast, isToday, isFuture, isAttended, isBeforeJoining } = slot;
+
+                            let cellBg = '#ffffff';
+                            let cellBorder = '#e2e8f0';
+                            let badgeColor = '#64748b';
+                            let statusLabel = '';
+                            let badgeBg = 'transparent';
+
+                            if (isSunday) {
+                              cellBg = '#fffbeb';
+                              cellBorder = '#fef08a';
+                              badgeColor = '#b45309';
+                              statusLabel = 'Off';
+                              badgeBg = '#fef3c7';
+                            } else if (isAttended) {
+                              cellBg = '#f0fdf4';
+                              cellBorder = '#86efac';
+                              badgeColor = '#15803d';
+                              statusLabel = '✓ Present';
+                              badgeBg = '#dcfce7';
+                            } else if (isBeforeJoining && isPast) {
+                              cellBg = '#fafafa';
+                              cellBorder = '#f1f5f9';
+                              badgeColor = '#94a3b8';
+                              statusLabel = '—';
+                              badgeBg = 'transparent';
+                            } else if (isPast) {
+                              cellBg = '#fef2f2';
+                              cellBorder = '#fca5a5';
+                              badgeColor = '#b91c1c';
+                              statusLabel = '✗ Absent';
+                              badgeBg = '#fee2e2';
+                            } else if (isToday) {
+                              cellBg = isAttended ? '#f0fdf4' : '#eef2ff';
+                              cellBorder = isAttended ? '#86efac' : '#818cf8';
+                              badgeColor = isAttended ? '#15803d' : '#4338ca';
+                              statusLabel = isAttended ? '✓ Present' : 'Today';
+                              badgeBg = isAttended ? '#dcfce7' : '#e0e7ff';
+                            } else {
+                              cellBg = '#fafafa';
+                              cellBorder = '#f1f5f9';
+                              badgeColor = '#94a3b8';
+                              statusLabel = '—';
+                            }
+
+                            return (
+                              <div
+                                key={slot.key}
+                                style={{
+                                  background: cellBg,
+                                  border: `1.5px solid ${isToday ? '#6366f1' : cellBorder}`,
+                                  borderRadius: '10px',
+                                  padding: '5px 4px',
+                                  minHeight: '44px',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  position: 'relative',
+                                  boxShadow: isToday ? '0 2px 8px rgba(99, 102, 241, 0.25)' : 'none'
+                                }}
+                              >
+                                {isToday && (
+                                  <div style={{
+                                    position: 'absolute',
+                                    top: '-6px',
+                                    right: '-3px',
+                                    background: '#4f46e5',
+                                    color: '#fff',
+                                    fontSize: '7px',
+                                    fontWeight: 900,
+                                    padding: '1px 3px',
+                                    borderRadius: '4px'
+                                  }}>
+                                    NOW
+                                  </div>
+                                )}
+                                <span style={{
+                                  fontSize: '12px',
+                                  fontWeight: isToday ? 900 : 700,
+                                  color: isSunday ? '#b45309' : isToday ? '#4338ca' : '#0f172a'
+                                }}>
+                                  {dayNum}
+                                </span>
+                                <span style={{
+                                  fontSize: '8.5px',
+                                  fontWeight: 800,
+                                  color: badgeColor,
+                                  background: badgeBg,
+                                  padding: '1px 3px',
+                                  borderRadius: '4px',
+                                  width: '100%',
+                                  textAlign: 'center',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis'
+                                }}>
+                                  {statusLabel}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
 
-            <div style={{ marginTop: '18px', textAlign: 'right' }}>
+            {/* 3. CLEAN SHIFT-WISE SESSIONS BREAKDOWN (Morning vs Evening) */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <span style={{ fontSize: '13.5px', fontWeight: 900, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <ClockIcon size={15} color="#4f46e5" /> Today's Shift Sessions Breakdown
+                </span>
+                <span style={{ fontSize: '11.5px', color: '#64748b', fontWeight: 600 }}>
+                  Consolidated by Daily Batch Time
+                </span>
+              </div>
+
+              {(() => {
+                const sb = showMemberSessionModal.shiftBreakdown || {};
+                const morning = sb.MORNING || { visits: 0, minutes: 0, formatted: '0m' };
+                const evening = sb.EVENING || { visits: 0, minutes: 0, formatted: '0m' };
+                const afternoon = sb.AFTERNOON || { visits: 0, minutes: 0, formatted: '0m' };
+
+                const hasAnyShift = (morning.visits > 0) || (evening.visits > 0) || (afternoon.visits > 0);
+
+                if (!hasAnyShift) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '24px', background: '#f8fafc', borderRadius: '14px', border: '1px solid #e2e8f0', color: '#64748b', fontSize: '13px' }}>
+                      No workout sessions logged for today.
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {/* MORNING SHIFT CARD */}
+                    {morning.visits > 0 && (
+                      <div style={{
+                        border: '1.5px solid #fde68a',
+                        background: '#fffbeb',
+                        borderRadius: '14px',
+                        padding: '14px 18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fef3c7', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#d97706' }}>
+                            <SunIcon size={20} color="#d97706" />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 900, color: '#78350f' }}>
+                              Morning Batch Session
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#92400e', marginTop: '2px', fontWeight: 600 }}>
+                              Timing: 04:00 AM – 01:00 PM
+                              {morning.firstCheckIn && ` • In: ${new Date(morning.firstCheckIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`}
+                              {morning.lastCheckOut && ` → Out: ${new Date(morning.lastCheckOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '16px', fontWeight: 900, color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                            <ClockIcon size={14} color="#b45309" /> {morning.formatted || `${morning.minutes || 0}m`}
+                          </div>
+                          <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: '6px' }}>
+                            Completed Session
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* EVENING SHIFT CARD */}
+                    {evening.visits > 0 && (
+                      <div style={{
+                        border: evening.isLive ? '1.5px solid #86efac' : '1.5px solid #ddd6fe',
+                        background: evening.isLive ? '#f0fdf4' : '#f5f3ff',
+                        borderRadius: '14px',
+                        padding: '14px 18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        boxShadow: evening.isLive ? '0 4px 14px rgba(16, 185, 129, 0.15)' : 'none'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: evening.isLive ? '#dcfce7' : '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: evening.isLive ? '#16a34a' : '#6d28d9' }}>
+                            <MoonIcon size={20} color={evening.isLive ? '#16a34a' : '#6d28d9'} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 900, color: evening.isLive ? '#14532d' : '#4c1d95', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              Evening Batch Session
+                              {evening.isLive && (
+                                <span style={{ fontSize: '10.5px', fontWeight: 900, color: '#16a34a', background: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
+                                  ● LIVE NOW
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '12px', color: evening.isLive ? '#15803d' : '#6d28d9', marginTop: '2px', fontWeight: 600 }}>
+                              Timing: 04:00 PM – 11:00 PM
+                              {evening.firstCheckIn && ` • In: ${new Date(evening.firstCheckIn).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`}
+                              {evening.lastCheckOut ? ` → Out: ${new Date(evening.lastCheckOut).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` : ' → Active In Gym'}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '16px', fontWeight: 900, color: evening.isLive ? '#15803d' : '#581c87', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                            <ClockIcon size={14} color={evening.isLive ? '#15803d' : '#581c87'} /> {evening.formatted || `${evening.minutes || 0}m`}{evening.isLive ? ' (Live)' : ''}
+                          </div>
+                          <span style={{ fontSize: '10.5px', fontWeight: 800, color: evening.isLive ? '#16a34a' : '#6d28d9', background: evening.isLive ? '#dcfce7' : '#ede9fe', padding: '2px 8px', borderRadius: '6px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                            {evening.isLive ? <><FireIcon size={10} color="#16a34a" /> Active Workout</> : 'Completed Session'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* AFTERNOON SHIFT CARD (IF LOGGED) */}
+                    {afternoon.visits > 0 && (
+                      <div style={{
+                        border: '1.5px solid #bae6fd',
+                        background: '#f0f9ff',
+                        borderRadius: '14px',
+                        padding: '14px 18px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
+                            <SunIcon size={20} color="#0284c7" />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '14px', fontWeight: 900, color: '#0c4a6e' }}>
+                              Afternoon Transition Batch
+                            </div>
+                            <div style={{ fontSize: '12px', color: '#0284c7', marginTop: '2px', fontWeight: 600 }}>
+                              Timing: 01:00 PM – 04:00 PM
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '16px', fontWeight: 900, color: '#0369a1', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                            <ClockIcon size={14} color="#0369a1" /> {afternoon.formatted || `${afternoon.minutes || 0}m`}
+                          </div>
+                          <span style={{ fontSize: '10.5px', fontWeight: 800, color: '#0369a1', background: '#e0f2fe', padding: '2px 8px', borderRadius: '6px' }}>
+                            Completed Session
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer Action */}
+            <div style={{ marginTop: '20px', paddingTop: '14px', borderTop: '1px solid #f1f5f9', textAlign: 'right' }}>
               <button
                 className="modal-submit-btn"
-                style={{ width: 'auto', padding: '8px 24px' }}
+                style={{
+                  width: 'auto',
+                  padding: '10px 28px',
+                  borderRadius: '12px',
+                  fontSize: '13px',
+                  fontWeight: 800,
+                  background: 'linear-gradient(135deg, #6366f1, #4f46e5)'
+                }}
                 onClick={() => setShowMemberSessionModal(null)}
               >
-                Close Details
+                Done / Close Details
               </button>
             </div>
           </div>

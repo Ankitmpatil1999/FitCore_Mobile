@@ -1,21 +1,9 @@
 {
+  "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "target": "esnext",
-    "module": "esnext",
-    "lib": ["es2019"],
-    "allowJs": true,
-    "jsx": "react-native",
-    "noEmit": true,
-    "isolatedModules": true,
-    "strict": false,
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "paths": {
-      "*": ["./FitCore/*"]
-    }
+    "types": ["jest"],
+    "skipLibCheck": true
   },
-  "include": ["FitCore/**/*.ts", "FitCore/**/*.tsx"],
+  "include": ["**/*.ts", "**/*.tsx", "src/**/*.d.ts"],
   "exclude": ["**/node_modules", "**/Pods", "**/dist", "**/build"]
 }

@@ -9,6 +9,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Colors, Typography, Radii } from '../../theme';
 import { getPlanById, getDaysRemaining, PLANS } from '../../data/mockData';
 import { apiService } from '../../services/api';
+import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 
 const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 

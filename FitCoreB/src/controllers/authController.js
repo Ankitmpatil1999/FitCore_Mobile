@@ -256,6 +256,24 @@ exports.login = async (req, res) => {
         $or: [{ userId }, { phone: user.phone }],
       });
       if (member) extraData.member = member;
+    } else if (['gym_owner', 'owner', 'admin', 'gym_admin'].includes(user.role)) {
+      const gymId = user.gymId || user.gym_id;
+      const gymsCollection = db.collection('gyms');
+      let gymDoc = null;
+      if (gymId) {
+        try {
+          const { ObjectId } = require('mongodb');
+          gymDoc = await gymsCollection.findOne({ _id: new ObjectId(gymId) });
+        } catch (e) {}
+      }
+      if (!gymDoc) {
+        gymDoc = await gymsCollection.findOne({
+          $or: [{ ownerPhone: user.phone }, { phone: user.phone }, { name: 'Ayushi GYM' }]
+        });
+      }
+      if (gymDoc) {
+        extraData.gym = gymDoc;
+      }
     }
 
     return res.json({
@@ -268,6 +286,7 @@ exports.login = async (req, res) => {
         phone: user.phone,
         email: user.email,
         role: user.role,
+        gymId: user.gymId || user.gym_id || '6a934afd13a1b16c3767d90f',
         avatar: user.avatar || 'FC',
         isFirstLogin: !!user.isFirstLogin,
         mustChangePassword: !!user.mustChangePassword,
@@ -283,7 +302,7 @@ exports.login = async (req, res) => {
 // ── WEB PORTAL LOGIN ─────────────────────────────────────────────────────────
 
 /**
- * Web Portal Login — ONLY super_admin and admin roles.
+ * Web Portal Login — super_admin, admin, gym_owner, and owner roles.
  * Security:
  * - No auto-create, no bypasses
  * - Role restricted at server level
@@ -321,12 +340,12 @@ exports.webLogin = async (req, res) => {
       return res.status(401).json({ success: false, error: 'Invalid Mobile Number or Password.' });
     }
 
-    // Role-based access control
-    const allowedRoles = ['super_admin', 'admin'];
+    // Role-based access control — allow Super Admin, Admin, and Gym Owners
+    const allowedRoles = ['super_admin', 'admin', 'gym_owner', 'owner', 'gym_admin'];
     if (!allowedRoles.includes(user.role)) {
       return res.status(403).json({
         success: false,
-        error: 'Access Denied. Only Super Admin and Admin can access this portal.',
+        error: 'Access Denied. Only Admins and Gym Owners can access this portal.',
       });
     }
 

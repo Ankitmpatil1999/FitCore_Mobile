@@ -87,27 +87,39 @@ export default function ProfileScreen({ navigation }: any) {
     ]).start();
   }, []);
 
+  const [liveGymData, setLiveGymData] = useState<any>(null);
+  const [liveTrainerData, setLiveTrainerData] = useState<any>(null);
+  const [livePlanName, setLivePlanName] = useState<string>('');
+
   // Fetch live member profile from backend API
   const loadLiveProfile = async () => {
     try {
       const userId = currentMember?.id || currentUser?.id || 'm1';
       const res: any = await apiService.getMemberProfile(userId);
-      if (res?.success && res.data?.member) {
+      if (res?.success && res.data) {
+        if (res.data.gym) setLiveGymData(res.data.gym);
+        if (res.data.trainer) setLiveTrainerData(res.data.trainer);
+        if (res.data.plan?.name || res.data.member?.planName) {
+          setLivePlanName(res.data.plan?.name || res.data.member?.planName);
+        }
+
         const m = res.data.member;
-        if (m.name) setMemberName(m.name);
-        if (m.phone) setMemberPhone(m.phone);
-        if (m.email) setMemberEmail(m.email);
-        if (m.gender) setGender(m.gender);
-        if (m.emergencyContact) setEmergencyContact(m.emergencyContact);
-        if (m.photo) setAvatarPhoto(m.photo);
-        if (m.dob) {
-          setDateOfBirth(m.dob);
-          // Calculate approx age from dob if year is present
-          const yrMatch = m.dob.match(/\d{4}/);
-          if (yrMatch) {
-            const yr = parseInt(yrMatch[0], 10);
-            if (yr > 1940 && yr < new Date().getFullYear()) {
-              setMemberAge(String(new Date().getFullYear() - yr));
+        if (m) {
+          if (m.name) setMemberName(m.name);
+          if (m.phone) setMemberPhone(m.phone);
+          if (m.email) setMemberEmail(m.email);
+          if (m.gender) setGender(m.gender);
+          if (m.emergencyContact) setEmergencyContact(m.emergencyContact);
+          if (m.photo) setAvatarPhoto(m.photo);
+          if (m.dob) {
+            setDateOfBirth(m.dob);
+            // Calculate approx age from dob if year is present
+            const yrMatch = m.dob.match(/\d{4}/);
+            if (yrMatch) {
+              const yr = parseInt(yrMatch[0], 10);
+              if (yr > 1940 && yr < new Date().getFullYear()) {
+                setMemberAge(String(new Date().getFullYear() - yr));
+              }
             }
           }
         }
@@ -256,12 +268,12 @@ export default function ProfileScreen({ navigation }: any) {
                 <View style={{ flex: 1, paddingHorizontal: 14 }}>
                   <Text style={styles.heroName} numberOfLines={1}>{memberName}</Text>
                   <Text style={styles.heroPlanName}>
-                    {plan?.name || 'Gold 6-Month Unlimited Pass'}
+                    {livePlanName || plan?.name || 'Pro Studio Unlimited Pass'}
                   </Text>
                   <Text style={styles.heroGymName}>
-                    🏢 {currentGym?.name || 'FNS Fitness Club, Shivaji Nagar'}
+                    🏢 {liveGymData?.name || currentGym?.name || 'FitCore Main Studio'}
                   </Text>
-                  <Text style={styles.heroMemberId}>ID: #FC-MEM-2026-8819</Text>
+                  <Text style={styles.heroMemberId}>ID: #FC-MEM-{memberPhone?.slice(-4) || '2026'}</Text>
                 </View>
 
                 <TouchableOpacity
@@ -364,7 +376,9 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
                 <View style={{ flex: 1, paddingHorizontal: 12 }}>
                   <Text style={styles.menuTitle}>My Personal Trainer</Text>
-                  <Text style={styles.menuSub}>Vikram Singh • Master Strength Coach</Text>
+                  <Text style={styles.menuSub}>
+                    {liveTrainerData?.name || 'Coach Vikram'} • {liveTrainerData?.role || 'Head Strength Coach'}
+                  </Text>
                 </View>
                 <Text style={styles.menuArrow}>›</Text>
               </TouchableOpacity>
@@ -452,15 +466,15 @@ export default function ProfileScreen({ navigation }: any) {
             <View style={styles.modalCard}>
               <View style={styles.modalHeaderRow}>
                 <View>
-                  <Text style={styles.modalTitle}>Personal Information</Text>
-                  <Text style={styles.modalSub}>Update your contact and emergency info</Text>
+                  <Text style={styles.modalTitle}>Personal Details</Text>
+                  <Text style={styles.modalSub}>Update your personal & medical details</Text>
                 </View>
                 <TouchableOpacity onPress={() => setShowPersonalInfoModal(false)}>
                   <Text style={styles.modalCloseX}>✕</Text>
                 </TouchableOpacity>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: hp(52) }}>
+              <ScrollView style={{ maxHeight: hp(50) }} showsVerticalScrollIndicator={false}>
                 <Text style={styles.inputLbl}>Full Name</Text>
                 <TextInput
                   style={styles.modalInput}
@@ -470,60 +484,12 @@ export default function ProfileScreen({ navigation }: any) {
                   placeholderTextColor="#94A3B8"
                 />
 
-                {/* Gender Selector Pills */}
-                <Text style={styles.inputLbl}>Gender</Text>
-                <View style={styles.genderPillRow}>
-                  <TouchableOpacity
-                    style={[styles.genderPill, gender === 'Male' && styles.genderPillActive]}
-                    onPress={() => setGender('Male')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.genderPillText, gender === 'Male' && styles.genderPillTextActive]}>
-                      ♂ Male
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.genderPill, gender === 'Female' && styles.genderPillActive]}
-                    onPress={() => setGender('Female')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.genderPillText, gender === 'Female' && styles.genderPillTextActive]}>
-                      ♀ Female
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.inputLbl}>Age</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={memberAge}
-                      onChangeText={setMemberAge}
-                      placeholder="e.g. 26"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="number-pad"
-                    />
-                  </View>
-                  <View style={{ flex: 1.5 }}>
-                    <Text style={styles.inputLbl}>Date of Birth</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={dateOfBirth}
-                      onChangeText={setDateOfBirth}
-                      placeholder="14 Aug 1999"
-                      placeholderTextColor="#94A3B8"
-                    />
-                  </View>
-                </View>
-
                 <Text style={styles.inputLbl}>Phone Number</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={memberPhone}
                   onChangeText={setMemberPhone}
-                  placeholder="+91 98230..."
+                  placeholder="+91 98230 44819"
                   placeholderTextColor="#94A3B8"
                   keyboardType="phone-pad"
                 />
@@ -533,9 +499,35 @@ export default function ProfileScreen({ navigation }: any) {
                   style={styles.modalInput}
                   value={memberEmail}
                   onChangeText={setMemberEmail}
-                  placeholder="arjun@fitcore.app"
+                  placeholder="member@fitcore.app"
                   placeholderTextColor="#94A3B8"
                   keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+
+                <Text style={styles.inputLbl}>Gender</Text>
+                <View style={styles.genderRow}>
+                  <TouchableOpacity
+                    style={[styles.genderChip, gender === 'Male' && styles.genderChipActive]}
+                    onPress={() => setGender('Male')}
+                  >
+                    <Text style={[styles.genderChipText, gender === 'Male' && styles.genderChipTextActive]}>Male</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.genderChip, gender === 'Female' && styles.genderChipActive]}
+                    onPress={() => setGender('Female')}
+                  >
+                    <Text style={[styles.genderChipText, gender === 'Female' && styles.genderChipTextActive]}>Female</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <Text style={styles.inputLbl}>Date of Birth</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={dateOfBirth}
+                  onChangeText={setDateOfBirth}
+                  placeholder="14 Aug 1999"
+                  placeholderTextColor="#94A3B8"
                 />
 
                 <Text style={styles.inputLbl}>Emergency Contact Person & Phone</Text>
@@ -581,15 +573,15 @@ export default function ProfileScreen({ navigation }: any) {
                   <Text style={{ fontSize: fontScale(32) }}>🏋️</Text>
                 </View>
                 <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                  <Text style={styles.trainerName}>Vikram Singh</Text>
-                  <Text style={styles.trainerRole}>Head Strength & Conditioning Coach</Text>
-                  <Text style={styles.trainerRating}>⭐ 4.9 (120+ Member Reviews)</Text>
+                  <Text style={styles.trainerName}>{liveTrainerData?.name || 'Coach Vikram'}</Text>
+                  <Text style={styles.trainerRole}>{liveTrainerData?.role || 'Head Strength & Conditioning Coach'}</Text>
+                  <Text style={styles.trainerRating}>⭐ {liveTrainerData?.rating || '4.9'} (120+ Member Reviews)</Text>
                 </View>
               </View>
 
               <View style={styles.trainerStatsRow}>
                 <View style={styles.trainerStatCol}>
-                  <Text style={styles.trainerStatVal}>8+ Yrs</Text>
+                  <Text style={styles.trainerStatVal}>{liveTrainerData?.experience || '8+ Yrs'}</Text>
                   <Text style={styles.trainerStatLbl}>Experience</Text>
                 </View>
                 <View style={styles.statDivider} />
@@ -599,7 +591,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.trainerStatCol}>
-                  <Text style={styles.trainerStatVal}>32</Text>
+                  <Text style={styles.trainerStatVal}>{liveTrainerData?.activeClients || 32}</Text>
                   <Text style={styles.trainerStatLbl}>Active Athletes</Text>
                 </View>
               </View>
@@ -1178,7 +1170,24 @@ const styles = StyleSheet.create({
     marginBottom: moderateScale(6),
     marginTop: moderateScale(2),
   },
+  genderRow: {
+    flexDirection: 'row',
+    gap: moderateScale(10),
+    marginBottom: moderateScale(6),
+    marginTop: moderateScale(2),
+  },
   genderPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(10),
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+  },
+  genderChip: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -1193,12 +1202,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(108, 92, 231, 0.08)',
     borderColor: '#6C5CE7',
   },
+  genderChipActive: {
+    backgroundColor: 'rgba(108, 92, 231, 0.08)',
+    borderColor: '#6C5CE7',
+  },
   genderPillText: {
     fontSize: fontScale(12),
     fontWeight: '700',
     color: '#64748B',
   },
+  genderChipText: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#64748B',
+  },
   genderPillTextActive: {
+    color: '#6C5CE7',
+    fontWeight: '900',
+  },
+  genderChipTextActive: {
     color: '#6C5CE7',
     fontWeight: '900',
   },

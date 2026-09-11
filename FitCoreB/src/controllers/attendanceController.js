@@ -10,11 +10,184 @@ function getLocalDateStr(d = new Date()) {
 
 function getSessionType(date = new Date()) {
   const hours = date.getHours();
-  if (hours >= 5 && hours < 12) return 'MORNING';      // 05:00 AM - 11:59 AM
-  if (hours >= 12 && hours < 17) return 'AFTERNOON';  // 12:00 PM - 04:59 PM
-  if (hours >= 17 && hours < 21) return 'EVENING';    // 05:00 PM - 08:59 PM
-  return 'NIGHT';                                     // 09:00 PM - 04:59 AM
+  const minutes = date.getMinutes();
+  const timeInMinutes = hours * 60 + minutes;
+
+  // Morning Shift: 04:00 AM (240 mins) to 01:00 PM / 13:00 (780 mins)
+  if (timeInMinutes >= 240 && timeInMinutes < 780) {
+    return 'MORNING';
+  }
+  // Afternoon Gap / Transition: 01:00 PM (780 mins) to 04:00 PM / 16:00 (960 mins)
+  if (timeInMinutes >= 780 && timeInMinutes < 960) {
+    return 'AFTERNOON';
+  }
+  // Evening Shift: 04:00 PM / 16:00 (960 mins) to 11:00 PM / 23:00 (1380 mins)
+  if (timeInMinutes >= 960 && timeInMinutes < 1380) {
+    return 'EVENING';
+  }
+  // Night Shift: 11:00 PM to 04:00 AM
+  return 'NIGHT';
 }
+
+// ── AUTO CHECK-OUT ENGINE ─────────────────────────────────
+/**
+ * Auto Check-Out Engine
+ * Automatically checks out members who forgot to check out when their shift/session completes.
+ * Shift Matrix & Cutoffs:
+ * - MORNING Shift: 04:00 AM to 13:00 (1:00 PM) -> Auto Cutoff at 13:00
+ * - AFTERNOON Shift: 13:00 (1:00 PM) to 16:00 (4:00 PM) -> Auto Cutoff at 16:00
+ * - EVENING Shift: 16:00 (4:00 PM) to 23:00 (11:00 PM) -> Auto Cutoff at 23:00
+ * - NIGHT Shift: 23:00 (11:00 PM) to 04:00 AM -> Auto Cutoff at 04:00 AM (Next Day)
+ * - Past Date Unclosed Records -> Auto Cutoff at respective shift end of check-in date
+ */
+async function runAutoCheckOutEngine(customDb = null) {
+  try {
+    const db = customDb || (await getDb());
+    const now = new Date();
+    const todayStr = getLocalDateStr(now);
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTimeInMinutes = currentHours * 60 + currentMinutes;
+
+    // Find all open attendance records with checkOutTime null or empty
+    const openRecords = await db.collection('attendance').find({
+      $or: [
+        { checkOutTime: null },
+        { checkOutTime: '' },
+        { status: 'CHECKED_IN' },
+        { status: 'in_gym' }
+      ]
+    }).toArray();
+
+    if (!openRecords || openRecords.length === 0) {
+      return { count: 0, records: [] };
+    }
+
+    const autoCheckedOutRecords = [];
+
+    for (const record of openRecords) {
+      const checkInDate = new Date(record.checkInTime || record.createdAt || now);
+      const recordDateStr = record.date || record.visitDate || getLocalDateStr(checkInDate);
+      const isPastDate = recordDateStr < todayStr;
+      const isToday = recordDateStr === todayStr;
+
+      const sessionType = (record.sessionType || getSessionType(checkInDate)).toUpperCase();
+
+      let shouldAutoCheckout = false;
+      let autoCheckoutTime = null;
+      let reason = '';
+
+      if (sessionType === 'MORNING') {
+        // Morning Shift ends at 13:00 (780 minutes)
+        if (isPastDate || (isToday && currentTimeInMinutes >= 780)) {
+          shouldAutoCheckout = true;
+          const cutoff = new Date(checkInDate);
+          cutoff.setHours(13, 0, 0, 0);
+          autoCheckoutTime = cutoff;
+          reason = 'Morning Shift Cutoff (13:00 / 1:00 PM)';
+        }
+      } else if (sessionType === 'AFTERNOON') {
+        // Afternoon Shift ends at 16:00 (960 minutes)
+        if (isPastDate || (isToday && currentTimeInMinutes >= 960)) {
+          shouldAutoCheckout = true;
+          const cutoff = new Date(checkInDate);
+          cutoff.setHours(16, 0, 0, 0);
+          autoCheckoutTime = cutoff;
+          reason = 'Afternoon Shift Cutoff (16:00 / 4:00 PM)';
+        }
+      } else if (sessionType === 'EVENING') {
+        // Evening Shift ends at 23:00 (1380 minutes)
+        if (isPastDate || (isToday && currentTimeInMinutes >= 1380)) {
+          shouldAutoCheckout = true;
+          const cutoff = new Date(checkInDate);
+          cutoff.setHours(23, 0, 0, 0);
+          autoCheckoutTime = cutoff;
+          reason = 'Evening Shift Cutoff (23:00 / 11:00 PM)';
+        }
+      } else if (sessionType === 'NIGHT') {
+        // Night Shift ends at 04:00 AM next day (240 minutes)
+        if (isPastDate || (isToday && currentTimeInMinutes >= 240 && checkInDate.getDate() !== now.getDate())) {
+          shouldAutoCheckout = true;
+          const cutoff = new Date(checkInDate);
+          cutoff.setDate(cutoff.getDate() + 1);
+          cutoff.setHours(4, 0, 0, 0);
+          autoCheckoutTime = cutoff;
+          reason = 'Night Shift Cutoff (04:00 AM)';
+        }
+      } else {
+        // Fallback: More than 6 hours open or past date
+        const elapsedMins = Math.round((now - checkInDate) / 60000);
+        if (isPastDate || elapsedMins >= 360) {
+          shouldAutoCheckout = true;
+          const cutoff = new Date(checkInDate.getTime() + 120 * 60000);
+          autoCheckoutTime = cutoff;
+          reason = 'Session Slot Timeout';
+        }
+      }
+
+      if (shouldAutoCheckout && autoCheckoutTime) {
+        const durationMs = Math.max(0, autoCheckoutTime - checkInDate);
+        const durationMins = Math.max(1, Math.min(Math.round(durationMs / 60000), 240));
+        const hours = Math.floor(durationMins / 60);
+        const mins = durationMins % 60;
+        const duration = hours > 0 ? `${hours}h ${String(mins).padStart(2, '0')}m` : `${mins}m`;
+        const caloriesBurned = Math.round(durationMins * 6.2);
+
+        await db.collection('attendance').updateOne(
+          { _id: record._id },
+          {
+            $set: {
+              checkOutTime: autoCheckoutTime.toISOString(),
+              duration,
+              durationMins,
+              durationMinutes: durationMins,
+              caloriesBurned,
+              status: 'AUTO_CHECKED_OUT',
+              autoCheckedOut: true,
+              autoCheckoutReason: reason,
+              badge: 'AUTO CHECKED OUT',
+              updatedAt: now
+            }
+          }
+        );
+
+        autoCheckedOutRecords.push({
+          id: record._id.toString(),
+          memberName: record.memberName,
+          sessionType,
+          checkInTime: record.checkInTime,
+          checkOutTime: autoCheckoutTime.toISOString(),
+          reason
+        });
+      }
+    }
+
+    if (autoCheckedOutRecords.length > 0) {
+      console.log(`⏱️ [Auto-Checkout Engine] Automatically checked out ${autoCheckedOutRecords.length} members after shift cutoff.`);
+    }
+
+    return { count: autoCheckedOutRecords.length, records: autoCheckedOutRecords };
+  } catch (err) {
+    console.error('❌ [Auto-Checkout Engine Error]:', err.message);
+    return { count: 0, error: err.message };
+  }
+}
+
+exports.runAutoCheckOutEngine = runAutoCheckOutEngine;
+
+// ── MANUAL / ON-DEMAND AUTO CHECKOUT TRIGGER ──────────────
+exports.triggerAutoCheckOut = async (req, res) => {
+  try {
+    const result = await runAutoCheckOutEngine();
+    res.json({
+      success: true,
+      message: `Auto-checkout engine evaluated successfully. ${result.count} expired sessions checked out.`,
+      ...result
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+};
 
 // ── CHECK-IN ──────────────────────────────────────────────
 exports.checkIn = async (req, res) => {
@@ -23,6 +196,10 @@ exports.checkIn = async (req, res) => {
     if (!gymId || !memberId) return res.status(400).json({ success: false, error: 'gymId and memberId required.' });
 
     const db = await getDb();
+    
+    // Automatically run auto-checkout first to clear any expired dangling sessions
+    await runAutoCheckOutEngine(db);
+
     const today = getLocalDateStr(new Date());
 
     // Build gym query supporting string and ObjectId
@@ -53,7 +230,7 @@ exports.checkIn = async (req, res) => {
       }
     }
 
-    // 2. Check if already checked in and NOT yet checked out
+    // 2. Check if already checked in and NOT yet checked out for active ongoing session
     const existingOpen = await db.collection('attendance').findOne({
       ...gymQuery,
       memberId: String(memberId),
@@ -100,6 +277,7 @@ exports.checkIn = async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 };
+
 
 // ── CHECK-OUT ─────────────────────────────────────────────
 exports.checkOut = async (req, res) => {
@@ -183,7 +361,12 @@ exports.getTodayAttendance = async (req, res) => {
     if (!gymId) return res.status(400).json({ success: false, error: 'gymId required.' });
 
     const db = await getDb();
+    
+    // Evaluate and execute auto-checkout for all shift cutoffs
+    await runAutoCheckOutEngine(db);
+
     const today = getLocalDateStr(new Date());
+
 
     const gymFilter = {
       $or: [
@@ -204,19 +387,45 @@ exports.getTodayAttendance = async (req, res) => {
       .sort({ checkInTime: -1 })
       .toArray();
 
-    // Group records by memberId for daily multi-session breakdown
+    // 1. Fetch all registered members for this gym
+    const membersList = await db.collection('members').find(gymFilter).toArray();
+    const memberDetailsMap = {};
+    membersList.forEach(m => {
+      const mid = m._id.toString();
+      memberDetailsMap[mid] = m;
+      if (m.userId) memberDetailsMap[String(m.userId)] = m;
+      if (m.id) memberDetailsMap[String(m.id)] = m;
+      if (m.phone) memberDetailsMap[String(m.phone)] = m;
+    });
+
+    // Group records by canonical member ID for daily multi-session breakdown
     const memberMap = {};
     records.forEach(r => {
-      const mid = String(r.memberId);
-      if (!memberMap[mid]) {
-        memberMap[mid] = {
-          memberId: mid,
-          memberName: r.memberName || 'Member',
-          membershipId: r.membershipId || 'Active Plan',
+      const rawMid = String(r.memberId || '');
+      // Try to find matching registered member
+      const matchedMember = memberDetailsMap[rawMid] || 
+        (r.memberPhone && memberDetailsMap[r.memberPhone]) ||
+        membersList.find(m => rawMid.includes(m.phone) || (r.memberName && m.name && m.name.toLowerCase() === r.memberName.toLowerCase()));
+
+      const canonicalMid = matchedMember ? matchedMember._id.toString() : rawMid;
+      const memName = matchedMember?.name || r.memberName || 'Member';
+      const memPlan = matchedMember?.plan || r.membershipId || 'Active Plan';
+
+      if (!memberMap[canonicalMid]) {
+        memberMap[canonicalMid] = {
+          memberId: canonicalMid,
+          memberName: memName,
+          membershipId: memPlan,
           visitDate: today,
           totalVisits: 0,
           totalMinutes: 0,
           isCurrentlyInside: false,
+          shiftBreakdown: {
+            MORNING: { visits: 0, minutes: 0, formatted: '0m' },
+            AFTERNOON: { visits: 0, minutes: 0, formatted: '0m' },
+            EVENING: { visits: 0, minutes: 0, formatted: '0m' },
+            NIGHT: { visits: 0, minutes: 0, formatted: '0m' }
+          },
           sessions: []
         };
       }
@@ -224,15 +433,38 @@ exports.getTodayAttendance = async (req, res) => {
       const isInside = !r.checkOutTime || r.status === 'CHECKED_IN';
       let durMins = r.durationMins || r.durationMinutes || 0;
       if (isInside) {
-        memberMap[mid].isCurrentlyInside = true;
+        memberMap[canonicalMid].isCurrentlyInside = true;
         durMins = Math.max(1, Math.round((Date.now() - new Date(r.checkInTime).getTime()) / 60000));
       }
 
-      memberMap[mid].totalVisits += 1;
-      memberMap[mid].totalMinutes += durMins;
-      memberMap[mid].sessions.push({
+      const sType = r.sessionType || getSessionType(new Date(r.checkInTime));
+      memberMap[canonicalMid].totalVisits += 1;
+      memberMap[canonicalMid].totalMinutes += durMins;
+
+      if (!memberMap[canonicalMid].shiftBreakdown[sType]) {
+        memberMap[canonicalMid].shiftBreakdown[sType] = {
+          visits: 0,
+          minutes: 0,
+          formatted: '0m',
+          firstCheckIn: r.checkInTime,
+          lastCheckOut: r.checkOutTime,
+          isLive: isInside
+        };
+      }
+      const shiftObj = memberMap[canonicalMid].shiftBreakdown[sType];
+      shiftObj.visits += 1;
+      shiftObj.minutes += durMins;
+      if (isInside) shiftObj.isLive = true;
+      if (!shiftObj.firstCheckIn || new Date(r.checkInTime) < new Date(shiftObj.firstCheckIn)) {
+        shiftObj.firstCheckIn = r.checkInTime;
+      }
+      if (!shiftObj.lastCheckOut || (r.checkOutTime && new Date(r.checkOutTime) > new Date(shiftObj.lastCheckOut))) {
+        shiftObj.lastCheckOut = r.checkOutTime;
+      }
+
+      memberMap[canonicalMid].sessions.push({
         id: r._id,
-        sessionType: r.sessionType || getSessionType(new Date(r.checkInTime)),
+        sessionType: sType,
         checkInTime: r.checkInTime,
         checkOutTime: r.checkOutTime,
         duration: r.duration || (isInside ? `${durMins}m (Live)` : `${durMins}m`),
@@ -242,24 +474,147 @@ exports.getTodayAttendance = async (req, res) => {
       });
     });
 
+    // 2. Fetch 30-day attendance to compute weekly & monthly aggregates per member
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+
+    const past30Records = await db.collection('attendance')
+      .find({ ...gymFilter, date: { $gte: thirtyDaysAgoStr } })
+      .toArray();
+
+    // Group 30-day stats per member
+    const member30DayStats = {};
+    past30Records.forEach(r => {
+      const rawMid = String(r.memberId || '');
+      const matchedMember = memberDetailsMap[rawMid] || 
+        (r.memberPhone && memberDetailsMap[r.memberPhone]) ||
+        membersList.find(m => rawMid.includes(m.phone) || (r.memberName && m.name && m.name.toLowerCase() === r.memberName.toLowerCase()));
+      const mid = matchedMember ? matchedMember._id.toString() : rawMid;
+
+      if (!member30DayStats[mid]) {
+        member30DayStats[mid] = { weeklyMins: 0, monthlyMins: 0, totalDaysAttended: new Set() };
+      }
+      const dur = r.durationMinutes || r.durationMins || 0;
+      member30DayStats[mid].monthlyMins += dur;
+      member30DayStats[mid].totalDaysAttended.add(r.date);
+
+      if (r.date >= sevenDaysAgoStr) {
+        member30DayStats[mid].weeklyMins += dur;
+      }
+    });
+
     const memberRoster = Object.values(memberMap).map(m => {
       const h = Math.floor(m.totalMinutes / 60);
       const mins = m.totalMinutes % 60;
+
+      const memDetail = memberDetailsMap[m.memberId] || {};
+      const stats30 = member30DayStats[m.memberId] || { weeklyMins: 0, monthlyMins: 0, totalDaysAttended: new Set() };
+
+      const weeklyMins = stats30.weeklyMins;
+      const weeklyH = Math.floor(weeklyMins / 60);
+      const weeklyM = weeklyMins % 60;
+      const weeklyFormatted = weeklyH > 0 ? `${weeklyH}h ${weeklyM}m` : `${weeklyM}m`;
+
+      const monthlyMins = stats30.monthlyMins;
+      const monthlyH = Math.floor(monthlyMins / 60);
+      const monthlyM = monthlyMins % 60;
+      const monthlyFormatted = monthlyH > 0 ? `${monthlyH}h ${monthlyM}m` : `${monthlyM}m`;
+
+      // Format individual shifts
+      Object.keys(m.shiftBreakdown).forEach(st => {
+        const sMins = m.shiftBreakdown[st].minutes;
+        const sh = Math.floor(sMins / 60);
+        const sm = sMins % 60;
+        m.shiftBreakdown[st].formatted = sh > 0 ? `${sh}h ${String(sm).padStart(2, '0')}m` : `${sm}m`;
+      });
+
+      // Compute past 7 days daily attended status (Mon to Sun)
+      const nowRef = new Date();
+      const currentDay = nowRef.getDay();
+      const distToMon = currentDay === 0 ? 6 : currentDay - 1;
+      const monday = new Date(nowRef);
+      monday.setDate(nowRef.getDate() - distToMon);
+      monday.setHours(0, 0, 0, 0);
+
+      const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const weeklyTimeline = dayNames.map((dayName, dIdx) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + dIdx);
+        const dateStr = getLocalDateStr(d);
+        const attended = stats30.totalDaysAttended.has(dateStr);
+        const isToday = dateStr === today;
+        const isPast = dateStr < today;
+        const isFuture = dateStr > today;
+        return {
+          day: dayName,
+          date: dateStr,
+          attended,
+          isToday,
+          isPast,
+          isFuture
+        };
+      });
+
       return {
         ...m,
+        memberName: memDetail.name || m.memberName || 'Member',
+        memberPhone: memDetail.phone || '',
+        planName: memDetail.plan || 'Standard Gym Plan',
+        planDurationMonths: memDetail.durationMonths || 1,
+        planDurationLabel: `${memDetail.durationMonths || 1} Month${(memDetail.durationMonths || 1) > 1 ? 's' : ''} Pass`,
+        planPrice: memDetail.planPrice || 0,
+        planExpiryDate: memDetail.expiryDate || '',
+        joinedDate: memDetail.joinedDate || memDetail.startDate || '',
+        todayTotalTimeFormatted: h > 0 ? `${h}h ${String(mins).padStart(2, '0')}m` : `${mins}m`,
         totalTimeFormatted: h > 0 ? `${h}h ${String(mins).padStart(2, '0')}m` : `${mins}m`,
+        weeklyMinutes: weeklyMins,
+        weeklyTimeFormatted: weeklyFormatted,
+        monthlyMinutes: monthlyMins,
+        monthlyTimeFormatted: monthlyFormatted,
+        daysAttendedThisMonth: stats30.totalDaysAttended.size,
+        attendedDates: Array.from(stats30.totalDaysAttended),
+        weeklyTimeline,
         avgVisitMins: Math.round(m.totalMinutes / m.totalVisits)
       };
     }).sort((a, b) => (b.isCurrentlyInside ? 1 : 0) - (a.isCurrentlyInside ? 1 : 0) || b.totalMinutes - a.totalMinutes);
 
+    const enrichedRecords = records.map(r => {
+      const mid = String(r.memberId);
+      const memDetail = memberDetailsMap[mid] || {};
+      const method = (r.method || 'mobile_qr').toLowerCase();
+      let accessTypeLabel = '📱 Mobile App';
+      if (method.includes('qr')) accessTypeLabel = '📷 Mobile QR';
+      else if (method.includes('button') || method.includes('dashboard')) accessTypeLabel = '📱 One-Tap App';
+      else if (method.includes('nfc')) accessTypeLabel = '💳 NFC Pass';
+      else if (method.includes('bio')) accessTypeLabel = '👆 Biometric';
+
+      return {
+        ...r,
+        memberName: memDetail.name || r.memberName || 'Member',
+        memberPhone: memDetail.phone || r.memberPhone || '',
+        planName: memDetail.plan || r.membershipId || 'Standard Pass',
+        accessTypeLabel,
+      };
+    });
+
     const totalUniqueMembers = Object.keys(memberMap).length;
     const totalVisits = records.length;
-    const stillInside = records.filter(r => !r.checkOutTime || r.status === 'CHECKED_IN').length;
-    const checkedOut = totalVisits - stillInside;
+    let stillInside = 0;
+    let checkedOut = 0;
+    records.forEach(r => {
+      const isInside = !r.checkOutTime || r.status === 'CHECKED_IN';
+      if (isInside) stillInside++;
+      else checkedOut++;
+    });
 
     res.json({
       success: true,
-      records,
+      records: enrichedRecords,
       memberRoster,
       stats: {
         totalUniqueMembers,
@@ -277,23 +632,62 @@ exports.getTodayAttendance = async (req, res) => {
 // ── MEMBER SPECIFIC DAILY TIMELINE ─────────────────────────
 exports.getMemberDailyTimeline = async (req, res) => {
   try {
-    const { gymId, memberId, date } = req.query;
-    if (!gymId || !memberId) return res.status(400).json({ success: false, error: 'gymId and memberId required.' });
+    const { gymId, memberId, date, phone } = req.query;
+    if (!memberId && !phone) return res.status(400).json({ success: false, error: 'memberId or phone required.' });
 
     const targetDate = date || getLocalDateStr(new Date());
     const db = await getDb();
 
-    const sessions = await db.collection('attendance')
-      .find({
-        gymId: String(gymId),
-        memberId: String(memberId),
-        $or: [{ date: targetDate }, { visitDate: targetDate }]
-      })
-      .sort({ checkInTime: 1 })
+    // Look up member profile to resolve all potential IDs
+    let memberDoc = null;
+    if (memberId && ObjectId.isValid(memberId)) {
+      memberDoc = await db.collection('members').findOne({ _id: new ObjectId(memberId) });
+    }
+    if (!memberDoc && memberId) {
+      memberDoc = await db.collection('members').findOne({
+        $or: [
+          { _id: memberId },
+          { userId: memberId },
+          { phone: memberId },
+          ...(phone ? [{ phone }] : [])
+        ]
+      });
+    }
+    if (!memberDoc && phone) {
+      memberDoc = await db.collection('members').findOne({ phone });
+    }
+
+    const memberMatchClauses = [];
+    if (memberId) {
+      memberMatchClauses.push({ memberId: String(memberId) });
+      if (ObjectId.isValid(memberId)) memberMatchClauses.push({ memberId: new ObjectId(memberId) });
+    }
+    if (phone) memberMatchClauses.push({ memberPhone: String(phone) });
+    if (memberDoc) {
+      memberMatchClauses.push(
+        { memberId: memberDoc._id.toString() },
+        { memberId: String(memberDoc.userId) },
+        { memberPhone: memberDoc.phone },
+        { memberName: memberDoc.name }
+      );
+    }
+
+    // Fetch all attendance history for this member
+    const allMemberRecords = await db.collection('attendance')
+      .find({ $or: memberMatchClauses })
+      .sort({ checkInTime: -1 })
       .toArray();
+
+    const sessions = allMemberRecords.filter(r => (r.date === targetDate || r.visitDate === targetDate));
 
     let totalMinutes = 0;
     let isCurrentlyInside = false;
+    const shiftBreakdown = {
+      MORNING: { visits: 0, minutes: 0, formatted: '0m' },
+      AFTERNOON: { visits: 0, minutes: 0, formatted: '0m' },
+      EVENING: { visits: 0, minutes: 0, formatted: '0m' },
+      NIGHT: { visits: 0, minutes: 0, formatted: '0m' }
+    };
 
     const formattedSessions = sessions.map(s => {
       const isInside = !s.checkOutTime || s.status === 'CHECKED_IN';
@@ -304,9 +698,16 @@ exports.getMemberDailyTimeline = async (req, res) => {
       }
       totalMinutes += durMins;
 
+      const sType = s.sessionType || getSessionType(new Date(s.checkInTime));
+      if (!shiftBreakdown[sType]) {
+        shiftBreakdown[sType] = { visits: 0, minutes: 0, formatted: '0m' };
+      }
+      shiftBreakdown[sType].visits += 1;
+      shiftBreakdown[sType].minutes += durMins;
+
       return {
         id: s._id,
-        sessionType: s.sessionType || getSessionType(new Date(s.checkInTime)),
+        sessionType: sType,
         checkInTime: s.checkInTime,
         checkOutTime: s.checkOutTime,
         duration: s.duration || (isInside ? `${durMins}m (Live)` : `${durMins}m`),
@@ -316,18 +717,93 @@ exports.getMemberDailyTimeline = async (req, res) => {
       };
     });
 
+    // Format individual shift totals for today
+    Object.keys(shiftBreakdown).forEach(st => {
+      const sMins = shiftBreakdown[st].minutes;
+      const sh = Math.floor(sMins / 60);
+      const sm = sMins % 60;
+      shiftBreakdown[st].formatted = sh > 0 ? `${sh}h ${String(sm).padStart(2, '0')}m` : `${sm}m`;
+    });
+
     const h = Math.floor(totalMinutes / 60);
     const m = totalMinutes % 60;
     const totalTimeFormatted = h > 0 ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`;
 
+    // Attended dates across all history
+    const attendedDatesSet = new Set(allMemberRecords.map(r => r.date || r.visitDate).filter(Boolean));
+    const attendedDates = Array.from(attendedDatesSet);
+
+    // Current month metrics
+    const nowRef = new Date();
+    const currentYearMonth = `${nowRef.getFullYear()}-${String(nowRef.getMonth() + 1).padStart(2, '0')}`;
+    const thisMonthRecords = allMemberRecords.filter(r => (r.date || r.visitDate || '').startsWith(currentYearMonth));
+    const thisMonthAttendedDates = Array.from(new Set(thisMonthRecords.map(r => r.date || r.visitDate).filter(Boolean)));
+    const monthlyMins = thisMonthRecords.reduce((acc, curr) => acc + (curr.durationMins || curr.durationMinutes || 0), 0);
+    const monthlyH = Math.floor(monthlyMins / 60);
+    const monthlyM = monthlyMins % 60;
+    const monthlyFormatted = monthlyH > 0 ? `${monthlyH}h ${monthlyM}m` : `${monthlyM}m`;
+
+    // Past 7 days (weekly)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoStr = sevenDaysAgo.toISOString().split('T')[0];
+    const past7Records = allMemberRecords.filter(r => (r.date || r.visitDate || '') >= sevenDaysAgoStr);
+    const weeklyMins = past7Records.reduce((acc, curr) => acc + (curr.durationMins || curr.durationMinutes || 0), 0);
+    const weeklyH = Math.floor(weeklyMins / 60);
+    const weeklyM = weeklyMins % 60;
+    const weeklyFormatted = weeklyH > 0 ? `${weeklyH}h ${weeklyM}m` : `${weeklyM}m`;
+
+    // Weekly Timeline (Monday to Sunday)
+    const currentDay = nowRef.getDay();
+    const distToMon = currentDay === 0 ? 6 : currentDay - 1;
+    const monday = new Date(nowRef);
+    monday.setDate(nowRef.getDate() - distToMon);
+    monday.setHours(0, 0, 0, 0);
+
+    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const weeklyTimeline = dayNames.map((dayName, dIdx) => {
+      const d = new Date(monday);
+      d.setDate(monday.getDate() + dIdx);
+      const dateStr = getLocalDateStr(d);
+      const attended = attendedDatesSet.has(dateStr);
+      const isToday = dateStr === targetDate;
+      const isPast = dateStr < targetDate;
+      const isFuture = dateStr > targetDate;
+      return {
+        day: dayName,
+        date: dateStr,
+        attended,
+        isToday,
+        isPast,
+        isFuture
+      };
+    });
+
     res.json({
       success: true,
       visitDate: targetDate,
+      memberName: memberDoc?.name || '',
+      memberPhone: memberDoc?.phone || phone || '',
+      planName: memberDoc?.plan || memberDoc?.membershipPlan || '',
+      planPrice: memberDoc?.planPrice || memberDoc?.price || 0,
+      planDurationMonths: memberDoc?.durationMonths || memberDoc?.duration || 1,
+      planDurationLabel: memberDoc?.durationMonths ? `${memberDoc.durationMonths} Months Pass` : (memberDoc?.plan ? `${memberDoc.plan} Pass` : 'Standard Pass'),
+      joinedDate: memberDoc?.joinedDate || memberDoc?.startDate || memberDoc?.createdAt || '',
+      planExpiryDate: memberDoc?.expiryDate || '',
       totalVisits: sessions.length,
       totalMinutes,
       totalTimeFormatted,
+      todayTotalTimeFormatted: totalTimeFormatted,
       isCurrentlyInside,
-      sessions: formattedSessions
+      shiftBreakdown,
+      sessions: formattedSessions,
+      attendedDates,
+      daysAttendedThisMonth: thisMonthAttendedDates.length,
+      monthlyMinutes: monthlyMins,
+      monthlyTimeFormatted: monthlyFormatted,
+      weeklyMinutes: weeklyMins,
+      weeklyTimeFormatted: weeklyFormatted,
+      weeklyTimeline
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });

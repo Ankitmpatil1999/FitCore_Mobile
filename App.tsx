@@ -32,12 +32,7 @@ function AppInner() {
     return <SplashScreen onFinish={setAppReady} />;
   }
 
-  // Step 2: Onboarding (only shown once, first launch)
-  if (!hasSeenOnboarding) {
-    return <OnboardingScreen onFinish={completeOnboarding} />;
-  }
-
-  // Step 3: Login / Signup
+  // Step 2: Login / Signup (Onboarding bypassed directly to Login)
   if (!isLoggedIn) {
     return <LoginScreen />;
   }

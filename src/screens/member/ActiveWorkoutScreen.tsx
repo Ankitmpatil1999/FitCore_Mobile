@@ -16,7 +16,11 @@ const dumbbellIcon = require('../../assets/Icons/dumbbell.png');
 const clockImg = require('../../assets/Icons2/clock.png');
 const kcalIconImg = require('../../assets/Icons/kcal.png');
 
+import { useAppContext } from '../../context/AppContext';
+import { apiService } from '../../services/api';
+
 export default function ActiveWorkoutScreen({ route, navigation }: any) {
+  const { currentMember, currentUser, currentGym } = useAppContext();
   const { title } = route?.params || {};
   const [secondsElapsed, setSecondsElapsed] = useState(145);
   const [isPaused, setIsPaused] = useState(false);
@@ -76,8 +80,23 @@ export default function ActiveWorkoutScreen({ route, navigation }: any) {
     }
   };
 
-  const handleFinishWorkout = () => {
+  const handleFinishWorkout = async () => {
     setShowFinishModal(false);
+    try {
+      const memberId = currentMember?.id || currentUser?.id || 'm1';
+      const gymId = currentGym?.id;
+      const durationMin = Math.max(1, Math.round(secondsElapsed / 60));
+      await apiService.logWorkout({
+        memberId,
+        gymId,
+        workoutName: title || 'Back & Biceps Power Session',
+        durationMin,
+        caloriesBurned,
+        completedSets,
+      });
+    } catch (e) {
+      console.log('Saved workout locally');
+    }
     navigation.goBack();
   };
 

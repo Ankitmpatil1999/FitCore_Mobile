@@ -16,6 +16,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 
+import { useAppContext } from '../../context/AppContext';
+import { apiService } from '../../services/api';
+
 // ── Asset Icons ──
 const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 const clockImg = require('../../assets/Icons2/clock.png');
@@ -95,6 +98,7 @@ const INITIAL_ADDRESSES: AddressItem[] = [
 ];
 
 export default function CartCheckoutScreen({ route, navigation }: any) {
+  const { currentMember, currentUser } = useAppContext();
   const passedItems = route?.params?.items;
   const [cartItems, setCartItems] = useState<CartItem[]>(
     passedItems && passedItems.length > 0 ? passedItems : INITIAL_CART
@@ -262,6 +266,18 @@ export default function CartCheckoutScreen({ route, navigation }: any) {
     setPickupOtp(generatedOtp);
     setEstimatedTime(est);
     setOrderPlaced(true);
+
+    // Persist to backend database
+    apiService.createOrder({
+      orderId: generatedId,
+      memberId: currentMember?.id || currentUser?.id,
+      items: cartItems,
+      totalAmount: grandTotal,
+      deliveryType,
+      paymentMethod,
+      address: deliveryType === 'home' ? activeAddress : null,
+      status: 'confirmed',
+    }).catch(() => {});
   };
 
   return (

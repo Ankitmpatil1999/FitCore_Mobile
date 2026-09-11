@@ -3,15 +3,17 @@
  * Connects FitCore Mobile App to FitCoreB Backend API
  */
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Candidate URLs for Android physical device (Wi-Fi IP / ADB reverse) & Android Studio Emulator
+// Candidate URLs for Android physical device (ADB reverse / Wi-Fi IP) & Android Studio Emulator
 const CANDIDATE_URLS = Platform.OS === 'android'
   ? [
-      'http://192.168.0.115:7000/api',
       'http://localhost:7000/api',
+      'http://10.0.0.14:7000/api',
       'http://10.0.2.2:7000/api',
+      'http://192.168.0.115:7000/api',
     ]
-  : ['http://localhost:7000/api', 'http://192.168.0.115:7000/api'];
+  : ['http://localhost:7000/api', 'http://10.0.0.14:7000/api', 'http://192.168.0.115:7000/api'];
 
 export let API_BASE_URL = CANDIDATE_URLS[0];
 
@@ -26,8 +28,19 @@ class ApiService {
   private token: string | null = null;
   private activeBaseUrl: string = CANDIDATE_URLS[0];
 
+  constructor() {
+    AsyncStorage.getItem('auth_token').then((t) => {
+      if (t) this.token = t;
+    }).catch(() => {});
+  }
+
   setToken(token: string | null) {
     this.token = token;
+    if (token) {
+      AsyncStorage.setItem('auth_token', token).catch(() => {});
+    } else {
+      AsyncStorage.removeItem('auth_token').catch(() => {});
+    }
   }
 
   private getHeaders(): Record<string, string> {
@@ -44,12 +57,21 @@ class ApiService {
     endpoint: string,
     options: any = {}
   ): Promise<ApiResponse<T>> {
+    if (!this.token) {
+      try {
+        const savedToken = await AsyncStorage.getItem('auth_token');
+        if (savedToken) this.token = savedToken;
+      } catch {}
+    }
+
     const urlsToTry = [
       this.activeBaseUrl,
       ...CANDIDATE_URLS.filter((u) => u !== this.activeBaseUrl),
     ];
 
     let lastError: any = null;
+
+    console.log(`📡 [API REQUEST] ➜ ${options.method || 'GET'} ${endpoint}`, options.body ? JSON.parse(options.body) : '');
 
     for (const baseUrl of urlsToTry) {
       try {
@@ -71,6 +93,8 @@ class ApiService {
         this.activeBaseUrl = baseUrl;
         API_BASE_URL = baseUrl;
 
+        console.log(`✅ [API RESPONSE] [${response.status}] ➜ ${endpoint}:`, json);
+
         return {
           success: response.ok,
           data: json.data !== undefined ? json.data : json,
@@ -78,8 +102,11 @@ class ApiService {
         };
       } catch (err: any) {
         lastError = err;
+        console.log(`⚠️ [API RETRY/FAIL] ${baseUrl}${endpoint}:`, err.message);
       }
     }
+
+    console.log(`❌ [API ERROR] Failed all candidate URLs for ${endpoint}:`, lastError?.message);
 
     return {
       success: false,
@@ -87,12 +114,17 @@ class ApiService {
     };
   }
 
+
   // ── Auth Endpoints ──
-  async login(phone: string, role: string) {
-    return this.request('/auth/login', {
+  async login(phone: string, password?: string) {
+    const res = await this.request<any>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ phone, role }),
+      body: JSON.stringify({ phone, password: password || 'Hello@123' }),
     });
+    if (res.success && res.data?.token) {
+      this.setToken(res.data.token);
+    }
+    return res;
   }
 
   async verifyOtp(phone: string, otp: string) {
@@ -334,8 +366,145 @@ class ApiService {
   async getExerciseCategories() {
     return this.request('/exercises/categories');
   }
-}
 
+  // ── Gym Owner / Admin Endpoints ──
+  async getOwnerOverview(gymId: string) {
+    return this.request(`/gym-admin/overview?gymId=${gymId}`);
+  }
+
+  async getOwnerMembers(gymId?: string) {
+    const query = gymId ? `?gymId=${gymId}` : '';
+    return this.request(`/gym-admin/members${query}`);
+  }
+
+  async createOwnerMember(data: any) {
+    return this.request('/gym-admin/members', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateOwnerMember(id: string, data: any) {
+    return this.request(`/gym-admin/members/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteOwnerMember(id: string) {
+    return this.request(`/gym-admin/members/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getOwnerTrainers(gymId?: string) {
+    const query = gymId ? `?gymId=${gymId}` : '';
+    return this.request(`/gym-admin/trainers${query}`);
+  }
+
+  async createOwnerTrainer(data: any) {
+    return this.request('/gym-admin/trainers', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateOwnerTrainer(id: string, data: any) {
+    return this.request(`/gym-admin/trainers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteOwnerTrainer(id: string) {
+    return this.request(`/gym-admin/trainers/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getOwnerPackages(gymId?: string) {
+    const query = gymId ? `?gymId=${gymId}` : '';
+    return this.request(`/gym-admin/packages${query}`);
+  }
+
+  async createOwnerPackage(data: any) {
+    return this.request('/gym-admin/packages', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateOwnerPackage(id: string, data: any) {
+    return this.request(`/gym-admin/packages/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteOwnerPackage(id: string) {
+    return this.request(`/gym-admin/packages/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getOwnerExpenses(gymId?: string) {
+    const query = gymId ? `?gymId=${gymId}` : '';
+    return this.request(`/gym-admin/expenses${query}`);
+  }
+
+  async createOwnerExpense(data: any) {
+    return this.request('/gym-admin/expenses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteOwnerExpense(id: string) {
+    return this.request(`/gym-admin/expenses/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getOwnerAttendanceToday(gymId?: string) {
+    const query = gymId ? `?gymId=${gymId}` : '';
+    return this.request(`/gym-admin/attendance/today${query}`);
+  }
+
+  async getOwnerAttendanceStats(gymId?: string) {
+    const query = gymId ? `?gymId=${gymId}` : '';
+    return this.request(`/gym-admin/attendance/stats${query}`);
+  }
+
+  async getOwnerGymSettings(gymId?: string) {
+    const query = gymId ? `?gymId=${gymId}` : '';
+    return this.request(`/gym-admin/settings${query}`);
+  }
+
+  async updateOwnerGymSettings(data: any) {
+    return this.request('/gym-admin/settings', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getOwnerKyc(gymId?: string) {
+    const query = gymId ? `?gymId=${gymId}` : '';
+    return this.request(`/gym-admin/kyc${query}`);
+  }
+
+  async getOwnerNotices(gymId?: string) {
+    const query = gymId ? `?gymId=${gymId}` : '';
+    return this.request(`/gym-admin/notices${query}`);
+  }
+
+  async createOwnerNotice(data: any) {
+    return this.request('/gym-admin/notices', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+}
 
 export const apiService = new ApiService();
 export default apiService;
+

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { API_ENDPOINTS } from '../../config/api';
 import CustomSelect from '../common/CustomSelect.jsx';
 import {
@@ -14,16 +14,81 @@ import {
   CheckCircleIcon,
   SearchIcon,
   AlertTriangleIcon,
-  PlusIcon
+  PlusIcon,
+  CreditCardIcon,
+  CloseIcon
 } from '../common/Icons';
 
-export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], onRefresh, onInspectGym }) {
-  // Dynamic API Configuration (Loaded directly from Database)
-  const [packagesList, setPackagesList] = useState([]);
-  const [citiesList, setCitiesList] = useState([]);
-  const [activityTypesList, setActivityTypesList] = useState([]);
-  const [amenitiesList, setAmenitiesList] = useState([]);
-  const [permissionsList, setPermissionsList] = useState([]);
+export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], onRefresh }) {
+  // Dynamic API Configuration with immediate fallbacks
+  const [packagesList, setPackagesList] = useState([
+    {
+      id: 'starter',
+      name: 'Starter Club',
+      price: '₹14,999 / yr',
+      amount: 14999,
+      billingCycle: 'yearly',
+      capacity: '150 Members',
+      badge: 'Standard',
+      features: ['Basic Member Check-in', 'Manual Turnstile Entry', 'Daily Attendance Logs', 'Standard Reports']
+    },
+    {
+      id: 'pro',
+      name: 'Pro Studio',
+      price: '₹34,999 / yr',
+      amount: 34999,
+      billingCycle: 'yearly',
+      capacity: '600 Members',
+      badge: 'Popular',
+      recommended: true,
+      features: ['Smart NFC Turnstile Sync', 'Live Floor Occupancy Gauge', 'Trainer Scheduling & Classes', 'Real-time Calorie Radar', 'Broadcast Push Alerts']
+    },
+    {
+      id: 'enterprise',
+      name: 'Enterprise VIP Flagship',
+      price: '₹69,999 / yr',
+      amount: 69999,
+      billingCycle: 'yearly',
+      capacity: 'Unlimited',
+      badge: 'All-Inclusive',
+      features: ['Unlimited Members & Gates', 'Supplement Store POS Integration', 'Multi-Gate Turnstile Access', 'Priority KYC Approvals', 'Dedicated Account Manager']
+    }
+  ]);
+
+  const [citiesList, setCitiesList] = useState([
+    'Mumbai', 'Delhi NCR', 'Bengaluru', 'Pune', 'Hyderabad', 
+    'Chennai', 'Nagpur', 'Ahmedabad', 'Kolkata', 'Jaipur', 
+    'Chandigarh', 'Lucknow', 'Indore', 'Surat', 'Kochi', 'Goa'
+  ]);
+
+  const [activityTypesList, setActivityTypesList] = useState([
+    { id: 'gym', label: 'Gym / Fitness', icon: '🏋️' },
+    { id: 'yoga', label: 'Yoga', icon: '🧘' },
+    { id: 'dance', label: 'Dance & Zumba', icon: '💃' },
+    { id: 'crossfit', label: 'CrossFit', icon: '🔥' },
+    { id: 'boxing', label: 'Boxing / MMA', icon: '🥊' },
+    { id: 'swimming', label: 'Swimming', icon: '🏊' }
+  ]);
+
+  const [amenitiesList, setAmenitiesList] = useState([
+    { id: 'turnstile', label: 'NFC Smart Turnstiles', icon: '⚡' },
+    { id: 'cardio', label: 'Cardio Cinema Theatre', icon: '🏃' },
+    { id: 'strength', label: 'Heavy Olympic Strength Zone', icon: '🏋️' },
+    { id: 'spa', label: 'Spa, Steam & Recovery Bath', icon: '🧖' },
+    { id: 'protein', label: 'Protein & Nutrition Bar', icon: '🥤' },
+    { id: 'yoga', label: 'AC Yoga & Pilates Studio', icon: '🧘' },
+    { id: 'shower', label: 'Luxury Shower & Locker Suites', icon: '🚿' },
+    { id: 'wifi', label: 'High-Speed Gym WiFi', icon: '📶' }
+  ]);
+
+  const [permissionsList, setPermissionsList] = useState([
+    { key: 'canRegisterMembers', label: 'Member Onboarding & KYC', desc: 'Allow gym to register and edit member profiles' },
+    { key: 'canUseTurnstiles', label: 'NFC Turnstile Scanner Sync', desc: 'Enable automated QR/NFC gate check-in' },
+    { key: 'canAccessStore', label: 'Supplement & Gear POS Store', desc: 'Sell MuscleZone/FitGear partner supplements' },
+    { key: 'canManageTrainers', label: 'Trainer Portal & Commissions', desc: 'Schedule trainer classes and calculate payroll' },
+    { key: 'canBroadcastAlerts', label: 'Push Broadcast Notifications', desc: 'Send real-time alerts to club members' },
+    { key: 'canViewBiometrics', label: 'Live Biometrics Radar', desc: 'Track live calorie and BPM heart rate HUD' }
+  ]);
 
   // Super Admin SaaS Pricing Editor Modal State
   const [showPricingModal, setShowPricingModal] = useState(false);
@@ -35,6 +100,8 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
   const [selectedCity, setSelectedCity] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedGym, setSelectedGym] = useState(null);
+  const [gymToDelete, setGymToDelete] = useState(null);
+  const [isDeletingGym, setIsDeletingGym] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [showAddWizard, setShowAddWizard] = useState(false);
@@ -92,36 +159,36 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
   const [ownerName, setOwnerName] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
-  const [ownerPassword, setOwnerPassword] = useState('FitCore@' + Math.floor(1000 + Math.random() * 9000));
-
-  // Dynamic Config Fetch via Backend API
-  const fetchApiConfig = async () => {
-    try {
-      const token = localStorage.getItem('fitcore_token');
-      const response = await fetch(API_ENDPOINTS.ADMIN_CONFIG, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': token ? `Bearer ${token}` : ''
-        }
-      });
-      const data = await response.json();
-      if (data.success && data.data) {
-        if (data.data.packages) {
-          setPackagesList(data.data.packages);
-          setEditingPackages(data.data.packages);
-        }
-        if (data.data.cities) setCitiesList(data.data.cities);
-        if (data.data.activityTypes) setActivityTypesList(data.data.activityTypes);
-        if (data.data.amenities) setAmenitiesList(data.data.amenities);
-        if (data.data.permissionsList) setPermissionsList(data.data.permissionsList);
-      }
-    } catch (err) {
-      console.error('API config fetch failed:', err);
-    }
-  };
+  const [ownerPassword, setOwnerPassword] = useState(() => 'FitCore@' + Math.floor(1000 + Math.random() * 9000));
 
   useEffect(() => {
-    fetchApiConfig();
+    let isMounted = true;
+    const loadConfig = async () => {
+      try {
+        const token = localStorage.getItem('fitcore_token');
+        const response = await fetch(API_ENDPOINTS.ADMIN_CONFIG, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          }
+        });
+        const data = await response.json();
+        if (isMounted && data.success && data.data) {
+          if (data.data.packages) {
+            setPackagesList(data.data.packages);
+            setEditingPackages(data.data.packages);
+          }
+          if (data.data.cities) setCitiesList(data.data.cities);
+          if (data.data.activityTypes) setActivityTypesList(data.data.activityTypes);
+          if (data.data.amenities) setAmenitiesList(data.data.amenities);
+          if (data.data.permissionsList) setPermissionsList(data.data.permissionsList);
+        }
+      } catch (err) {
+        console.error('API config fetch failed:', err);
+      }
+    };
+    loadConfig();
+    return () => { isMounted = false; };
   }, []);
 
   const handleSaveSaaSPricing = async (e) => {
@@ -148,6 +215,7 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
         showToast(data.error || 'Failed to update SaaS pricing in database.', 'error');
       }
     } catch (err) {
+      console.error('Error saving SaaS pricing:', err);
       setIsSavingPricing(false);
       showToast('Network error updating SaaS pricing.', 'error');
     }
@@ -258,6 +326,7 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
         showToast(data.error || 'Failed to update franchise status.', 'error');
       }
     } catch (err) {
+      console.error('Error updating status:', err);
       showToast('Network error connecting to backend API.', 'error');
     }
   };
@@ -334,35 +403,54 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
         if (data.validationErrors) setEditValidationErrors(data.validationErrors);
       }
     } catch (err) {
+      console.error('Error saving gym edit:', err);
       setIsSubmitting(false);
       showToast('Error saving updates to backend.', 'error');
     }
   };
 
-  const handleDeleteGym = async (gymId, gymName) => {
-    if (!window.confirm(`Are you sure you want to permanently delete franchise "${gymName}"?`)) {
-      return;
-    }
+  const confirmDeleteGym = async () => {
+    if (!gymToDelete) return;
+    const { id: gymId, name: gymName } = gymToDelete;
+    setIsDeletingGym(true);
+
     try {
+      const token = localStorage.getItem('fitcore_token');
       const response = await fetch(`${API_ENDPOINTS.ADMIN_GYMS}/${gymId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('fitcore_token')}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         }
       });
       const data = await response.json();
+      setIsDeletingGym(false);
+      setGymToDelete(null);
+
       if (response.ok && data.success) {
-        showToast(`Franchise "${gymName}" deleted successfully.`, 'success');
+        showToast(`Franchise "${gymName}" permanently deleted from database.`, 'success');
+        if (typeof setGyms === 'function') {
+          setGyms(prev => prev.filter(g => (g.id || g._id) !== gymId && g._id !== gymId && g.id !== gymId));
+        }
         if (selectedGym && (selectedGym.id === gymId || selectedGym._id === gymId)) {
           setSelectedGym(null);
         }
-        if (typeof onRefresh === 'function') onRefresh();
+        if (typeof onRefresh === 'function') {
+          onRefresh();
+        }
       } else {
-        showToast(data.error || 'Failed to delete franchise.', 'error');
+        showToast(data.error || 'Failed to delete franchise from database.', 'error');
       }
     } catch (err) {
+      console.error('Error deleting gym franchise:', err);
+      setIsDeletingGym(false);
+      setGymToDelete(null);
       showToast('Network error connecting to backend API.', 'error');
     }
+  };
+
+  const handleDeleteGym = (gymId, gymName) => {
+    setGymToDelete({ id: gymId, name: gymName });
   };
 
   const handleCompleteRegistration = async (e) => {
@@ -425,6 +513,7 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
         }
       }
     } catch (err) {
+      console.error('Error in franchise onboarding:', err);
       setIsSubmitting(false);
       setServerError('Connection refused. Please ensure backend server is online on port 7000.');
     }
@@ -468,21 +557,6 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
   const validCurrentPage = Math.min(Math.max(currentPage, 1), totalPages);
   const startIndex = (validCurrentPage - 1) * pageSize;
   const paginatedGyms = filteredGyms.slice(startIndex, startIndex + pageSize);
-
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleCityChange = (e) => {
-    setSelectedCity(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handleStatusFilterChange = (e) => {
-    setSelectedStatus(e.target.value);
-    setCurrentPage(1);
-  };
 
   return (
     <div className="adm-view-container">
@@ -546,7 +620,7 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
             className="adm-input-field search"
             placeholder="Search franchise name, city, address, or phone..."
             value={searchTerm}
-            onChange={handleSearchChange}
+            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
           />
         </div>
 
@@ -821,10 +895,12 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
                   {wizardStep === 4 && 'Owner Credentials & Activation'}
                 </h2>
               </div>
-              <button className="wizard-close-btn" onClick={resetWizard}>✕</button>
+              <button type="button" className="wizard-close-btn" onClick={resetWizard} aria-label="Close">
+                <CloseIcon size={16} color="#64748b" />
+              </button>
             </div>
 
-            {/* Stepper Progress Bar */}
+            {/* Stepper Progress Bar (Interactive Step Switching) */}
             <div className="wizard-stepper-bar">
               {[
                 { num: 1, label: 'Identity' },
@@ -832,7 +908,17 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
                 { num: 3, label: 'Permissions' },
                 { num: 4, label: 'Credentials' }
               ].map(s => (
-                <div key={s.num} className={`step-item ${wizardStep >= s.num ? 'active' : ''}`}>
+                <div 
+                  key={s.num} 
+                  className={`step-item ${wizardStep >= s.num ? 'active' : ''}`}
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => {
+                    if (s.num === 1 || wizardStep >= s.num || validateStep1()) {
+                      setWizardStep(s.num);
+                    }
+                  }}
+                  title={`Jump to Step ${s.num}: ${s.label}`}
+                >
                   <div className="step-circle">{s.num}</div>
                   <span className="step-label">{s.label}</span>
                 </div>
@@ -883,6 +969,17 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
                             <option key={i} value={c}>{c}</option>
                           ))}
                         </select>
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">State / Region</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          placeholder="e.g. Maharashtra" 
+                          value={gymState} 
+                          onChange={(e) => setGymState(e.target.value)} 
+                        />
                       </div>
 
                       <div className="form-group full-width">
@@ -976,6 +1073,30 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
                         {(validationErrors.gymAddress || validationErrors.address) && (
                           <span className="field-error-msg">⚠️ {validationErrors.gymAddress || validationErrors.address}</span>
                         )}
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Postal Pincode</label>
+                        <input 
+                          type="text" 
+                          maxLength={6}
+                          className="form-input" 
+                          placeholder="e.g. 440027" 
+                          value={gymPincode} 
+                          onChange={(e) => setGymPincode(e.target.value.replace(/\D/g, '').slice(0, 6))} 
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label className="form-label">GSTIN / Tax ID (Optional)</label>
+                        <input 
+                          type="text" 
+                          maxLength={15}
+                          className="form-input" 
+                          placeholder="e.g. 27AAAAA0000A1Z5" 
+                          value={gymGst} 
+                          onChange={(e) => setGymGst(e.target.value.toUpperCase())} 
+                        />
                       </div>
 
                       <div className="form-group">
@@ -1375,7 +1496,9 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
                 <span className="wizard-step-badge">EDIT FRANCHISE</span>
                 <h2 className="wizard-title">Update {editFormData.name}</h2>
               </div>
-              <button className="wizard-close-btn" onClick={() => setEditingGym(null)}>✕</button>
+              <button type="button" className="wizard-close-btn" onClick={() => setEditingGym(null)} aria-label="Close">
+                <CloseIcon size={16} color="#64748b" />
+              </button>
             </div>
 
             <form onSubmit={handleSaveEditGym}>
@@ -1574,7 +1697,9 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
                   </p>
                 </div>
               </div>
-              <button className="wizard-close-btn" onClick={() => setSelectedGym(null)}>✕</button>
+              <button type="button" className="wizard-close-btn" onClick={() => setSelectedGym(null)} aria-label="Close">
+                <CloseIcon size={16} color="#64748b" />
+              </button>
             </div>
 
             {/* Modal Body */}
@@ -1721,19 +1846,29 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
       )}
       {/* Super Admin SaaS Subscription Pricing & Tiers Management Modal */}
       {showPricingModal && (
-        <div className="modal-backdrop-luxury">
-          <div className="luxury-wizard-box" style={{ maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="wizard-modal-header">
-              <div className="wizard-title-group">
-                <span className="step-count-pill" style={{ background: '#ecfdf5', color: '#059669', borderColor: '#a7f3d0' }}>
-                  Super Admin Console
+        <div className="modal-backdrop-luxury" onClick={() => setShowPricingModal(false)}>
+          <div className="luxury-wizard-box" style={{ maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <div className="wizard-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '24px 32px', background: 'rgba(248, 250, 252, 0.95)', borderBottom: '1px solid #e2e8f0' }}>
+              <div className="wizard-title-wrap">
+                <span className="wizard-step-badge" style={{ background: '#ecfdf5', color: '#059669', borderColor: '#a7f3d0', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <ShieldCheckIcon size={12} color="#059669" /> Super Admin Console
                 </span>
-                <h3 className="wizard-headline">Manage SaaS Franchise Subscription Pricing</h3>
-                <p className="wizard-sub-info">
+                <h2 className="wizard-title" style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', margin: '4px 0 2px 0' }}>
+                  Manage SaaS Franchise Subscription Pricing
+                </h2>
+                <p style={{ fontSize: '13px', color: '#64748b', margin: '4px 0 0 0', fontWeight: '500' }}>
                   Configure the monthly/yearly platform fee charged to gyms and franchises stored directly in MongoDB.
                 </p>
               </div>
-              <button className="wizard-close-btn" onClick={() => setShowPricingModal(false)}>✕</button>
+              <button 
+                type="button" 
+                className="wizard-close-btn" 
+                onClick={() => setShowPricingModal(false)}
+                aria-label="Close"
+                style={{ flexShrink: 0, marginLeft: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <CloseIcon size={16} color="#64748b" />
+              </button>
             </div>
 
             <form onSubmit={handleSaveSaaSPricing} className="wizard-form-flow" style={{ padding: '24px 28px' }}>
@@ -1837,6 +1972,55 @@ export default function SuperAdminGymsView({ gyms = [], setGyms, members = [], o
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modern Confirmation Modal for Permanent Franchise Deletion */}
+      {gymToDelete && (
+        <div className="modal-backdrop-luxury" onClick={() => setGymToDelete(null)}>
+          <div className="luxury-wizard-box" style={{ maxWidth: '480px', padding: '28px', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+            <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: '#fee2e2', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px auto' }}>
+              <TrashIcon size={32} color="#ef4444" />
+            </div>
+            <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#0f172a', marginBottom: '8px' }}>
+              Delete Franchise Club?
+            </h3>
+            <p style={{ fontSize: '14px', color: '#64748b', lineHeight: '1.5', marginBottom: '20px' }}>
+              Are you sure you want to permanently delete <strong style={{ color: '#0f172a' }}>"{gymToDelete.name}"</strong>? This will remove all linked member records, owner logins, biometric logs, and turnstile access from MongoDB. This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="wizard-back-btn"
+                style={{ padding: '10px 20px', borderRadius: '12px', fontWeight: '600' }}
+                onClick={() => setGymToDelete(null)}
+                disabled={isDeletingGym}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteGym}
+                disabled={isDeletingGym}
+                style={{
+                  background: '#ef4444',
+                  color: '#ffffff',
+                  border: 'none',
+                  padding: '10px 24px',
+                  borderRadius: '12px',
+                  fontWeight: '700',
+                  fontSize: '14px',
+                  cursor: isDeletingGym ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.4)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                {isDeletingGym ? 'Deleting...' : 'Yes, Delete Franchise'}
+              </button>
+            </div>
           </div>
         </div>
       )}

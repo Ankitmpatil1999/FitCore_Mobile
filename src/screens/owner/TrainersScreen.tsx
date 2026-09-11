@@ -15,7 +15,7 @@ import {
   TouchableWithoutFeedback,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Ionicons';
+import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { TRAINERS, MEMBERS, Trainer } from '../../data/mockData';
@@ -169,7 +169,7 @@ export default function TrainersScreen() {
             onPress={() => setAddModal(true)}
             activeOpacity={0.85}
           >
-            <Icon name="person-add" size={moderateScale(16)} color="#FFFFFF" />
+            <AppIcon name="person-add" size={moderateScale(16)} color="#FFFFFF" />
             <Text style={styles.addBtnText}>+ Add Coach</Text>
           </TouchableOpacity>
         </View>
@@ -220,7 +220,7 @@ export default function TrainersScreen() {
                   </View>
                 </View>
 
-                <Icon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
+                <AppIcon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
               </AnimatedPressable>
             );
           })}
@@ -235,7 +235,7 @@ export default function TrainersScreen() {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Add New Coach</Text>
                 <TouchableOpacity onPress={() => setAddModal(false)}>
-                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                  <AppIcon name="close" size={moderateScale(22)} color="#0F172A" />
                 </TouchableOpacity>
               </View>
 
@@ -291,7 +291,7 @@ export default function TrainersScreen() {
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Coach Profile</Text>
                 <TouchableOpacity onPress={() => setDetailTrainer(null)}>
-                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                  <AppIcon name="close" size={moderateScale(22)} color="#0F172A" />
                 </TouchableOpacity>
               </View>
 

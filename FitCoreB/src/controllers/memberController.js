@@ -58,40 +58,118 @@ exports.getMemberProfile = async (req, res) => {
       date: todayStr,
     });
 
+    // Dynamic Gym Lookup from MongoDB
+    let gymData = null;
+    const gymsCollection = db.collection('gyms');
+    if (member.gymId || member.gym_id) {
+      const { ObjectId } = require('mongodb');
+      const gId = String(member.gymId || member.gym_id);
+      const gymQuery = {
+        $or: [
+          { _id: gId },
+          { id: gId },
+          ...(ObjectId.isValid(gId) ? [{ _id: new ObjectId(gId) }] : [])
+        ]
+      };
+      gymData = await gymsCollection.findOne(gymQuery);
+    }
+    if (!gymData) {
+      gymData = await gymsCollection.findOne({});
+    }
+
+    // Dynamic Trainer Lookup from MongoDB
+    let trainerData = null;
+    const trainersCollection = db.collection('trainers');
+    if (member.trainerId) {
+      const { ObjectId } = require('mongodb');
+      const tId = String(member.trainerId);
+      const trainerQuery = {
+        $or: [
+          { _id: tId },
+          { id: tId },
+          ...(ObjectId.isValid(tId) ? [{ _id: new ObjectId(tId) }] : [])
+        ]
+      };
+      trainerData = await trainersCollection.findOne(trainerQuery);
+    }
+    if (!trainerData && gymData) {
+      const { ObjectId } = require('mongodb');
+      const gIdStr = gymData._id.toString();
+      trainerData = await trainersCollection.findOne({
+        $or: [
+          { gymId: gIdStr },
+          { gym_id: gIdStr },
+          ...(ObjectId.isValid(gIdStr) ? [{ gymId: new ObjectId(gIdStr) }] : [])
+        ]
+      });
+    }
+
     res.json({
       success: true,
       data: {
         member: {
-          id: member.id || member._id || String(userId),
-          name: member.name || 'Arjun Mehta',
-          phone: member.phone || '9876543210',
+          id: member.id || member._id?.toString() || String(userId),
+          name: member.name || 'Member',
+          phone: member.phone || '',
           email: member.email || 'member@fitcore.com',
           gender: member.gender || 'Male',
-          dob: member.dob || '1996-05-15',
+          dob: member.dob || '1998-05-15',
           height: member.height || 178,
           weight: member.weight || 74.5,
           bmi: member.bmi || 23.5,
           goal: member.goal || 'Muscle Gain',
           medicalIssues: member.medicalIssues || 'None',
-          emergencyContact: member.emergencyContact || 'Vikram Mehta',
-          emergencyPhone: member.emergencyPhone || '9876543211',
+          emergencyContact: member.emergencyContact || '',
+          emergencyPhone: member.emergencyPhone || '',
           status: member.status || 'active',
-          joinDate: member.joinDate || '2024-01-10',
-          expiryDate: member.expiryDate,
+          joinDate: member.joinDate || member.startDate || '2024-01-10',
+          expiryDate: member.expiryDate || '',
           daysRemaining,
           photo: member.photo || '',
+          membershipNumber: member.membershipNumber || member.id || `FC-${member.phone?.slice(-4) || '2026'}`,
+          planName: member.plan || member.planName || 'Pro Studio Membership',
         },
-        gym: {
+        gym: gymData ? {
+          id: gymData._id?.toString() || gymData.id,
+          name: gymData.name,
+          address: gymData.address || `${gymData.city || 'India'}`,
+          city: gymData.city || 'City',
+          phone: gymData.phone || '+91 98765 43210',
+          email: gymData.email || '',
+          rating: gymData.rating || 4.9,
+          tagline: gymData.tagline || 'Transform Your Body & Mind with State-of-the-Art Facilities',
+          isOpen: true,
+          openTime: gymData.openTime || '06:00 AM',
+          closeTime: gymData.closeTime || '10:00 PM',
+        } : {
           id: 'gym_01',
           name: 'FitCore Elite Gym',
-          address: 'Phoenix Millennium, Viman Nagar',
-          city: 'Pune',
+          address: 'Civil Lines',
+          city: 'Nagpur',
           phone: '+91 98765 43210',
           rating: 4.9,
         },
+        trainer: trainerData ? {
+          id: trainerData._id?.toString() || trainerData.id,
+          name: trainerData.name || 'Coach Vikram',
+          role: trainerData.specialization || trainerData.role || 'Head Strength & Conditioning Coach',
+          phone: trainerData.phone || '+91 98765 43210',
+          rating: trainerData.rating || 4.9,
+          experience: trainerData.experience || '8+ Yrs',
+          activeClients: trainerData.activeClients || 32,
+          certifications: trainerData.certifications || ['CSCS', 'ACE', 'K11'],
+        } : {
+          id: 't1',
+          name: 'Vikram Singh',
+          role: 'Head Strength & Conditioning Coach',
+          phone: '+91 98765 43210',
+          rating: 4.9,
+          experience: '8+ Yrs',
+          activeClients: 32,
+        },
         plan: {
-          name: 'Gold Annual Pass',
-          price: 12999,
+          name: member.plan || 'Gold Annual Pass',
+          price: member.planPrice || 12999,
           durationDays: 365,
         },
         todayCheckedIn: !!todayAttendance,
@@ -732,9 +810,34 @@ exports.checkIn = async (req, res) => {
 
     // 1. Verify Member Subscription / Expiry
     const membersCollection = db.collection('members');
+    const usersCollection = db.collection('users');
+
+    const cleanMemberPhone = String(memberId).startsWith('guest_') ? String(memberId).replace('guest_', '') : null;
+
     let member = await membersCollection.findOne({
-      $or: [{ userId: String(memberId) }, { id: String(memberId) }, { _id: String(memberId) }],
+      $or: [
+        { userId: String(memberId) },
+        { id: String(memberId) },
+        { _id: String(memberId) },
+        ...(cleanMemberPhone ? [{ phone: cleanMemberPhone }] : []),
+      ],
     });
+
+    let user = null;
+    if (!member && cleanMemberPhone) {
+      user = await usersCollection.findOne({ phone: cleanMemberPhone });
+      if (user && user.gymId) {
+        member = await membersCollection.findOne({
+          $or: [{ phone: cleanMemberPhone }, { userId: user.userId || user._id.toString() }]
+        });
+      }
+    }
+
+    if (!user && member) {
+      user = await usersCollection.findOne({
+        $or: [{ phone: member.phone }, { gymId: member.gymId }]
+      });
+    }
 
     if (member && member.expiryDate) {
       const expiry = new Date(member.expiryDate);
@@ -773,14 +876,34 @@ exports.checkIn = async (req, res) => {
     // 4. Create new attendance check-in record for today
     const now = new Date();
     const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const timeInMins = hours * 60 + minutes;
+
     let sessionType = 'NIGHT';
-    if (hours >= 5 && hours < 12) sessionType = 'MORNING';
-    else if (hours >= 12 && hours < 17) sessionType = 'AFTERNOON';
-    else if (hours >= 17 && hours < 21) sessionType = 'EVENING';
+    // Morning Shift: 04:00 AM (240 mins) to 01:00 PM / 13:00 (780 mins)
+    if (timeInMins >= 240 && timeInMins < 780) {
+      sessionType = 'MORNING';
+    }
+    // Afternoon Gap / Transition: 01:00 PM (780 mins) to 04:00 PM / 16:00 (960 mins)
+    else if (timeInMins >= 780 && timeInMins < 960) {
+      sessionType = 'AFTERNOON';
+    }
+    // Evening Shift: 04:00 PM / 16:00 (960 mins) to 11:00 PM / 23:00 (1380 mins)
+    else if (timeInMins >= 960 && timeInMins < 1380) {
+      sessionType = 'EVENING';
+    }
+
+    const targetGymId = String(member?.gymId || user?.gymId || gymId || '6a934afd13a1b16c3767d90f');
+    const resolvedName = member?.name || user?.name || (cleanMemberPhone ? `Member (${cleanMemberPhone})` : 'Member');
+    const resolvedPhone = member?.phone || user?.phone || cleanMemberPhone || '';
 
     const newRecord = {
-      memberId: String(memberId),
-      gymId: String(gymId || '65123456789abcdef0123456'),
+      memberId: String(member?.userId || member?._id || memberId),
+      memberName: resolvedName,
+      memberPhone: resolvedPhone,
+      membershipId: member?.plan || 'Standard Pass',
+      gymId: targetGymId,
+      gym_id: targetGymId,
       date: todayStr,
       visitDate: todayStr,
       sessionType,
@@ -929,8 +1052,8 @@ exports.getAttendanceHistory = async (req, res) => {
       const now = new Date();
       const initialLogs = [];
 
-      const pastDaysOffsets = [0, 1, 2, 3, 5, 6, 7, 8, 10, 12, 13, 14];
-      const durations = [95, 80, 110, 75, 105, 85, 90, 120, 65, 95, 85, 100];
+      const pastDaysOffsets = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 13, 14];
+      const durations = [80, 110, 75, 105, 85, 90, 120, 65, 95, 85, 100, 90];
 
       for (let i = 0; i < pastDaysOffsets.length; i++) {
         const offset = pastDaysOffsets[i];
@@ -1069,16 +1192,67 @@ exports.getAttendanceHistory = async (req, res) => {
     const todayMins = todayTotalMinutes % 60;
     const todayDurationFormatted = todayHrs > 0 ? `${todayHrs}h ${todayMins}m` : `${todayMins}m`;
 
+    // Compute today shift breakdown (Morning 4AM-1PM, Afternoon 1PM-4PM, Evening 4PM-11PM, Night)
+    const todayShiftBreakdown = {
+      MORNING: { visits: 0, minutes: 0, formatted: '0m' },
+      AFTERNOON: { visits: 0, minutes: 0, formatted: '0m' },
+      EVENING: { visits: 0, minutes: 0, formatted: '0m' },
+      NIGHT: { visits: 0, minutes: 0, formatted: '0m' }
+    };
+
+    records.filter(r => r.date === todayStr).forEach(r => {
+      const inDate = new Date(r.checkInTime);
+      const hours = inDate.getHours();
+      const mins = inDate.getMinutes();
+      const tMins = hours * 60 + mins;
+
+      let st = 'NIGHT';
+      if (tMins >= 240 && tMins < 780) st = 'MORNING';
+      else if (tMins >= 780 && tMins < 960) st = 'AFTERNOON';
+      else if (tMins >= 960 && tMins < 1380) st = 'EVENING';
+
+      const isLive = !r.checkOutTime;
+      const dur = isLive
+        ? Math.max(1, Math.round((Date.now() - inDate.getTime()) / (1000 * 60)))
+        : (r.durationMinutes || 0);
+
+      todayShiftBreakdown[st].visits += 1;
+      todayShiftBreakdown[st].minutes += dur;
+    });
+
+    Object.keys(todayShiftBreakdown).forEach(st => {
+      const sMins = todayShiftBreakdown[st].minutes;
+      const sh = Math.floor(sMins / 60);
+      const sm = sMins % 60;
+      todayShiftBreakdown[st].formatted = sh > 0 ? `${sh}h ${String(sm).padStart(2, '0')}m` : `${sm}m`;
+    });
+
+    const lastCompletedToday = records.find(r => r.date === todayStr && r.checkOutTime);
+    const activeCheckInTime = activeTodayRecord?.checkInTime || null;
+    const checkInFormatted = activeTodayRecord
+      ? new Date(activeTodayRecord.checkInTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+      : lastCompletedToday
+        ? new Date(lastCompletedToday.checkInTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        : null;
+
+    const checkOutFormatted = lastCompletedToday && !activeTodayRecord
+      ? new Date(lastCompletedToday.checkOutTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+      : null;
+
     const todaySession = {
       isCheckedIn: !!activeTodayRecord,
       isCheckedOut: !activeTodayRecord && todaySessionsCount > 0,
+      checkInFormatted,
+      checkOutFormatted,
+      durationFormatted: activeTodayRecord ? `${Math.max(1, Math.round(currentSessionSeconds / 60))}m (Live)` : todayDurationFormatted,
       todayTotalSeconds,
       todayCompletedSeconds,
       currentSessionSeconds,
       todayTotalMinutes,
       todayDurationFormatted,
       todaySessionsCount,
-      activeCheckInTime: activeTodayRecord?.checkInTime || null,
+      todayShiftBreakdown,
+      activeCheckInTime,
     };
 
     // ── Calculate Live Week Overview (Monday to Sunday) ──

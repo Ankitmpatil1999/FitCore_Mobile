@@ -51,13 +51,15 @@
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border-right: 1px solid var(--adm-border);
-  padding: 32px 24px;
+  padding: 28px 20px;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
-  height: 100%;
+  height: 100vh;
+  box-sizing: border-box;
   z-index: 10;
   box-shadow: 4px 0 24px rgba(15, 23, 42, 0.03);
+  overflow: hidden;
 }
 
 .adm-logo-area {
@@ -65,11 +67,12 @@
   font-size: 26px;
   font-weight: 800;
   color: var(--adm-text-main);
-  margin-bottom: 36px;
+  margin-bottom: 24px;
   letter-spacing: -0.04em;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .adm-logo-dot {
@@ -84,25 +87,39 @@
 .adm-nav-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 24px;
+  gap: 6px;
+  margin-bottom: 12px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+  flex: 1 1 auto;
+}
+
+.adm-nav-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.adm-nav-list::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
 }
 
 .adm-nav-item {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 13px 18px;
+  padding: 12px 16px;
   border: 1px solid transparent;
   background: none;
-  border-radius: 16px;
-  font-size: 14px;
+  border-radius: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--adm-text-sub);
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
   text-align: left;
   width: 100%;
+  flex-shrink: 0;
 }
 
 .adm-nav-item:hover {
@@ -123,22 +140,44 @@
 .adm-sidebar-divider {
   height: 1px;
   background-color: var(--adm-border);
-  margin: 16px 0;
+  margin: 12px 0;
+  flex-shrink: 0;
 }
 
 .adm-sidebar-footer {
   margin-top: auto;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .adm-system-badge {
   background: rgba(241, 245, 249, 0.8);
   border: 1px solid var(--adm-border);
-  border-radius: 16px;
-  padding: 16px;
+  border-radius: 14px;
+  padding: 12px 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+.logout-btn {
+  background: linear-gradient(135deg, #fff1f2 0%, #ffe4e6 100%) !important;
+  color: #e11d48 !important;
+  border: 1px solid #fecdd3 !important;
+  font-weight: 700 !important;
+  justify-content: center;
+  transition: all 0.2s ease !important;
+}
+
+.logout-btn:hover {
+  background: #e11d48 !important;
+  color: #ffffff !important;
+  border-color: #e11d48 !important;
+  box-shadow: 0 4px 14px rgba(225, 29, 72, 0.3) !important;
+  transform: translateY(-1px) !important;
 }
 
 .adm-system-badge h4 {
@@ -1190,16 +1229,6 @@
 
 /* Responsive */
 @media (max-width: 1200px) {
-  .adm-dashboard-root {
-    flex-direction: column;
-  }
-  .adm-sidebar {
-    width: 100%;
-    height: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--adm-border);
-    padding: 20px;
-  }
   .adm-metrics-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -2826,23 +2855,23 @@
   white-space: nowrap;
 }
 
-.modern-franchise-table tbody tr.gym-table-row {
+.modern-franchise-table tbody tr {
   transition: background-color 0.15s ease;
   background: #ffffff;
   border-bottom: 1px solid #f1f5f9;
 }
 
-.modern-franchise-table tbody tr.gym-table-row:last-child {
+.modern-franchise-table tbody tr:last-child {
   border-bottom: none;
 }
 
-.modern-franchise-table tbody tr.gym-table-row td {
+.modern-franchise-table tbody tr td {
   padding: 14px 18px;
   vertical-align: middle;
   background: transparent !important;
 }
 
-.modern-franchise-table tbody tr.gym-table-row:hover {
+.modern-franchise-table tbody tr:hover {
   background: #f8fafc !important;
 }
 
@@ -5991,3 +6020,1327 @@ input:checked + .slider:before {
   line-height: 1.5;
 }
 
+/* ==========================================================================
+   SUPER ADMIN REVENUE & TRANSACTION LEDGER - RESPONSIVE & CLEAN UI
+   ========================================================================== */
+
+.revenue-view-container {
+  width: 100%;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.subtab-switcher-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+  border-bottom: 1.5px solid #e2e8f0;
+  padding-bottom: 10px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.subtab-btn {
+  padding: 10px 22px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.subtab-btn.active-tx {
+  background: #f43f5e;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(244, 63, 94, 0.28);
+  border-color: #f43f5e;
+}
+
+.subtab-btn.active-subs {
+  background: #4f46e5;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.28);
+  border-color: #4f46e5;
+}
+
+.subtab-btn.inactive {
+  background: #ffffff;
+  color: #64748b;
+  border-color: #e2e8f0;
+}
+
+.subtab-btn.inactive:hover {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #cbd5e1;
+}
+
+/* Luxury Detail Pills & Plan Badges */
+.luxury-detail-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.plan-badge-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+  white-space: nowrap;
+}
+
+.plan-badge-pill.enterprise {
+  background: #fffbeb;
+  color: #b45309;
+  border-color: #fde68a;
+}
+
+.plan-badge-pill.starter {
+  background: #f8fafc;
+  color: #475569;
+  border-color: #e2e8f0;
+}
+
+.city-pill-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  background: #f8fafc;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.club-avatar-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.table-primary-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.club-name-txt {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+  display: block;
+}
+
+.club-meta-txt {
+  font-size: 11.5px;
+  color: #64748b;
+  display: block;
+  margin-top: 1px;
+}
+
+.status-tag.approved {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.status-tag.pending {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Responsive Table Breakpoints */
+@media (max-width: 1200px) {
+  .adm-viewport {
+    padding: 24px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .adm-search-filter-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .search-input-wrap {
+    min-width: 100%;
+  }
+
+  .custom-select-container {
+    flex: 1;
+    min-width: 160px;
+  }
+}
+
+@media (max-width: 768px) {
+  .adm-viewport {
+    padding: 16px;
+  }
+
+  .adm-view-header-bar {
+    flex-direction: column;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .adm-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+  }
+
+  .modern-franchise-table {
+    min-width: 700px;
+  }
+}
+
+/* Custom Sleek Scrollbar for Tables */
+.adm-table-wrap::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.adm-table-wrap::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+
+.adm-table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.adm-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* ==========================================================================
+   SUPER ADMIN SECURITY PROFILE VIEW - ULTRA RESPONSIVE & LUXURY UI
+   ========================================================================== */
+
+.superadmin-profile-view {
+  width: 100%;
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+.profile-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.title-with-pill {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* Hero Passport Card */
+.admin-profile-hero-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.9) 100%);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 24px;
+  padding: 26px 30px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  margin-bottom: 24px;
+  transition: all 0.25s ease;
+}
+
+.admin-profile-hero-card:hover {
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: 0 14px 36px rgba(79, 70, 229, 0.08);
+}
+
+.profile-hero-inner {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.profile-avatar-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profile-hero-avatar {
+  width: 78px;
+  height: 78px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(79, 70, 229, 0.35);
+  letter-spacing: 0.02em;
+}
+
+.profile-role-dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 15px;
+  height: 15px;
+  background: #10b981;
+  border: 2.5px solid #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+}
+
+.profile-hero-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-badge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-rank-badge {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.admin-verified-badge {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.admin-designation-badge {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #e2e8f0;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.profile-hero-name {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+  letter-spacing: -0.01em;
+  word-break: break-word;
+}
+
+.profile-meta-pills-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.profile-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 5px 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+  max-width: 100%;
+}
+
+.profile-meta-item .meta-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 2-Column Responsive Forms Grid */
+.profile-forms-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  align-items: stretch;
+}
+
+.profile-form-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 24px;
+  padding: 28px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.03);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.22s ease;
+}
+
+.profile-form-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+}
+
+.panel-header-custom {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.panel-icon-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.panel-icon-circle.indigo {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+
+.panel-icon-circle.amber {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.panel-title-text {
+  font-family: 'Outfit', sans-serif;
+  font-size: 17px;
+  font-weight: 800;
+  color: #0f172a;
+  margin: 0;
+}
+
+.panel-subtitle-text {
+  font-size: 12.5px;
+  color: #64748b;
+  margin: 3px 0 0 0;
+}
+
+/* Security Notice Box */
+.profile-security-alert {
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(254, 243, 199, 0.65) 0%, rgba(254, 249, 195, 0.5) 100%);
+  border: 1px solid #fde68a;
+  border-radius: 16px;
+  margin-bottom: 20px;
+}
+
+.security-alert-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.security-alert-desc {
+  margin: 0;
+  font-size: 12px;
+  color: #78350f;
+  line-height: 1.45;
+}
+
+/* Form Controls */
+.profile-form-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1;
+}
+
+.profile-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile-input-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #334155;
+  letter-spacing: 0.02em;
+}
+
+.profile-input-field {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  background-color: #f8fafc;
+  font-size: 13.5px;
+  color: #0f172a;
+  font-weight: 500;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.profile-input-field:focus {
+  background-color: #ffffff;
+  border-color: #4f46e5;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.1);
+}
+
+.profile-input-field.textarea-field {
+  resize: none;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+/* Phone input with country tag */
+.input-with-prefix {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.input-prefix-tag {
+  position: absolute;
+  left: 14px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #64748b;
+  pointer-events: none;
+}
+
+.profile-input-field.with-prefix {
+  padding-left: 50px;
+}
+
+/* Password options row */
+.password-options-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 2px 2px;
+}
+
+.show-password-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+}
+
+.show-password-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #4f46e5;
+  cursor: pointer;
+}
+
+.password-match-status {
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.password-match-status.match {
+  color: #059669;
+  background: #ecfdf5;
+}
+
+.password-match-status.mismatch {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+/* Action Submit Buttons */
+.form-submit-row {
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.profile-save-btn {
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+  color: #ffffff;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.28);
+  transition: all 0.22s ease;
+}
+
+.profile-save-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.38);
+}
+
+.profile-save-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.profile-password-btn {
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  border: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.28);
+  transition: all 0.22s ease;
+}
+
+.profile-password-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.38);
+}
+
+.profile-password-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   GLOBAL SUPER ADMIN RESPONSIVE & MOBILE POLISH (ALL SCREENS)
+   ========================================================================== */
+
+/* Mobile Backdrop */
+.adm-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9998;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.adm-mobile-backdrop.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Mobile Close & Hamburger */
+.adm-mobile-close-btn {
+  display: none;
+  background: none;
+  border: 1px solid var(--adm-border);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--adm-text-sub);
+  transition: all 0.2s ease;
+}
+
+.adm-mobile-close-btn:hover {
+  background: #f1f5f9;
+  color: var(--adm-text-main);
+}
+
+.adm-mobile-menu-trigger {
+  display: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--adm-border);
+  background: #ffffff;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.adm-mobile-menu-trigger:hover {
+  background: #f8fafc;
+  border-color: var(--indigo-primary);
+}
+
+/* Base Viewport & Card Containment */
+.adm-viewport {
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.adm-view-container {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Grid Auto-fit utilities for all screens */
+.adm-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.adm-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 20px;
+}
+
+.franchise-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.summary-pill-card {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+/* ==========================================================================
+   BREAKPOINTS: LARGE TABLETS & DESKTOPS (<= 1200px)
+   ========================================================================== */
+@media (max-width: 1200px) {
+  .adm-header {
+    padding: 0 20px;
+    gap: 14px;
+  }
+
+  .adm-viewport {
+    padding: 24px 20px;
+  }
+
+  .adm-search-wrap {
+    max-width: 240px;
+  }
+
+  .trigger-main-title {
+    max-width: 160px;
+  }
+
+  .hub-stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .hub-bento-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .franchise-summary-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ==========================================================================
+   BREAKPOINTS: TABLETS & IPADS (<= 1024px)
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .adm-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 9999;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 10px 0 40px rgba(15, 23, 42, 0.15);
+  }
+
+  .adm-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .adm-mobile-close-btn {
+    display: flex;
+  }
+
+  .adm-mobile-menu-trigger {
+    display: flex;
+  }
+
+  .adm-logo-area {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    margin-bottom: 24px;
+  }
+
+  .adm-header {
+    height: 70px;
+    padding: 0 16px;
+  }
+
+  .adm-header-left {
+    gap: 10px;
+  }
+
+  .adm-header-right {
+    gap: 10px;
+  }
+
+  .adm-clock {
+    display: none;
+  }
+
+  .header-onboard-btn span {
+    font-size: 11.5px;
+  }
+
+  .adm-grid-3 {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+
+  .adm-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-forms-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .adm-search-filter-row {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .adm-search-filter-row > * {
+    flex: 1 1 200px;
+  }
+
+  .search-input-wrap,
+  .adm-input-field.search {
+    min-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  /* NextGen Hub Hero Passport */
+  .nextgen-hero-passport {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+    padding: 24px;
+  }
+
+  .passport-badge-flipper-col {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* KYC Split Layout */
+  .kyc-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Franchise Detail Page Hero */
+  .hero-passport-main {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .hero-kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ==========================================================================
+   BREAKPOINTS: MOBILE SMARTPHONES (<= 768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+  .adm-viewport {
+    padding: 14px 12px;
+  }
+
+  .adm-header {
+    height: 64px;
+    padding: 0 12px;
+  }
+
+  .adm-search-wrap {
+    display: none;
+  }
+
+  .custom-franchise-trigger {
+    padding: 5px 8px;
+    gap: 6px;
+    border-radius: 12px;
+  }
+
+  .trigger-sub-label {
+    display: none;
+  }
+
+  .trigger-main-title {
+    max-width: 110px;
+    font-size: 11px;
+  }
+
+  .trigger-icon-box {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+  }
+
+  .header-onboard-btn {
+    display: none !important;
+  }
+
+  .adm-profile-badge {
+    padding: 4px 6px;
+    gap: 6px;
+  }
+
+  .adm-profile-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 12px;
+  }
+
+  .adm-profile-info {
+    display: none;
+  }
+
+  .adm-icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .adm-view-header-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .adm-view-title h1 {
+    font-size: 19px;
+    line-height: 1.25;
+  }
+
+  .adm-view-subtitle {
+    font-size: 12px;
+  }
+
+  .adm-metrics-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .adm-metric-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .adm-metric-value {
+    font-size: 26px;
+  }
+
+  .hub-stats-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .stat-card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  .stat-number {
+    font-size: 26px;
+  }
+
+  .franchise-summary-strip {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .summary-pill-card {
+    padding: 12px 14px;
+    border-radius: 16px;
+  }
+
+  .adm-grid-3,
+  .adm-grid-2 {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .adm-card-panel {
+    padding: 16px 14px;
+    border-radius: 18px;
+  }
+
+  /* Franchise Radar 2-Col Grid */
+  .franchise-radar-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  /* Tables container */
+  .adm-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 14px;
+    margin: 0;
+    max-width: 100%;
+  }
+
+  .adm-table th,
+  .adm-table td {
+    padding: 10px 8px;
+    font-size: 11.5px;
+  }
+
+  .modern-franchise-table {
+    min-width: 600px;
+  }
+
+  /* 4-Step Wizard Modal on Mobile */
+  .wizard-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .wizard-modal-card {
+    max-width: 100%;
+    max-height: 94vh;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .wizard-header {
+    padding: 18px 20px;
+  }
+
+  .wizard-title {
+    font-size: 16px;
+  }
+
+  .wizard-stepper-bar {
+    padding: 10px 14px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .step-label {
+    display: none;
+  }
+
+  .wizard-step-content {
+    padding: 18px 16px;
+    max-height: calc(94vh - 180px);
+  }
+
+  .wizard-form-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .form-group.full-width {
+    grid-column: span 1;
+  }
+
+  .activity-chips-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .amenities-pill-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .package-cards-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .permissions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wizard-footer {
+    padding: 14px 18px;
+  }
+
+  /* Side Drawer / Detail Inspector Modals on Mobile */
+  .adm-drawer-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .adm-drawer {
+    width: 100% !important;
+    max-height: 92vh;
+    border-radius: 24px 24px 0 0;
+    padding: 20px 16px;
+  }
+
+  /* Notification dropdown on mobile */
+  .adm-noti-dropdown {
+    position: fixed;
+    top: 68px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    border-radius: 18px;
+  }
+
+  /* Franchise Switcher Dropdown on mobile */
+  .custom-franchise-menu {
+    position: fixed;
+    top: 68px;
+    left: 10px;
+    right: 10px;
+    width: auto;
+    border-radius: 18px;
+    max-height: 60vh;
+  }
+
+  /* Subtab Switchers in Revenue view */
+  .subtab-switcher-row {
+    padding-bottom: 6px;
+    gap: 6px;
+  }
+
+  .subtab-btn {
+    padding: 7px 12px;
+    font-size: 11.5px;
+    border-radius: 10px;
+  }
+
+  /* Pagination Bar on Mobile */
+  .adm-pagination-bar,
+  .table-pagination-footer {
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    text-align: center;
+  }
+
+  .pagination-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .page-size-selector {
+    width: 100%;
+    justify-content: center;
+    margin-bottom: 4px;
+  }
+
+  /* Franchise Detail Page */
+  .detail-top-nav-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .hero-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-tabs-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+  }
+}
+
+/* ==========================================================================
+   BREAKPOINTS: EXTRA SMALL MOBILE SCREENS (<= 480px)
+   ========================================================================== */
+@media (max-width: 480px) {
+  .adm-view-title h1 {
+    font-size: 17px;
+  }
+
+  .title-with-pill {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .profile-save-btn,
+  .profile-password-btn,
+  .adm-action-btn {
+    font-size: 12px;
+    padding: 10px 14px;
+  }
+
+  .live-status-pill {
+    font-size: 9.5px;
+    padding: 3px 8px;
+  }
+
+  .activity-chips-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .neon-bar-chart-container {
+    height: 180px;
+  }
+
+  .stat-val-spark-row .mini-sparkline {
+    display: none;
+  }
+
+  .chart-period-tabs {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .period-pill {
+    flex: 1;
+    text-align: center;
+    padding: 5px 8px;
+    font-size: 11px;
+  }
+}
+
+/* ==========================================================================
+   LUXURY MODAL BACKDROP & BOX (DELETE CONFIRMATION & INVOICES)
+   ========================================================================== */
+.modal-backdrop-luxury {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+  padding: 20px;
+  box-sizing: border-box;
+  animation: modalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.luxury-wizard-box {
+  width: 100%;
+  max-width: 520px;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 24px;
+  box-shadow: 0 25px 60px -15px rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalScaleUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+  z-index: 100000;
+}
+
+@keyframes modalScaleUp {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}

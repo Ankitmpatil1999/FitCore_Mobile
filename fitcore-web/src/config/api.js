@@ -10,6 +10,9 @@ export const API_ENDPOINTS = {
   ADMIN_GYMS: `${API_URL}/admin/gyms`,
   ADMIN_VENDORS: `${API_URL}/admin/vendors`,
   ADMIN_MEMBERS: `${API_URL}/admin/members`,
+  ADMIN_TRANSACTIONS: `${API_URL}/admin/transactions`,
+  ADMIN_PROFILE: `${API_URL}/admin/profile`,
+  ADMIN_CHANGE_PASSWORD: `${API_URL}/admin/change-password`,
   
   // Auth & Notifications
   AUTH_LOGIN: `${API_URL}/auth/login`,

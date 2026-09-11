@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   BuildingIcon,
   UsersIcon,
@@ -407,38 +407,38 @@ export default function FranchiseDetailView({
       {/* Tab Content 3: Assigned Trainers & Coaches */}
       {activeSubTab === 'trainers' && (
         <div className="trainers-grid-cards">
-          {[
+          {(trainers && trainers.length > 0 ? trainers : [
             { name: 'Vikram Singh', role: 'Head Strength Coach', cert: 'CSCS & Olympic Weightlifting', rating: 4.9, athletes: 38, specialty: 'Hypertrophy & Powerlifting' },
             { name: 'Ananya Joshi', role: 'Master Yoga & Mobility Lead', cert: 'RYT 500 & Breathwork Specialist', rating: 5.0, athletes: 42, specialty: 'Vinyasa Flow & Biomechanics' },
             { name: 'Rohan Kapoor', role: 'HIIT & Combat Conditioning', cert: 'Kettlebell Lv2 & Boxing Coach', rating: 4.8, athletes: 29, specialty: 'Agility, Speed & HIIT' },
             { name: 'Pooja Verma', role: 'Clinical Dietitian & Nutritionist', cert: 'Sports Nutrition Specialist', rating: 4.9, athletes: 55, specialty: 'Metabolic & Fat Loss Protocols' }
-          ].map((coach, idx) => (
+          ]).map((coach, idx) => (
             <div key={idx} className="trainer-detail-card glass-card">
               <div className="trainer-top-row">
                 <div className="trainer-avatar-box">
-                  {coach.name.substring(0, 2).toUpperCase()}
+                  {(coach.name || 'TR').substring(0, 2).toUpperCase()}
                 </div>
                 <div className="trainer-title-col">
                   <h4 className="trainer-name">{coach.name}</h4>
-                  <span className="trainer-role-badge">{coach.role}</span>
+                  <span className="trainer-role-badge">{coach.role || 'Fitness Coach'}</span>
                 </div>
               </div>
               <div className="trainer-stats-row">
                 <div className="trainer-stat-pill">
-                  <StarIcon size={12} color="#f59e0b" /> {coach.rating} Rating
+                  <StarIcon size={12} color="#f59e0b" /> {coach.rating || 4.9} Rating
                 </div>
                 <div className="trainer-stat-pill">
-                  <UsersIcon size={12} color="#4f46e5" /> {coach.athletes} Athletes
+                  <UsersIcon size={12} color="#4f46e5" /> {coach.athletes || 25} Athletes
                 </div>
               </div>
               <div className="trainer-meta-info">
                 <div className="trainer-kv">
                   <span className="k">Specialty:</span>
-                  <span className="v">{coach.specialty}</span>
+                  <span className="v">{coach.specialty || 'General Fitness'}</span>
                 </div>
                 <div className="trainer-kv">
                   <span className="k">Certifications:</span>
-                  <span className="v">{coach.cert}</span>
+                  <span className="v">{coach.cert || 'Certified Trainer'}</span>
                 </div>
               </div>
             </div>

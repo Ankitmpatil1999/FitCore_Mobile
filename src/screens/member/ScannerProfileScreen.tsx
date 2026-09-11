@@ -141,6 +141,7 @@ export default function CheckInScreen({ navigation }: any) {
 
   // ── Handle Check-In ──
   const handleCheckIn = async () => {
+    if (actionLoading) return;
     try {
       setActionLoading(true);
       const memberId = currentMember?.id || currentUser?.id || 'm1';
@@ -159,6 +160,7 @@ export default function CheckInScreen({ navigation }: any) {
 
   // ── Handle Check-Out ──
   const handleCheckOut = async () => {
+    if (actionLoading) return;
     try {
       setActionLoading(true);
       const memberId = currentMember?.id || currentUser?.id || 'm1';

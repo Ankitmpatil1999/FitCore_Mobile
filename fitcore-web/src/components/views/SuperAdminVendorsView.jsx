@@ -1,14 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { API_URL } from '../../config/api';
 import CustomSelect from '../common/CustomSelect.jsx';
 import {
   StoreIcon,
-  UsersIcon,
-  LocationPinIcon,
   StarIcon,
   BoltIcon,
   ShieldCheckIcon,
-  EditIcon,
   CheckCircleIcon,
   SearchIcon,
   CreditCardIcon,
@@ -23,7 +20,7 @@ const CAT_LABELS = {
   sports_nutrition: 'Sports Nutrition Specialist',
 };
 
-export default function SuperAdminVendorsView({ vendors = [], setVendors, onRefresh }) {
+export default function SuperAdminVendorsView({ vendors = [], onRefresh }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -51,6 +48,7 @@ export default function SuperAdminVendorsView({ vendors = [], setVendors, onRefr
         alert(data.error || 'Failed to update status.');
       }
     } catch (err) {
+      console.error('Error updating vendor status:', err);
       alert('Error connecting to backend.');
     }
   };

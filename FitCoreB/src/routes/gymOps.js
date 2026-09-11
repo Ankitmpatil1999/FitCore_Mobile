@@ -65,6 +65,8 @@ router.post('/attendance/check-in', attendance.checkIn);
  *         description: Check-out recorded
  */
 router.post('/attendance/check-out', attendance.checkOut);
+router.post('/attendance/auto-checkout', attendance.triggerAutoCheckOut);
+
 
 /**
  * @swagger
