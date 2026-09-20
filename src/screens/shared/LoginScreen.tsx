@@ -85,7 +85,7 @@ export default function LoginScreen() {
     setMode(newMode);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setError('');
     setSuccess(false);
 
@@ -125,19 +125,26 @@ export default function LoginScreen() {
     }
 
     // Login mode
+    console.log('🔘 [LOGIN BUTTON PRESSED]', { mobileNumber, passwordLength: password.length });
     if (!mobileNumber) { setError('Mobile number is required.'); return; }
     if (mobileNumber.length < 10) { setError('Please enter a valid 10-digit mobile number.'); return; }
     if (!password) { setError('Password is required.'); return; }
 
     setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      const res = login(mobileNumber, password);
+    try {
+      console.log('🚀 [CALLING APP CONTEXT LOGIN] with:', mobileNumber);
+      const res = await login(mobileNumber, password);
+      console.log('📥 [LOGIN RESULT RECEIVED]:', res);
       if (!res.success) {
         setError(res.error || 'Invalid mobile number or password.');
       }
-    }, 800);
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
+
 
   // ─── Reusable Text Input ───
   const renderInput = (
@@ -255,21 +262,6 @@ export default function LoginScreen() {
                 <View style={styles.secureDot} />
                 <Text style={styles.secureBadgeText}>SMART ECOSYSTEM PORTAL</Text>
               </View>
-
-              <Text style={styles.headerTitle}>
-                {mode === 'login'
-                  ? 'Welcome Back 👋'
-                  : mode === 'forgot'
-                  ? 'Reset Password'
-                  : 'Create Account'}
-              </Text>
-              <Text style={styles.headerSubtitle}>
-                {mode === 'login'
-                  ? 'Sign in to access your biometric pass & gym workout hub'
-                  : mode === 'forgot'
-                  ? 'Enter your mobile number to recover your credentials'
-                  : 'Join FitCore India and unlock premier club access'}
-              </Text>
             </View>
 
             {/* Error Alert */}
@@ -323,6 +315,8 @@ export default function LoginScreen() {
                   )}
                 </TouchableOpacity>
 
+
+
                 <View style={styles.switchRow}>
                   <Text style={styles.switchText}>Don't have an account? </Text>
                   <TouchableOpacity onPress={() => handleModeChange('signup')}>
@@ -331,6 +325,7 @@ export default function LoginScreen() {
                 </View>
               </>
             )}
+
 
             {/* ─── FORGOT PASSWORD ─── */}
             {mode === 'forgot' && (

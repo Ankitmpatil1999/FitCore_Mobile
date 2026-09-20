@@ -28,20 +28,71 @@ interface Message {
   time: string;
 }
 
-const MOCK_MESSAGES: Message[] = [
-  { id: '1', from: 'trainer', text: 'Good morning! How did yesterday\'s chest workout go? Did you hit all 4 sets?', time: '08:05 AM' },
-  { id: '2', from: 'member', text: 'Good morning Coach! Yes, completed all sets. Bench press felt solid at 40kg!', time: '08:30 AM' },
-  { id: '3', from: 'trainer', text: 'Great progress! Today we have Back & Biceps scheduled. Focus on strict form for Lat Pulldowns.', time: '08:35 AM' },
-  { id: '4', from: 'member', text: 'Got it! Should I increase Deadlift load today?', time: '08:40 AM' },
-  { id: '5', from: 'trainer', text: 'Yes, aim for 75kg for 10 reps. Keep your core tight. See you at our 06:00 PM session! 🏋️', time: '08:45 AM' },
-];
+import { useAppContext } from '../../context/AppContext';
+import { apiService } from '../../services/api';
 
 export default function TrainerChatScreen({ route, navigation }: any) {
-  const { memberId, memberName } = route.params || {};
+  const { currentTrainer } = useAppContext();
+  const { memberId = 'm1', memberName = 'Arjun Mehta' } = route.params || {};
   const client = getMemberById(memberId);
-  const [messages, setMessages] = useState<Message[]>(MOCK_MESSAGES);
+  const trainerId = String(currentTrainer?.id || client?.trainerId || 't1');
+
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loading, setLoading] = useState(true);
   const [input, setInput] = useState('');
   const scrollViewRef = useRef<ScrollView>(null);
+
+  const [isMemberOnline, setIsMemberOnline] = useState(false);
+
+  // ── 1. Fetch live chat and presence from Backend API ──
+  const fetchMessages = async () => {
+    try {
+      const res: any = await apiService.getTrainerChatMessages(memberId);
+      if (res?.success && Array.isArray(res.data)) {
+        setMessages(res.data);
+      }
+      await apiService.markTrainerChatAsRead(memberId, undefined, 'trainer');
+
+      // Heartbeat Trainer Presence
+      await apiService.sendPresenceHeartbeat(trainerId, 'trainer', true);
+
+      // Check Member presence
+      const presRes: any = await apiService.getUserPresence(memberId);
+      if (presRes?.success) {
+        setIsMemberOnline(!!presRes.isOnline);
+      }
+    } catch (e) {
+      console.log('Error fetching messages on trainer side:', e);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages();
+    const interval = setInterval(() => {
+      apiService.getTrainerChatMessages(memberId).then((res: any) => {
+        if (res?.success && Array.isArray(res.data)) {
+          setMessages((prev) => {
+            if (res.data.length !== prev.length || JSON.stringify(res.data) !== JSON.stringify(prev)) {
+              return res.data;
+            }
+            return prev;
+          });
+        }
+      }).catch(() => {});
+
+      apiService.sendPresenceHeartbeat(trainerId, 'trainer', true).catch(() => {});
+      apiService.getUserPresence(memberId).then((p: any) => {
+        if (p?.success) {
+          setIsMemberOnline(!!p.isOnline);
+        }
+      }).catch(() => {});
+    }, 3500);
+
+    return () => {
+      clearInterval(interval);
+      apiService.sendPresenceHeartbeat(trainerId, 'trainer', false).catch(() => {});
+    };
+  }, [memberId, trainerId]);
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -68,33 +119,31 @@ export default function TrainerChatScreen({ route, navigation }: any) {
     scrollViewRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (!input.trim()) return;
+    const content = input.trim();
     const now = new Date();
     const time = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const localMsgId = `temp_${Date.now()}`;
     const newMsg: Message = {
-      id: Date.now().toString(),
+      id: localMsgId,
       from: 'trainer',
-      text: input.trim(),
+      text: content,
       time,
     };
     setMessages((prev) => [...prev, newMsg]);
     setInput('');
 
-    setTimeout(() => {
-      const replies = [
-        'Understood Coach! Will log my sets right after.',
-        'Thanks for the tip! Looking forward to today’s session. 💪',
-        'Should I take whey protein immediately after the session?',
-      ];
-      const reply: Message = {
-        id: (Date.now() + 1).toString(),
-        from: 'member',
-        text: replies[Math.floor(Math.random() * replies.length)],
-        time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, reply]);
-    }, 1000);
+    try {
+      await apiService.sendTrainerChatMessage({
+        memberId,
+        from: 'trainer',
+        text: content,
+        senderName: 'Coach',
+      });
+    } catch (e) {
+      console.log('Error sending message from trainer:', e);
+    }
   };
 
   return (
@@ -122,8 +171,20 @@ export default function TrainerChatScreen({ route, navigation }: any) {
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>{memberName || client?.name || 'Arjun Mehta'}</Text>
             <View style={styles.onlineRow}>
-              <View style={styles.onlineDot} />
-              <Text style={styles.onlineText}>Online • Client</Text>
+              <View
+                style={[
+                  styles.onlineDot,
+                  { backgroundColor: isMemberOnline ? '#10B981' : '#94A3B8' },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.onlineText,
+                  { color: isMemberOnline ? '#10B981' : '#64748B' },
+                ]}
+              >
+                {isMemberOnline ? 'Online • Athlete' : 'Offline • Athlete'}
+              </Text>
             </View>
           </View>
 
@@ -138,32 +199,63 @@ export default function TrainerChatScreen({ route, navigation }: any) {
           contentContainerStyle={styles.messagesScroll}
           showsVerticalScrollIndicator={false}
         >
-          {messages.map((msg) => {
-            const isTrainer = msg.from === 'trainer';
-            return (
-              <View
-                key={msg.id}
-                style={[
-                  styles.msgWrapper,
-                  isTrainer ? styles.msgWrapperTrainer : styles.msgWrapperMember,
-                ]}
-              >
+          {messages.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconBg}>
+                <Icon name="chatbubbles-outline" size={moderateScale(32)} color="#6C5CE7" />
+              </View>
+              <Text style={styles.emptyTitle}>Direct Athlete Chat</Text>
+              <Text style={styles.emptySub}>
+                Start chatting with {memberName || client?.name || 'Athlete'}. Guide workouts, diet, and form checks directly in real-time.
+              </Text>
+
+              <Text style={styles.quickPromptsTitle}>QUICK GUIDANCE TEMPLATES</Text>
+              <View style={styles.promptChipsRow}>
+                {[
+                  "💪 How did today's workout feel?",
+                  "🥗 Remember to hit your protein goal!",
+                  "🏋️ Ready for our 1-on-1 PT session?",
+                  "💧 Keep your hydration at 3.5L+ today.",
+                ].map((txt, idx) => (
+                  <TouchableOpacity
+                    key={idx}
+                    style={styles.promptChip}
+                    onPress={() => setInput(txt)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.promptChipText}>{txt}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ) : (
+            messages.map((msg) => {
+              const isTrainer = msg.from === 'trainer';
+              return (
                 <View
+                  key={msg.id}
                   style={[
-                    styles.msgBubble,
-                    isTrainer ? styles.bubbleTrainer : styles.bubbleMember,
+                    styles.msgWrapper,
+                    isTrainer ? styles.msgWrapperTrainer : styles.msgWrapperMember,
                   ]}
                 >
-                  <Text style={[styles.msgText, isTrainer && styles.msgTextTrainer]}>
-                    {msg.text}
-                  </Text>
-                  <Text style={[styles.msgTime, isTrainer && styles.msgTimeTrainer]}>
-                    {msg.time}
-                  </Text>
+                  <View
+                    style={[
+                      styles.msgBubble,
+                      isTrainer ? styles.bubbleTrainer : styles.bubbleMember,
+                    ]}
+                  >
+                    <Text style={[styles.msgText, isTrainer && styles.msgTextTrainer]}>
+                      {msg.text}
+                    </Text>
+                    <Text style={[styles.msgTime, isTrainer && styles.msgTimeTrainer]}>
+                      {msg.time}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            );
-          })}
+              );
+            })
+          )}
         </ScrollView>
 
         {/* ── INPUT BAR ── */}
@@ -358,5 +450,65 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: {
     backgroundColor: '#C7D2FE',
+  },
+
+  // Empty State Styles
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(4),
+    paddingHorizontal: wp(6),
+  },
+  emptyIconBg: {
+    width: moderateScale(64),
+    height: moderateScale(64),
+    borderRadius: moderateScale(32),
+    backgroundColor: '#ECEAFD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: moderateScale(14),
+  },
+  emptyTitle: {
+    fontSize: fontScale(17),
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  emptySub: {
+    fontSize: fontScale(12),
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: fontScale(18),
+    marginBottom: hp(3),
+  },
+  quickPromptsTitle: {
+    fontSize: fontScale(10.5),
+    fontWeight: '800',
+    color: '#6C5CE7',
+    letterSpacing: 0.8,
+    marginBottom: moderateScale(10),
+    alignSelf: 'flex-start',
+  },
+  promptChipsRow: {
+    width: '100%',
+    gap: moderateScale(8),
+  },
+  promptChip: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(10),
+    borderRadius: moderateScale(12),
+    elevation: 1,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 3,
+  },
+  promptChipText: {
+    fontSize: fontScale(12),
+    fontWeight: '600',
+    color: '#0F172A',
   },
 });

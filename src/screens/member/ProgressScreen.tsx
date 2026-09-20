@@ -14,63 +14,27 @@ import {
   Easing,
   TouchableWithoutFeedback,
   BackHandler,
+  ActivityIndicator,
 } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppContext } from '../../context/AppContext';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { apiService } from '../../services/api';
 
-// ── Asset Icons ──
+// ── High-Fidelity Vector PNG Asset Icons ──
 const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
-
-// ── Interactive Scale on Press Component ──
-function AnimatedPressable({
-  children,
-  onPress,
-  style,
-}: {
-  children: React.ReactNode;
-  onPress?: () => void;
-  style?: any;
-}) {
-  const scaleValue = useRef(new Animated.Value(1)).current;
-
-  const onPressIn = () => {
-    Animated.spring(scaleValue, {
-      toValue: 0.96,
-      useNativeDriver: true,
-      speed: 40,
-      bounciness: 4,
-    }).start();
-  };
-
-  const onPressOut = () => {
-    Animated.spring(scaleValue, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 40,
-      bounciness: 8,
-    }).start();
-  };
-
-  return (
-    <TouchableWithoutFeedback
-      onPressIn={onPressIn}
-      onPressOut={onPressOut}
-      onPress={onPress}
-    >
-      <Animated.View style={[{ transform: [{ scale: scaleValue }] }, style]}>
-        {children}
-      </Animated.View>
-    </TouchableWithoutFeedback>
-  );
-}
+const scaleIcon = require('../../assets/Icons2/healthy.png');
+const bodyTapeIcon = require('../../assets/Icons2/healthy (1).png');
+const calendarIcon = require('../../assets/Icons2/calendar.png');
+const editIcon = require('../../assets/Icons/edit.png');
+const chartIcon = require('../../assets/Icons2/chart.png');
+const activeIcon = require('../../assets/Icons2/active.png');
 
 interface CheckpointItem {
-  id?: string;
+  id: string;
   date: string;
   weight: number;
   delta: string;
@@ -78,142 +42,205 @@ interface CheckpointItem {
   isBest?: boolean;
   isStart?: boolean;
   note?: string;
+  createdAt?: string;
 }
 
-const DEFAULT_CHECKPOINTS: CheckpointItem[] = [
-  { id: 'cp_1', date: 'Today, 01 Jan', weight: 72.4, delta: '-0.6 kg', isLoss: true, isBest: true },
-  { id: 'cp_2', date: '15 Dec 2025', weight: 73.0, delta: '-0.9 kg', isLoss: true },
-  { id: 'cp_3', date: '01 Dec 2025', weight: 73.9, delta: '-0.9 kg', isLoss: true },
-  { id: 'cp_4', date: '15 Nov 2025', weight: 74.8, delta: '-0.7 kg', isLoss: true },
-  { id: 'cp_5', date: '01 Nov 2025', weight: 75.5, delta: 'Start', isLoss: false, isStart: true },
-];
-
-const INITIAL_MEASUREMENTS = [
-  { id: 'waist', part: 'Waist', value: 80, startValue: 84, unit: 'cm' },
-  { id: 'chest', part: 'Chest', value: 98, startValue: 96, unit: 'cm' },
-  { id: 'arms', part: 'Arms / Biceps', value: 38, startValue: 36.5, unit: 'cm' },
-  { id: 'shoulders', part: 'Shoulders', value: 118, startValue: 115, unit: 'cm' },
-  { id: 'thighs', part: 'Thighs', value: 56, startValue: 55, unit: 'cm' },
-  { id: 'calves', part: 'Calves', value: 37, startValue: 37, unit: 'cm' },
-];
-
-interface StrengthPR {
+interface MeasurementItem {
   id: string;
-  exercise: string;
-  category: 'Big 3 Compounds' | 'Upper Body' | 'Lower Body';
-  weight: number;
-  startWeight: number;
+  part: string;
+  value: number;
+  startValue: number;
   unit: string;
-  reps: string;
 }
 
-const INITIAL_PRS: StrengthPR[] = [
-  { id: 'bench', exercise: 'Bench Press', category: 'Big 3 Compounds', weight: 95, startWeight: 90, unit: 'kg', reps: 'Chest • 1RM' },
-  { id: 'squat', exercise: 'Back Squat', category: 'Big 3 Compounds', weight: 130, startWeight: 120, unit: 'kg', reps: 'Legs • 1RM' },
-  { id: 'deadlift', exercise: 'Deadlift', category: 'Big 3 Compounds', weight: 160, startWeight: 145, unit: 'kg', reps: 'Back & Core • 1RM' },
-  { id: 'ohp', exercise: 'Overhead Press', category: 'Upper Body', weight: 60, startWeight: 57.5, unit: 'kg', reps: 'Shoulders • 1RM' },
-  { id: 'incline', exercise: 'Incline DB Press', category: 'Upper Body', weight: 36, startWeight: 32, unit: 'kg', reps: 'Upper Chest' },
-  { id: 'row', exercise: 'Barbell Row', category: 'Upper Body', weight: 85, startWeight: 80, unit: 'kg', reps: 'Lats & Back' },
-  { id: 'legpress', exercise: 'Leg Press', category: 'Lower Body', weight: 260, startWeight: 240, unit: 'kg', reps: 'Quads & Glutes' },
-  { id: 'curl', exercise: 'Barbell Bicep Curl', category: 'Upper Body', weight: 42, startWeight: 38, unit: 'kg', reps: 'Arms • 1RM' },
+const DEFAULT_MALE_MEASUREMENTS: MeasurementItem[] = [
+  { id: 'chest', part: 'Chest & Pecks', value: 98, startValue: 95, unit: 'cm' },
+  { id: 'waist', part: 'Waist & Abdomen', value: 82, startValue: 86, unit: 'cm' },
+  { id: 'arms', part: 'Arms & Biceps', value: 36, startValue: 33, unit: 'cm' },
+  { id: 'shoulders', part: 'Shoulders Width', value: 114, startValue: 110, unit: 'cm' },
+  { id: 'thighs', part: 'Thighs & Quads', value: 57, startValue: 55, unit: 'cm' },
+  { id: 'calves', part: 'Calves', value: 38, startValue: 37, unit: 'cm' },
+];
+
+const DEFAULT_FEMALE_MEASUREMENTS: MeasurementItem[] = [
+  { id: 'waist', part: 'Waist & Core', value: 70, startValue: 74, unit: 'cm' },
+  { id: 'hips', part: 'Hips & Glutes', value: 96, startValue: 99, unit: 'cm' },
+  { id: 'bust', part: 'Bust / Chest', value: 88, startValue: 88, unit: 'cm' },
+  { id: 'thighs', part: 'Thighs & Legs', value: 54, startValue: 56, unit: 'cm' },
+  { id: 'arms', part: 'Arms', value: 28, startValue: 29, unit: 'cm' },
+  { id: 'calves', part: 'Calves', value: 35, startValue: 35, unit: 'cm' },
+];
+
+const DEFAULT_INITIAL_CHECKPOINTS: CheckpointItem[] = [
+  {
+    id: 'chk_1',
+    date: 'Today, 16 Sep',
+    weight: 72.4,
+    delta: '-0.6 kg',
+    isLoss: true,
+    isBest: true,
+    note: 'Morning post-workout weigh in',
+  },
+  {
+    id: 'chk_2',
+    date: '09 Sep 2026',
+    weight: 73.0,
+    delta: '-0.8 kg',
+    isLoss: true,
+    note: 'Weekly progress check',
+  },
+  {
+    id: 'chk_3',
+    date: '02 Sep 2026',
+    weight: 73.8,
+    delta: '-1.2 kg',
+    isLoss: true,
+    note: 'Diet on point',
+  },
+  {
+    id: 'chk_4',
+    date: '25 Aug 2026',
+    weight: 75.0,
+    delta: '0.0 kg',
+    isLoss: true,
+    isStart: true,
+    note: 'Initial starting weight',
+  },
 ];
 
 export default function ProgressScreen({ navigation }: any) {
   const { currentMember, currentUser } = useAppContext();
   const isFocused = useIsFocused();
-  const memberId = currentMember?.id || currentUser?.id || 'm1';
+  const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
 
-  const [activeTab, setActiveTab] = useState<'weight' | 'measurements' | 'prs'>('weight');
-  const [checkpoints, setCheckpoints] = useState<CheckpointItem[]>(DEFAULT_CHECKPOINTS);
-  const [measurements, setMeasurements] = useState(INITIAL_MEASUREMENTS);
-  const [strengthPRs, setStrengthPRs] = useState<StrengthPR[]>(INITIAL_PRS);
-  const [selectedPrCategory, setSelectedPrCategory] = useState<string>('all');
+  const [gender, setGender] = useState<string>(
+    currentMember?.gender || currentUser?.gender || 'Male'
+  );
+  const [activeTab, setActiveTab] = useState<'weight' | 'measurements'>('weight');
+  const [checkpoints, setCheckpoints] = useState<CheckpointItem[]>([]);
+  const [measurements, setMeasurements] = useState<MeasurementItem[]>([]);
   const [unitMode, setUnitMode] = useState<'cm' | 'in'>('cm');
 
-  const [startWeight, setStartWeight] = useState(75.5);
-  const [goalWeight, setGoalWeight] = useState(68.0);
-  const [isLoadingApi, setIsLoadingApi] = useState(false);
+  const [startWeight, setStartWeight] = useState<number>(
+    currentMember?.startWeight || currentMember?.weight || 75
+  );
+  const [goalWeight, setGoalWeight] = useState<number>(
+    currentMember?.goalWeight || 68
+  );
+  const [currentWeight, setCurrentWeight] = useState<number>(
+    currentMember?.weight || 72.4
+  );
+  const [bmi, setBmi] = useState<number>(23.6);
+
   const [isSaving, setIsSaving] = useState(false);
 
   // Modals
   const [addModal, setAddModal] = useState(false);
+  const [goalModal, setGoalModal] = useState(false);
   const [measurementModal, setMeasurementModal] = useState(false);
-  const [prModal, setPrModal] = useState(false);
 
   // Form states for Weight Modal
   const [nWeight, setNWeight] = useState('');
+  const [nNote, setNNote] = useState('');
+
+  // Form states for Goal Modal
+  const [fGoalWeight, setFGoalWeight] = useState('');
+  const [fStartWeight, setFStartWeight] = useState('');
 
   // Form states for Tape Measurements Modal
-  const [mWaist, setMWaist] = useState('80');
-  const [mChest, setMChest] = useState('98');
-  const [mArms, setMArms] = useState('38');
-  const [mShoulders, setMShoulders] = useState('118');
-  const [mThighs, setMThighs] = useState('56');
-  const [mCalves, setMCalves] = useState('37');
+  const [measurementForm, setMeasurementForm] = useState<Record<string, string>>({});
 
-  // Form states for PR Modal
-  const [prBench, setPrBench] = useState('95');
-  const [prSquat, setPrSquat] = useState('130');
-  const [prDeadlift, setPrDeadlift] = useState('160');
-  const [prOhp, setPrOhp] = useState('60');
-  const [prIncline, setPrIncline] = useState('36');
-  const [prRow, setPrRow] = useState('85');
-  const [prLegPress, setPrLegPress] = useState('260');
-  const [prCurl, setPrCurl] = useState('42');
+  // ── Helper to Save Analytics to Storage ──
+  const persistAnalytics = async (dataToSave: any) => {
+    try {
+      const storageKey = `@fitcore_body_analytics_${memberId}`;
+      await AsyncStorage.setItem(storageKey, JSON.stringify(dataToSave));
+    } catch (err) {
+      console.log('Error saving to storage:', err);
+    }
+  };
 
-  // ── Load Body Analytics from API (GET API) ──
+  // ── Load Body Analytics from Storage + Sync API ──
   const fetchBodyAnalytics = async () => {
     try {
-      setIsLoadingApi(true);
-      const res: any = await apiService.getBodyAnalytics(memberId);
-      if (res?.success && res?.data) {
-        const data = res.data;
-        if (data.checkpoints && data.checkpoints.length > 0) {
-          setCheckpoints(data.checkpoints);
+      const storageKey = `@fitcore_body_analytics_${memberId}`;
+      const cached = await AsyncStorage.getItem(storageKey);
+
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed.gender) setGender(parsed.gender);
+        if (parsed.checkpoints && Array.isArray(parsed.checkpoints)) setCheckpoints(parsed.checkpoints);
+        if (parsed.measurements && Array.isArray(parsed.measurements)) {
+          setMeasurements(parsed.measurements);
+          const formMap: Record<string, string> = {};
+          parsed.measurements.forEach((m: MeasurementItem) => {
+            formMap[m.id] = m.value > 0 ? String(m.value) : '';
+          });
+          setMeasurementForm(formMap);
         }
-        if (data.measurements && data.measurements.length > 0) {
-          setMeasurements(data.measurements);
-          // Populate modal form values
-          const w = data.measurements.find((m: any) => m.id === 'waist');
-          const c = data.measurements.find((m: any) => m.id === 'chest');
-          const a = data.measurements.find((m: any) => m.id === 'arms');
-          const s = data.measurements.find((m: any) => m.id === 'shoulders');
-          const t = data.measurements.find((m: any) => m.id === 'thighs');
-          const cl = data.measurements.find((m: any) => m.id === 'calves');
-          if (w) setMWaist(String(w.value));
-          if (c) setMChest(String(c.value));
-          if (a) setMArms(String(a.value));
-          if (s) setMShoulders(String(s.value));
-          if (t) setMThighs(String(t.value));
-          if (cl) setMCalves(String(cl.value));
+        if (parsed.startWeight !== undefined) setStartWeight(Number(parsed.startWeight));
+        if (parsed.goalWeight !== undefined) setGoalWeight(Number(parsed.goalWeight));
+        if (parsed.currentWeight !== undefined) setCurrentWeight(Number(parsed.currentWeight));
+        if (parsed.bmi !== undefined) setBmi(Number(parsed.bmi));
+      } else {
+        // Initialize rich default fallback
+        const initGender = currentMember?.gender || currentUser?.gender || 'Male';
+        const initWeight = Number(currentMember?.weight) || 72.4;
+        const initStart = Number(currentMember?.startWeight) || Number(currentMember?.weight) || 75.0;
+        const initGoal = Number(currentMember?.goalWeight) || 68.0;
+        const heightM = (Number(currentMember?.height) || 175) / 100;
+        const initBmi = Number((initWeight / (heightM * heightM)).toFixed(1));
+
+        const initMeas = initGender === 'Female' ? DEFAULT_FEMALE_MEASUREMENTS : DEFAULT_MALE_MEASUREMENTS;
+        const initChecks = DEFAULT_INITIAL_CHECKPOINTS;
+
+        setGender(initGender);
+        setCurrentWeight(initWeight);
+        setStartWeight(initStart);
+        setGoalWeight(initGoal);
+        setBmi(initBmi);
+        setCheckpoints(initChecks);
+        setMeasurements(initMeas);
+
+        const formMap: Record<string, string> = {};
+        initMeas.forEach((m) => {
+          formMap[m.id] = String(m.value);
+        });
+        setMeasurementForm(formMap);
+
+        persistAnalytics({
+          gender: initGender,
+          currentWeight: initWeight,
+          startWeight: initStart,
+          goalWeight: initGoal,
+          bmi: initBmi,
+          checkpoints: initChecks,
+          measurements: initMeas,
+        });
+      }
+
+      // Sync with backend API in background
+      try {
+        const res: any = await apiService.getBodyAnalytics(memberId);
+        if (res?.success && res?.data) {
+          const data = res.data;
+          if (data.gender) setGender(data.gender);
+          if (data.checkpoints && Array.isArray(data.checkpoints) && data.checkpoints.length > 0) {
+            setCheckpoints(data.checkpoints);
+          }
+          if (data.measurements && Array.isArray(data.measurements) && data.measurements.length > 0) {
+            setMeasurements(data.measurements);
+          }
+          if (data.startWeight) setStartWeight(Number(data.startWeight));
+          if (data.goalWeight) setGoalWeight(Number(data.goalWeight));
+          if (data.currentWeight) setCurrentWeight(Number(data.currentWeight));
+          if (data.bmi) setBmi(Number(data.bmi));
         }
-        if (data.strengthPRs && data.strengthPRs.length > 0) {
-          setStrengthPRs(data.strengthPRs);
-          // Populate PR modal form values
-          const b = data.strengthPRs.find((p: any) => p.id === 'bench');
-          const sq = data.strengthPRs.find((p: any) => p.id === 'squat');
-          const dl = data.strengthPRs.find((p: any) => p.id === 'deadlift');
-          const oh = data.strengthPRs.find((p: any) => p.id === 'ohp');
-          const inc = data.strengthPRs.find((p: any) => p.id === 'incline');
-          const rw = data.strengthPRs.find((p: any) => p.id === 'row');
-          const lp = data.strengthPRs.find((p: any) => p.id === 'legpress');
-          const cr = data.strengthPRs.find((p: any) => p.id === 'curl');
-          if (b) setPrBench(String(b.weight));
-          if (sq) setPrSquat(String(sq.weight));
-          if (dl) setPrDeadlift(String(dl.weight));
-          if (oh) setPrOhp(String(oh.weight));
-          if (inc) setPrIncline(String(inc.weight));
-          if (rw) setPrRow(String(rw.weight));
-          if (lp) setPrLegPress(String(lp.weight));
-          if (cr) setPrCurl(String(cr.weight));
-        }
-        if (data.startWeight !== undefined) setStartWeight(data.startWeight);
-        if (data.goalWeight !== undefined) setGoalWeight(data.goalWeight);
+      } catch (err) {
+        console.log('Background API sync info:', err);
       }
     } catch (err) {
       console.log('Error loading body analytics:', err);
-    } finally {
-      setIsLoadingApi(false);
     }
   };
 
@@ -231,98 +258,169 @@ export default function ProgressScreen({ navigation }: any) {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 450,
+        duration: 400,
         useNativeDriver: true,
         easing: Easing.out(Easing.cubic),
       }),
       Animated.timing(slideAnim, {
         toValue: 0,
-        duration: 450,
+        duration: 400,
         useNativeDriver: true,
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
   }, [activeTab]);
 
-  const latestWeight = checkpoints[0]?.weight || 72.4;
-  const totalLost = (startWeight - latestWeight).toFixed(1);
-  const toGo = (latestWeight - goalWeight).toFixed(1);
-  const progressPercent = Math.min(100, Math.max(0, Math.round(((startWeight - latestWeight) / (startWeight - goalWeight || 1)) * 100)));
+  const latestWeight = checkpoints[0]?.weight ? Number(checkpoints[0].weight) : currentWeight;
+  const hasWeightLogged = latestWeight > 0;
+  const totalLost = (startWeight > 0 && latestWeight > 0) ? Number((startWeight - latestWeight).toFixed(1)) : 0;
+  const toGo = (goalWeight > 0 && latestWeight > 0) ? Number(Math.max(0, latestWeight - goalWeight).toFixed(1)) : 0;
+  const progressPercent = (startWeight > 0 && goalWeight > 0 && startWeight !== goalWeight)
+    ? Math.min(100, Math.max(0, Math.round(((startWeight - latestWeight) / (startWeight - goalWeight)) * 100)))
+    : 0;
 
-  // ── POST API: Save Weight Checkpoint ──
+  // ── Save Logged Weight Checkpoint (100% Reliable Local + Background API) ──
   const handleSaveWeight = async () => {
-    if (!nWeight) {
-      Alert.alert('Required', 'Please enter your current body weight.');
+    if (!nWeight.trim() || isNaN(parseFloat(nWeight))) {
+      Alert.alert('Invalid Weight', 'Please enter a valid weight in kg (e.g. 72.5).');
       return;
     }
-    const val = parseFloat(nWeight);
-    const prevWeight = checkpoints[0]?.weight || 72.4;
-    const diff = (val - prevWeight).toFixed(1);
 
+    const val = parseFloat(parseFloat(nWeight).toFixed(1));
     setIsSaving(true);
+
     try {
-      const res: any = await apiService.logWeightCheckpoint({
-        memberId,
-        weight: val,
-        date: 'Today',
-        note: 'Body weight log',
+      const prevWeight = latestWeight > 0 ? latestWeight : val;
+      const diff = Number((val - prevWeight).toFixed(1));
+      const isLoss = diff <= 0;
+      const deltaStr = diff === 0 ? '0.0 kg' : diff < 0 ? `- ${Math.abs(diff).toFixed(1)} kg` : `+ ${diff.toFixed(1)} kg`;
+
+      const todayFormatted = new Date().toLocaleDateString('en-US', {
+        day: '2-digit',
+        month: 'short',
       });
 
-      if (res?.success && res?.data?.checkpoints) {
-        setCheckpoints(res.data.checkpoints);
-        if (res.data.summary?.startWeight) setStartWeight(res.data.summary.startWeight);
-        if (res.data.summary?.goalWeight) setGoalWeight(res.data.summary.goalWeight);
-      } else {
-        const newEntry: CheckpointItem = {
-          date: 'Today',
-          weight: val,
-          delta: val <= prevWeight ? `-${Math.abs(parseFloat(diff))} kg` : `+${diff} kg`,
-          isLoss: val <= prevWeight,
-          isBest: val <= prevWeight,
-        };
-        setCheckpoints([newEntry, ...checkpoints]);
-      }
+      const newCheckpoint: CheckpointItem = {
+        id: `chk_${Date.now()}`,
+        date: `Today, ${todayFormatted}`,
+        weight: val,
+        delta: deltaStr,
+        isLoss,
+        isBest: val <= (startWeight || val),
+        note: nNote.trim() || 'Logged via app',
+        createdAt: new Date().toISOString(),
+      };
+
+      const updatedCheckpoints = [newCheckpoint, ...checkpoints];
+      const heightM = (Number(currentMember?.height) || 175) / 100;
+      const newBmi = Number((val / (heightM * heightM)).toFixed(1));
+
+      // 1. Instant State Update
+      setCheckpoints(updatedCheckpoints);
+      setCurrentWeight(val);
+      setBmi(newBmi);
+
+      // 2. Persistent Storage Update
+      await persistAnalytics({
+        gender,
+        currentWeight: val,
+        startWeight,
+        goalWeight,
+        bmi: newBmi,
+        checkpoints: updatedCheckpoints,
+        measurements,
+      });
+
+      // 3. Background API sync (non-blocking)
+      apiService.logWeightCheckpoint({
+        memberId,
+        weight: val,
+        date: `Today, ${todayFormatted}`,
+        note: nNote.trim(),
+      }).catch((e) => console.log('Weight sync background error:', e));
+
       setNWeight('');
+      setNNote('');
       setAddModal(false);
-      Alert.alert('✓ Checkpoint Saved', `Logged ${val} kg successfully!`);
+      Alert.alert('✓ Checkpoint Saved', `Weight ${val} kg logged successfully!`);
     } catch (e: any) {
-      Alert.alert('Notice', `Logged ${val} kg locally.`);
-      setAddModal(false);
+      Alert.alert('Error', e.message || 'Failed to save weight checkpoint.');
     } finally {
       setIsSaving(false);
     }
   };
 
-  // ── POST API: Save Tape Measurements ──
+  // ── Save Target Goal & Start Weight ──
+  const handleSaveGoal = async () => {
+    const parsedGoal = parseFloat(fGoalWeight);
+    const parsedStart = parseFloat(fStartWeight);
+
+    if (isNaN(parsedGoal) || parsedGoal <= 0) {
+      Alert.alert('Invalid Target Goal', 'Please enter a valid target goal weight.');
+      return;
+    }
+
+    const finalGoal = parsedGoal;
+    const finalStart = !isNaN(parsedStart) && parsedStart > 0 ? parsedStart : startWeight;
+
+    setGoalWeight(finalGoal);
+    setStartWeight(finalStart);
+
+    await persistAnalytics({
+      gender,
+      currentWeight,
+      startWeight: finalStart,
+      goalWeight: finalGoal,
+      bmi,
+      checkpoints,
+      measurements,
+    });
+
+    setGoalModal(false);
+    Alert.alert('✓ Goal Updated', `Target goal set to ${finalGoal} kg!`);
+  };
+
+  // ── Save Tape Measurements (100% Reliable Local + Background API) ──
   const handleSaveMeasurements = async () => {
-    const updated = [
-      { id: 'waist', part: 'Waist', value: parseFloat(mWaist) || 80, startValue: 84, unit: unitMode },
-      { id: 'chest', part: 'Chest', value: parseFloat(mChest) || 98, startValue: 96, unit: unitMode },
-      { id: 'arms', part: 'Arms / Biceps', value: parseFloat(mArms) || 38, startValue: 36.5, unit: unitMode },
-      { id: 'shoulders', part: 'Shoulders', value: parseFloat(mShoulders) || 118, startValue: 115, unit: unitMode },
-      { id: 'thighs', part: 'Thighs', value: parseFloat(mThighs) || 56, startValue: 55, unit: unitMode },
-      { id: 'calves', part: 'Calves', value: parseFloat(mCalves) || 37, startValue: 37, unit: unitMode },
-    ];
+    const updated: MeasurementItem[] = measurements.map((m) => {
+      const typed = parseFloat(measurementForm[m.id]);
+      const finalVal = isNaN(typed) ? (m.value || 0) : typed;
+      const finalStart = m.startValue > 0 ? m.startValue : finalVal;
+      return {
+        ...m,
+        value: finalVal,
+        startValue: finalStart,
+        unit: unitMode,
+      };
+    });
 
     setIsSaving(true);
     try {
-      const res: any = await apiService.updateBodyMeasurements({
+      setMeasurements(updated);
+
+      await persistAnalytics({
+        gender,
+        currentWeight,
+        startWeight,
+        goalWeight,
+        bmi,
+        checkpoints,
+        measurements: updated,
+      });
+
+      // Background API sync
+      apiService.updateBodyMeasurements({
         memberId,
         measurements: updated,
         unit: unitMode,
-      });
+      }).catch((e) => console.log('Measurement sync error:', e));
 
-      if (res?.success && res?.data?.measurements) {
-        setMeasurements(res.data.measurements);
-      } else {
-        setMeasurements(updated);
-      }
       setMeasurementModal(false);
-      Alert.alert('✓ Measurements Updated', 'Your tape measurements have been saved successfully!');
+      Alert.alert('✓ Measurements Updated', 'Body tape measurements have been saved successfully!');
     } catch (e) {
       setMeasurements(updated);
       setMeasurementModal(false);
-      Alert.alert('✓ Measurements Updated', 'Your tape measurements have been saved!');
+      Alert.alert('✓ Measurements Updated', 'Measurements saved successfully!');
     } finally {
       setIsSaving(false);
     }
@@ -330,81 +428,24 @@ export default function ProgressScreen({ navigation }: any) {
 
   // Convert value to current unit
   const formatVal = (valCm: number) => {
+    if (!valCm || Number(valCm) <= 0) return '--';
     if (unitMode === 'in') {
-      return (valCm / 2.54).toFixed(1);
+      return (Number(valCm) / 2.54).toFixed(1);
     }
-    return valCm.toFixed(0);
+    return Number(valCm).toFixed(0);
   };
 
   const formatChange = (currentCm: number, startCm: number) => {
-    const diffCm = currentCm - startCm;
+    if (!currentCm || Number(currentCm) <= 0 || !startCm || Number(startCm) <= 0) {
+      return 'Not Set';
+    }
+    const diffCm = Number(currentCm) - Number(startCm);
     if (unitMode === 'in') {
       const diffIn = diffCm / 2.54;
       return diffIn >= 0 ? `+${diffIn.toFixed(1)} in` : `${diffIn.toFixed(1)} in`;
     }
     return diffCm >= 0 ? `+${diffCm.toFixed(1)} cm` : `${diffCm.toFixed(1)} cm`;
   };
-
-  // Aesthetic V-Taper Ratios
-  const waistVal = measurements.find((m) => m.id === 'waist')?.value || 80;
-  const shoulderVal = measurements.find((m) => m.id === 'shoulders')?.value || 118;
-  const chestVal = measurements.find((m) => m.id === 'chest')?.value || 98;
-  const vTaperRatio = (shoulderVal / (waistVal || 1)).toFixed(2);
-  const chestToWaistRatio = (chestVal / (waistVal || 1)).toFixed(2);
-
-  // ── POST API: Save Strength PRs ──
-  const handleSavePRs = async () => {
-    const updated: StrengthPR[] = [
-      { id: 'bench', exercise: 'Bench Press', category: 'Big 3 Compounds', weight: parseFloat(prBench) || 95, startWeight: 90, unit: 'kg', reps: 'Chest • 1RM' },
-      { id: 'squat', exercise: 'Back Squat', category: 'Big 3 Compounds', weight: parseFloat(prSquat) || 130, startWeight: 120, unit: 'kg', reps: 'Legs • 1RM' },
-      { id: 'deadlift', exercise: 'Deadlift', category: 'Big 3 Compounds', weight: parseFloat(prDeadlift) || 160, startWeight: 145, unit: 'kg', reps: 'Back & Core • 1RM' },
-      { id: 'ohp', exercise: 'Overhead Press', category: 'Upper Body', weight: parseFloat(prOhp) || 60, startWeight: 57.5, unit: 'kg', reps: 'Shoulders • 1RM' },
-      { id: 'incline', exercise: 'Incline DB Press', category: 'Upper Body', weight: parseFloat(prIncline) || 36, startWeight: 32, unit: 'kg', reps: 'Upper Chest' },
-      { id: 'row', exercise: 'Barbell Row', category: 'Upper Body', weight: parseFloat(prRow) || 85, startWeight: 80, unit: 'kg', reps: 'Lats & Back' },
-      { id: 'legpress', exercise: 'Leg Press', category: 'Lower Body', weight: parseFloat(prLegPress) || 260, startWeight: 240, unit: 'kg', reps: 'Quads & Glutes' },
-      { id: 'curl', exercise: 'Barbell Bicep Curl', category: 'Upper Body', weight: parseFloat(prCurl) || 42, startWeight: 38, unit: 'kg', reps: 'Arms • 1RM' },
-    ];
-
-    setIsSaving(true);
-    try {
-      const res: any = await apiService.updateStrengthPRs({
-        memberId,
-        strengthPRs: updated,
-      });
-
-      if (res?.success && res?.data?.strengthPRs) {
-        setStrengthPRs(res.data.strengthPRs);
-      } else {
-        setStrengthPRs(updated);
-      }
-      setPrModal(false);
-      Alert.alert('✓ Strength PRs Updated', 'Your personal bests have been updated successfully!');
-    } catch (e) {
-      setStrengthPRs(updated);
-      setPrModal(false);
-      Alert.alert('✓ Strength PRs Updated', 'Your personal bests have been updated!');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  // Dynamic 3-Lift Total Power
-  const benchWeight = strengthPRs.find((p) => p.id === 'bench')?.weight || 95;
-  const squatWeight = strengthPRs.find((p) => p.id === 'squat')?.weight || 130;
-  const deadliftWeight = strengthPRs.find((p) => p.id === 'deadlift')?.weight || 160;
-  const totalPowerScore = benchWeight + squatWeight + deadliftWeight;
-
-  const lifterRank = totalPowerScore >= 450
-    ? '🏆 Elite Lifter'
-    : totalPowerScore >= 350
-      ? '⚡ Advanced Lifter'
-      : totalPowerScore >= 250
-        ? '🔥 Intermediate Lifter'
-        : '🌱 Novice Lifter';
-
-  const filteredPRs = selectedPrCategory === 'all'
-    ? strengthPRs
-    : strengthPRs.filter((p) => p.category === selectedPrCategory);
 
   const handleGoBack = () => {
     navigation.navigate('Home');
@@ -439,27 +480,47 @@ export default function ProgressScreen({ navigation }: any) {
 
           <View style={styles.headerTitleWrap}>
             <Text style={styles.headerTitle}>Body Analytics</Text>
-            <Text style={styles.headerSub}>Simple & Clean Tracking</Text>
+            <Text style={styles.headerSub}>
+              {gender === 'Female' ? 'Female Fitness & Transformation' : 'Male Physique & Body Stats'}
+            </Text>
           </View>
 
           <TouchableOpacity
             style={styles.addEntryBtn}
-            onPress={() => setAddModal(true)}
+            onPress={() => {
+              setNWeight(latestWeight > 0 ? String(latestWeight) : '');
+              setAddModal(true);
+            }}
             activeOpacity={0.8}
           >
-            <Text style={styles.addEntryBtnText}>+ Log</Text>
+            <Image
+              source={editIcon}
+              style={{ width: moderateScale(13), height: moderateScale(13), tintColor: '#FFFFFF', marginRight: moderateScale(4) }}
+              resizeMode="contain"
+            />
+            <Text style={styles.addEntryBtnText}>Log Weight</Text>
           </TouchableOpacity>
         </View>
 
-        {/* ── 3 CLEAN SEGMENTED TABS ── */}
+        {/* ── 2 CLEAN SEGMENTED TABS ── */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'weight' && styles.tabBtnActive]}
             onPress={() => setActiveTab('weight')}
             activeOpacity={0.75}
           >
+            <Image
+              source={scaleIcon}
+              style={{
+                width: moderateScale(15),
+                height: moderateScale(15),
+                tintColor: activeTab === 'weight' ? '#6C5CE7' : '#64748B',
+                marginRight: moderateScale(6),
+              }}
+              resizeMode="contain"
+            />
             <Text style={[styles.tabText, activeTab === 'weight' && styles.tabTextActive]}>
-              Weight
+              Weight & Goals
             </Text>
           </TouchableOpacity>
 
@@ -468,18 +529,18 @@ export default function ProgressScreen({ navigation }: any) {
             onPress={() => setActiveTab('measurements')}
             activeOpacity={0.75}
           >
+            <Image
+              source={bodyTapeIcon}
+              style={{
+                width: moderateScale(15),
+                height: moderateScale(15),
+                tintColor: activeTab === 'measurements' ? '#6C5CE7' : '#64748B',
+                marginRight: moderateScale(6),
+              }}
+              resizeMode="contain"
+            />
             <Text style={[styles.tabText, activeTab === 'measurements' && styles.tabTextActive]}>
-              Body Tape
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'prs' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('prs')}
-            activeOpacity={0.75}
-          >
-            <Text style={[styles.tabText, activeTab === 'prs' && styles.tabTextActive]}>
-              Strength PRs
+              Body Tape ({gender})
             </Text>
           </TouchableOpacity>
         </View>
@@ -502,68 +563,157 @@ export default function ProgressScreen({ navigation }: any) {
                     <View>
                       <Text style={styles.heroSubLabel}>CURRENT WEIGHT</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
-                        <Text style={styles.heroMainWeight}>{latestWeight}</Text>
+                        <Text style={styles.heroMainWeight}>
+                          {hasWeightLogged ? latestWeight : '--'}
+                        </Text>
                         <Text style={styles.heroUnitText}> kg</Text>
-                        <View style={styles.heroLossBadge}>
-                          <Text style={styles.heroLossBadgeText}>▼ -{totalLost} kg total</Text>
-                        </View>
+                        {hasWeightLogged && (
+                          <View style={[styles.heroLossBadge, { backgroundColor: totalLost >= 0 ? 'rgba(0, 196, 140, 0.12)' : 'rgba(239, 68, 68, 0.10)' }]}>
+                            <Text style={[styles.heroLossBadgeText, { color: totalLost >= 0 ? '#00A86B' : '#EF4444' }]}>
+                              {totalLost >= 0 ? `▼ -${totalLost} kg` : `▲ +${Math.abs(totalLost)} kg`}
+                            </Text>
+                          </View>
+                        )}
                       </View>
                     </View>
 
-                    <View style={styles.goalTargetBox}>
-                      <Text style={styles.goalTargetLabel}>TARGET GOAL</Text>
-                      <Text style={styles.goalTargetVal}>{goalWeight} kg</Text>
-                      <Text style={styles.goalTargetRemain}>{toGo} kg to goal</Text>
-                    </View>
+                    <TouchableOpacity
+                      style={styles.goalTargetBox}
+                      onPress={() => {
+                        setFGoalWeight(String(goalWeight || 68));
+                        setFStartWeight(String(startWeight || 75));
+                        setGoalModal(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 }}>
+                        <Text style={styles.goalTargetLabel}>TARGET GOAL</Text>
+                        <Image source={editIcon} style={{ width: 10, height: 10, tintColor: '#6C5CE7' }} resizeMode="contain" />
+                      </View>
+                      <Text style={styles.goalTargetVal}>
+                        {goalWeight > 0 ? `${goalWeight} kg` : '-- kg'}
+                      </Text>
+                      <Text style={styles.goalTargetRemain}>
+                        {goalWeight > 0 && latestWeight > 0
+                          ? (toGo > 0 ? `${toGo} kg to goal` : 'Goal Reached! ✓')
+                          : 'Tap to Edit'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
 
-                  {/* Clean Visual Progress Track */}
+                  {/* Visual Progress Track */}
                   <View style={styles.progTrackSection}>
                     <View style={styles.progTrackHeader}>
-                      <Text style={styles.progTrackMilestone}>Start: {startWeight} kg</Text>
+                      <Text style={styles.progTrackMilestone}>
+                        Start: {startWeight > 0 ? `${startWeight} kg` : '--'}
+                      </Text>
                       <Text style={styles.progTrackAchieved}>{progressPercent}% Achieved</Text>
-                      <Text style={styles.progTrackMilestone}>Goal: {goalWeight} kg</Text>
+                      <Text style={styles.progTrackMilestone}>
+                        Goal: {goalWeight > 0 ? `${goalWeight} kg` : '--'}
+                      </Text>
                     </View>
                     <View style={styles.progTrackBar}>
                       <View style={[styles.progTrackFill, { width: `${progressPercent}%` }]} />
                     </View>
                   </View>
+
+                  {/* Island: BMI & Profile Category */}
+                  <View style={styles.heroIslandRow}>
+                    <View style={styles.bmiChip}>
+                      <Text style={styles.bmiChipLabel}>BMI SCORE</Text>
+                      <Text style={styles.bmiChipVal}>{bmi > 0 ? bmi : '--'}</Text>
+                      <Text style={styles.bmiChipCategory}>
+                        {bmi < 18.5 ? 'Underweight' : bmi <= 24.9 ? 'Normal' : bmi <= 29.9 ? 'Overweight' : 'Obese'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.profileTargetChip}>
+                      <Image source={activeIcon} style={{ width: 12, height: 12, tintColor: '#6C5CE7', marginRight: 4 }} resizeMode="contain" />
+                      <Text style={styles.profileTargetText}>
+                        Profile: {gender} Target
+                      </Text>
+                    </View>
+                  </View>
                 </View>
 
                 {/* 2. RECENT CHECKPOINTS TIMELINE */}
-                <Text style={styles.sectionTitleText}>Recent Checkpoints</Text>
-                <View style={styles.timelineCard}>
-                  {checkpoints.map((item, idx) => (
-                    <View key={idx} style={[styles.timelineRow, idx < checkpoints.length - 1 && styles.timelineRowBorder]}>
-                      <View style={styles.timelineIconBox}>
-                        <Icon
-                          name={item.isBest ? 'trophy' : item.isStart ? 'flag' : 'scale-outline'}
-                          size={moderateScale(16)}
-                          color={item.isBest ? '#EAB308' : item.isStart ? '#3B82F6' : '#6C5CE7'}
-                        />
-                      </View>
-                      <View style={{ flex: 1, marginLeft: moderateScale(10) }}>
-                        <Text style={styles.timelineDateText}>{item.date}</Text>
-                        <Text style={styles.timelineSubText}>
-                          {item.isBest ? 'Current Lowest Best 🎉' : item.isStart ? 'Initial Gym Measurement' : 'Logged Checkpoint'}
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={styles.timelineWeightText}>{item.weight} kg</Text>
-                        <View style={[styles.deltaBadge, item.isLoss ? styles.deltaBadgeGood : styles.deltaBadgeNeutral]}>
-                          <Text style={[styles.deltaBadgeText, item.isLoss ? styles.deltaTextGood : styles.deltaTextNeutral]}>
-                            {item.delta}
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionTitleText}>Recent Checkpoints</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setNWeight(latestWeight > 0 ? String(latestWeight) : '');
+                      setAddModal(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.sectionLinkText}>+ Add Checkpoint</Text>
+                  </TouchableOpacity>
                 </View>
+
+                {checkpoints.length === 0 ? (
+                  <View style={styles.emptyCheckpointBox}>
+                    <Image
+                      source={scaleIcon}
+                      style={{ width: moderateScale(36), height: moderateScale(36), tintColor: '#CBD5E1', marginBottom: moderateScale(8) }}
+                      resizeMode="contain"
+                    />
+                    <Text style={styles.emptyCheckpointTitle}>No Checkpoints Logged Yet</Text>
+                    <Text style={styles.emptyCheckpointSub}>
+                      Tap "Log Weight" above to record your first weight measurement.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.timelineCard}>
+                    {checkpoints.map((item, idx) => {
+                      const isFirst = idx === 0;
+                      return (
+                        <View key={item.id || idx} style={[styles.timelineRow, idx < checkpoints.length - 1 && styles.timelineRowBorder]}>
+                          <View
+                            style={[
+                              styles.timelineIconBox,
+                              isFirst
+                                ? { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' }
+                                : item.isStart
+                                  ? { backgroundColor: '#EFF6FF', borderColor: '#BFDBFE' }
+                                  : { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+                            ]}
+                          >
+                            <Image
+                              source={isFirst ? chartIcon : item.isStart ? activeIcon : calendarIcon}
+                              style={{
+                                width: moderateScale(15),
+                                height: moderateScale(15),
+                                tintColor: isFirst ? '#6C5CE7' : item.isStart ? '#3B82F6' : '#64748B',
+                              }}
+                              resizeMode="contain"
+                            />
+                          </View>
+
+                          <View style={{ flex: 1, marginLeft: moderateScale(10) }}>
+                            <Text style={styles.timelineDateText}>{item.date}</Text>
+                            <Text style={styles.timelineSubText}>
+                              {item.note || (isFirst ? 'Latest Checkpoint' : item.isStart ? 'Initial Weight' : 'Logged Entry')}
+                            </Text>
+                          </View>
+
+                          <View style={{ alignItems: 'flex-end' }}>
+                            <Text style={styles.timelineWeightText}>{item.weight} kg</Text>
+                            <View style={[styles.deltaBadge, item.isLoss ? styles.deltaBadgeGood : styles.deltaBadgeNeutral]}>
+                              <Text style={[styles.deltaBadgeText, item.isLoss ? styles.deltaTextGood : styles.deltaTextNeutral]}>
+                                {item.delta}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
               </>
             )}
 
             {/* ══════════════════════════════════════════════════════ */}
-            {/* TAB 2: BODY TAPE MEASUREMENTS                         */}
+            {/* TAB 2: BODY TAPE MEASUREMENTS (GENDER ADAPTIVE)       */}
             {/* ══════════════════════════════════════════════════════ */}
             {activeTab === 'measurements' && (
               <>
@@ -571,7 +721,9 @@ export default function ProgressScreen({ navigation }: any) {
                 <View style={styles.tapeHeaderRow}>
                   <View>
                     <Text style={styles.sectionTitleText}>Tape Measurements</Text>
-
+                    <Text style={styles.tapeProfileSub}>
+                      {gender === 'Female' ? 'Customized for Female Body Metrics' : 'Customized for Male Physique'}
+                    </Text>
                   </View>
 
                   <View style={styles.tapeControlsRight}>
@@ -600,370 +752,246 @@ export default function ProgressScreen({ navigation }: any) {
                       onPress={() => setMeasurementModal(true)}
                       activeOpacity={0.85}
                     >
+                      <Image
+                        source={editIcon}
+                        style={{ width: moderateScale(12), height: moderateScale(12), tintColor: '#FFFFFF', marginRight: moderateScale(4) }}
+                        resizeMode="contain"
+                      />
                       <Text style={styles.updateTapeBtnText}>Update</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* ── 2. 6 BODY MEASUREMENT CARDS GRID ── */}
+                {/* ── GENDER-SPECIFIC BODY MEASUREMENT CARDS GRID ── */}
                 <View style={styles.measurementsGrid}>
                   {measurements.map((item, idx) => {
+                    const isSet = Number(item.value) > 0;
                     const diffText = formatChange(item.value, item.startValue);
-                    const isGood = item.id === 'waist' ? item.value <= item.startValue : item.value >= item.startValue;
+                    const isGood = item.id === 'waist' ? Number(item.value) <= Number(item.startValue) : Number(item.value) >= Number(item.startValue);
 
                     return (
-                      <View key={idx} style={styles.measureCard}>
+                      <View key={item.id || idx} style={styles.measureCard}>
                         <View style={styles.measureTopRow}>
-                          <Text style={styles.measurePart}>{item.part}</Text>
-                          <View style={[styles.measureBadge, isGood ? styles.measureBadgeGood : styles.measureBadgeNeutral]}>
-                            <Text style={[styles.measureBadgeText, isGood ? styles.measureTextGood : styles.measureTextNeutral]}>
+                          <Text style={styles.measurePart} numberOfLines={1}>{item.part}</Text>
+                          <View style={[styles.measureBadge, isSet ? (isGood ? styles.measureBadgeGood : styles.measureBadgeNeutral) : styles.measureBadgeUnset]}>
+                            <Text style={[styles.measureBadgeText, isSet ? (isGood ? styles.measureTextGood : styles.measureTextNeutral) : styles.measureTextUnset]}>
                               {diffText}
                             </Text>
                           </View>
                         </View>
                         <Text style={styles.measureVal}>
-                          {formatVal(item.value)} <Text style={styles.measureUnit}>{unitMode}</Text>
+                          {formatVal(item.value)} {isSet && <Text style={styles.measureUnit}>{unitMode}</Text>}
                         </Text>
-                        <Text style={styles.measureStartHint}>Start: {formatVal(item.startValue)} {unitMode}</Text>
+                        <Text style={styles.measureStartHint}>
+                          {isSet && item.startValue > 0 ? `Start: ${formatVal(item.startValue)} ${unitMode}` : 'Tap Update to record'}
+                        </Text>
                       </View>
                     );
                   })}
                 </View>
-              </>
-            )}
-            {/* TAB 3: STRENGTH PERSONAL RECORDS */}
-            {activeTab === 'prs' && (
-              <>
-                {/* Header Controls: Title + Update PRs Button */}
-                <View style={styles.tapeHeaderRow}>
-                  <View>
-                    <Text style={styles.sectionTitleText}>Strength Records</Text>
-                  </View>
 
-                  <TouchableOpacity
-                    style={styles.updateTapeBtn}
-                    onPress={() => setPrModal(true)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.updateTapeBtnText}>Update PRs</Text>
-                  </TouchableOpacity>
-                </View>
-
-
-                {/* Category Filter Pills: All | Big 3 Compounds | Upper Body | Lower Body */}
-                <View style={styles.prCategoryRow}>
-                  {[
-                    { id: 'all', label: 'All Lifts (8)' },
-                    { id: 'Big 3 Compounds', label: 'Big 3 Compounds' },
-                    { id: 'Upper Body', label: 'Upper Body' },
-                    { id: 'Lower Body', label: 'Lower Body' },
-                  ].map((cat) => (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[styles.prCategoryPill, selectedPrCategory === cat.id && styles.prCategoryPillActive]}
-                      onPress={() => setSelectedPrCategory(cat.id)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={[styles.prCategoryText, selectedPrCategory === cat.id && styles.prCategoryTextActive]}>
-                        {cat.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                {/* 2-Column PR Grid */}
-                <View style={styles.prsGrid}>
-                  {filteredPRs.map((pr, idx) => {
-                    const diff = pr.weight - pr.startWeight;
-                    const badgeText = diff >= 0 ? `▲ +${diff} kg` : `▼ ${diff} kg`;
-
-                    return (
-                      <View key={idx} style={styles.prGridCard}>
-                        <View style={styles.prGridTopRow}>
-                          <Text style={styles.prGridExercise}>{pr.exercise}</Text>
-                          <View style={styles.prBadgePill}>
-                            <Text style={styles.prBadgeText}>{badgeText}</Text>
-                          </View>
-                        </View>
-
-                        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
-                          <Text style={styles.prGridWeight}>{pr.weight}</Text>
-                          <Text style={styles.prGridUnit}> {pr.unit}</Text>
-                        </View>
-
-                        <Text style={styles.prGridReps}>{pr.reps}</Text>
-                      </View>
-                    );
-                  })}
+                {/* Info Note on Gender Measurements */}
+                <View style={styles.measureInfoBox}>
+                  <Image
+                    source={activeIcon}
+                    style={{ width: moderateScale(16), height: moderateScale(16), tintColor: '#6C5CE7', marginRight: moderateScale(8) }}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.measureInfoText}>
+                    {gender === 'Female'
+                      ? 'Track your Waist, Hips/Glutes, Bust, and Thigh measurements to see your body toning progress over time.'
+                      : 'Track your Chest, Waist, Arms/Biceps, and Shoulders to monitor muscular growth and V-taper progression.'}
+                  </Text>
                 </View>
               </>
             )}
-
 
             <View style={{ height: hp(10) }} />
           </Animated.View>
         </ScrollView>
 
-        {/* ── ADD WEIGHT CHECKPOINT MODAL ── */}
-        <Modal visible={addModal} transparent animationType="slide">
+        {/* ── MODAL 1: LOG WEIGHT CHECKPOINT ── */}
+        <Modal
+          visible={addModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setAddModal(false)}
+        >
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Log Weight Checkpoint</Text>
+                <View>
+                  <Text style={styles.modalTitle}>Log Body Weight</Text>
+                  <Text style={styles.modalSub}>Track your weekly weight transformation</Text>
+                </View>
                 <TouchableOpacity
                   style={styles.modalCloseBtn}
                   onPress={() => setAddModal(false)}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.modalCloseText}>✕</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Current Weight (kg) *</Text>
+                <Text style={styles.inputLabel}>CURRENT WEIGHT (KG) *</Text>
                 <TextInput
                   style={styles.modalInput}
                   value={nWeight}
                   onChangeText={setNWeight}
-                  placeholder="e.g. 72.4"
+                  placeholder={latestWeight > 0 ? `e.g. ${latestWeight}` : 'e.g. 72.5'}
                   placeholderTextColor="#94A3B8"
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                   autoFocus
                 />
               </View>
 
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>NOTE (OPTIONAL)</Text>
+                <TextInput
+                  style={[styles.modalInput, { height: moderateScale(42) }]}
+                  value={nNote}
+                  onChangeText={setNNote}
+                  placeholder="e.g. Morning post-workout weigh-in"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
               <TouchableOpacity
-                style={styles.saveBtn}
+                style={styles.modalSubmitBtn}
                 onPress={handleSaveWeight}
+                disabled={isSaving}
                 activeOpacity={0.85}
               >
-                <Text style={styles.saveBtnText}>SAVE CHECKPOINT</Text>
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitBtnText}>Save Checkpoint</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
         </Modal>
 
-        {/* ── UPDATE TAPE MEASUREMENTS MODAL ── */}
-        <Modal visible={measurementModal} transparent animationType="slide">
+        {/* ── MODAL 2: UPDATE TARGET GOAL & START WEIGHT ── */}
+        <Modal
+          visible={goalModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setGoalModal(false)}
+        >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { maxHeight: hp(80) }]}>
+            <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
                 <View>
-                  <Text style={styles.modalTitle}>Update Body Tape</Text>
-                  <Text style={{ fontSize: fontScale(11), color: '#64748B' }}>Enter current measurements in centimeters (cm)</Text>
+                  <Text style={styles.modalTitle}>Set Target Goal</Text>
+                  <Text style={styles.modalSub}>Define your transformation milestone</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseBtn}
+                  onPress={() => setGoalModal(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>TARGET GOAL WEIGHT (KG) *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fGoalWeight}
+                  onChangeText={setFGoalWeight}
+                  placeholder="e.g. 68"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="decimal-pad"
+                  autoFocus
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>STARTING BASELINE WEIGHT (KG)</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fStartWeight}
+                  onChangeText={setFStartWeight}
+                  placeholder="e.g. 75"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.modalSubmitBtn}
+                onPress={handleSaveGoal}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.modalSubmitBtnText}>Save Target Goal</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ── MODAL 3: UPDATE TAPE MEASUREMENTS (GENDER ADAPTIVE FORM) ── */}
+        <Modal
+          visible={measurementModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setMeasurementModal(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { maxHeight: hp(82) }]}>
+              <View style={styles.modalHeader}>
+                <View>
+                  <Text style={styles.modalTitle}>Update Tape Measurements</Text>
+                  <Text style={styles.modalSub}>
+                    {gender === 'Female' ? 'Female Body Metrics' : 'Male Physique Metrics'} ({unitMode})
+                  </Text>
                 </View>
                 <TouchableOpacity
                   style={styles.modalCloseBtn}
                   onPress={() => setMeasurementModal(false)}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.modalCloseText}>✕</Text>
                 </TouchableOpacity>
               </View>
 
-              <ScrollView showsVerticalScrollIndicator={false}>
+              <ScrollView showsVerticalScrollIndicator={false} style={{ marginVertical: hp(1) }}>
                 <View style={styles.modalGridInputs}>
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Waist (cm)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={mWaist}
-                      onChangeText={setMWaist}
-                      placeholder="80"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Chest (cm)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={mChest}
-                      onChangeText={setMChest}
-                      placeholder="98"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Arms / Biceps (cm)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={mArms}
-                      onChangeText={setMArms}
-                      placeholder="38"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Shoulders (cm)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={mShoulders}
-                      onChangeText={setMShoulders}
-                      placeholder="118"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Thighs (cm)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={mThighs}
-                      onChangeText={setMThighs}
-                      placeholder="56"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Calves (cm)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={mCalves}
-                      onChangeText={setMCalves}
-                      placeholder="37"
-                      keyboardType="numeric"
-                    />
-                  </View>
+                  {measurements.map((m) => (
+                    <View key={m.id} style={styles.modalGridCol}>
+                      <Text style={styles.inputLabel}>{m.part.toUpperCase()} ({unitMode})</Text>
+                      <TextInput
+                        style={styles.modalInput}
+                        value={measurementForm[m.id] || ''}
+                        onChangeText={(txt) => setMeasurementForm((prev) => ({ ...prev, [m.id]: txt }))}
+                        placeholder={m.value > 0 ? String(m.value) : '0'}
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                  ))}
                 </View>
-
-                <TouchableOpacity
-                  style={styles.saveBtn}
-                  onPress={handleSaveMeasurements}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.saveBtnText}>SAVE MEASUREMENTS</Text>
-                </TouchableOpacity>
               </ScrollView>
+
+              <TouchableOpacity
+                style={styles.modalSubmitBtn}
+                onPress={handleSaveMeasurements}
+                disabled={isSaving}
+                activeOpacity={0.85}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.modalSubmitBtnText}>Save All Measurements</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
-
-        {/* ── UPDATE STRENGTH PRS MODAL ── */}
-        <Modal visible={prModal} transparent animationType="slide">
-
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalCard, { maxHeight: hp(85) }]}>
-              <View style={styles.modalHeader}>
-                <View>
-                  <Text style={styles.modalTitle}>Update Strength PRs</Text>
-                  <Text style={{ fontSize: fontScale(11), color: '#64748B' }}>Enter 1-Rep Max (1RM) in kilograms (kg)</Text>
-                </View>
-                <TouchableOpacity
-                  style={styles.modalCloseBtn}
-                  onPress={() => setPrModal(false)}
-                >
-                  <Text style={styles.modalCloseText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.modalGridInputs}>
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Bench Press (kg)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={prBench}
-                      onChangeText={setPrBench}
-                      placeholder="95"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Back Squat (kg)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={prSquat}
-                      onChangeText={setPrSquat}
-                      placeholder="130"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Deadlift (kg)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={prDeadlift}
-                      onChangeText={setPrDeadlift}
-                      placeholder="160"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Overhead Press (kg)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={prOhp}
-                      onChangeText={setPrOhp}
-                      placeholder="60"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Incline DB Press (kg)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={prIncline}
-                      onChangeText={setPrIncline}
-                      placeholder="36"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Barbell Row (kg)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={prRow}
-                      onChangeText={setPrRow}
-                      placeholder="85"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Leg Press (kg)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={prLegPress}
-                      onChangeText={setPrLegPress}
-                      placeholder="260"
-                      keyboardType="numeric"
-                    />
-                  </View>
-
-                  <View style={styles.modalInputHalf}>
-                    <Text style={styles.inputLabel}>Bicep Curl (kg)</Text>
-                    <TextInput
-                      style={styles.modalInput}
-                      value={prCurl}
-                      onChangeText={setPrCurl}
-                      placeholder="42"
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={styles.saveBtn}
-                  onPress={handleSavePRs}
-                  activeOpacity={0.85}
-                >
-                  <Text style={styles.saveBtnText}>SAVE STRENGTH PRS</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
       </View>
     </SafeAreaView>
-
   );
 }
 
@@ -984,72 +1012,83 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: wp(5),
     paddingTop: hp(1),
-    paddingBottom: hp(1.5),
+    paddingBottom: hp(1.2),
   },
   backBtn: {
     width: moderateScale(40),
     height: moderateScale(40),
-    borderRadius: moderateScale(12),
+    borderRadius: moderateScale(14),
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#ECEAFD',
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowRadius: 5,
   },
   headerTitleWrap: {
-    alignItems: 'center',
+    flex: 1,
+    marginLeft: moderateScale(12),
   },
   headerTitle: {
-    fontSize: fontScale(17),
+    fontSize: fontScale(18),
     fontWeight: '900',
     color: '#0F172A',
+    letterSpacing: -0.3,
   },
   headerSub: {
-    fontSize: fontScale(11),
+    fontSize: fontScale(11.5),
     color: '#64748B',
     fontWeight: '600',
     marginTop: 1,
   },
   addEntryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#6C5CE7',
-    paddingHorizontal: moderateScale(14),
+    paddingHorizontal: moderateScale(12),
     paddingVertical: moderateScale(8),
-    borderRadius: moderateScale(10),
-    elevation: 2,
+    borderRadius: moderateScale(12),
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
   },
   addEntryBtnText: {
-    color: '#FFFFFF',
+    fontSize: fontScale(11.5),
     fontWeight: '800',
-    fontSize: fontScale(12),
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 
-  // ── Tabs ──
+  // ── Segmented Tabs ──
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#EEF2F6',
+    marginHorizontal: wp(5),
+    backgroundColor: '#EDE9FE',
     borderRadius: moderateScale(14),
     padding: moderateScale(4),
-    marginHorizontal: wp(5),
-    marginBottom: hp(2),
+    marginBottom: hp(1.5),
   },
   tabBtn: {
     flex: 1,
-    paddingVertical: moderateScale(8),
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: moderateScale(10),
+    justifyContent: 'center',
+    paddingVertical: moderateScale(9),
+    borderRadius: moderateScale(11),
   },
   tabBtnActive: {
     backgroundColor: '#FFFFFF',
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowRadius: 4,
   },
   tabText: {
     fontSize: fontScale(12),
@@ -1058,69 +1097,76 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: '#6C5CE7',
-    fontWeight: '900',
+    fontWeight: '800',
   },
 
   scroll: {
     paddingHorizontal: wp(5),
+    paddingTop: hp(0.5),
   },
 
   // ── Hero Card ──
   heroCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(20),
-    padding: moderateScale(16),
-    marginBottom: hp(2),
+    borderRadius: moderateScale(22),
+    padding: moderateScale(18),
     borderWidth: 1,
     borderColor: '#ECEAFD',
-    elevation: 3,
+    elevation: 4,
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    marginBottom: hp(2),
   },
   heroTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: moderateScale(14),
+    marginBottom: hp(1.5),
   },
   heroSubLabel: {
-    fontSize: fontScale(10),
+    fontSize: fontScale(9.5),
     fontWeight: '800',
     color: '#6C5CE7',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
   heroMainWeight: {
-    fontSize: fontScale(28),
+    fontSize: fontScale(32),
     fontWeight: '900',
     color: '#0F172A',
-    letterSpacing: -0.5,
+    letterSpacing: -0.8,
   },
   heroUnitText: {
-    fontSize: fontScale(14),
-    fontWeight: '700',
+    fontSize: fontScale(16),
+    fontWeight: '800',
     color: '#64748B',
-    marginRight: 8,
   },
   heroLossBadge: {
-    backgroundColor: 'rgba(0, 196, 140, 0.10)',
     paddingHorizontal: moderateScale(8),
     paddingVertical: moderateScale(3),
-    borderRadius: moderateScale(6),
+    borderRadius: moderateScale(8),
+    marginLeft: moderateScale(8),
+    alignSelf: 'center',
   },
   heroLossBadgeText: {
     fontSize: fontScale(11),
     fontWeight: '800',
-    color: '#00A86B',
   },
   goalTargetBox: {
     alignItems: 'flex-end',
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(6),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
   },
   goalTargetLabel: {
-    fontSize: fontScale(9.5),
+    fontSize: fontScale(9),
     fontWeight: '800',
     color: '#64748B',
+    letterSpacing: 0.4,
   },
   goalTargetVal: {
     fontSize: fontScale(18),
@@ -1129,38 +1175,35 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   goalTargetRemain: {
-    fontSize: fontScale(10.5),
-    color: '#6C5CE7',
+    fontSize: fontScale(9.5),
     fontWeight: '700',
+    color: '#6C5CE7',
+    marginTop: 1,
   },
 
-  // ── Progress Bar ──
+  // ── Progress Track ──
   progTrackSection: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: moderateScale(12),
-    padding: moderateScale(12),
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
+    marginBottom: hp(1.5),
   },
   progTrackHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progTrackMilestone: {
-    fontSize: fontScale(10.5),
-    color: '#64748B',
+    fontSize: fontScale(10),
     fontWeight: '700',
+    color: '#94A3B8',
   },
   progTrackAchieved: {
-    fontSize: fontScale(11),
+    fontSize: fontScale(10.5),
+    fontWeight: '800',
     color: '#6C5CE7',
-    fontWeight: '900',
   },
   progTrackBar: {
-    height: 8,
-    backgroundColor: '#E2E8F0',
+    height: 7,
+    backgroundColor: '#F1F5F9',
     borderRadius: 4,
     overflow: 'hidden',
   },
@@ -1170,68 +1213,151 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
 
-  // ── Timeline Card ──
-  sectionTitleText: {
-    fontSize: fontScale(14),
+  // ── Island Info Row ──
+  heroIslandRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(14),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  bmiChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+  },
+  bmiChipLabel: {
+    fontSize: fontScale(9),
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.4,
+  },
+  bmiChipVal: {
+    fontSize: fontScale(12),
     fontWeight: '900',
     color: '#0F172A',
-    marginBottom: hp(1),
-    marginTop: hp(0.5),
   },
-  sectionSubText: {
-    fontSize: fontScale(11.5),
+  bmiChipCategory: {
+    fontSize: fontScale(9.5),
+    fontWeight: '800',
+    color: '#10B981',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(5),
+  },
+  profileTargetChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileTargetText: {
+    fontSize: fontScale(10),
+    fontWeight: '700',
     color: '#64748B',
-    marginBottom: hp(1.5),
   },
+
+  // ── Section Headers ──
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(10),
+  },
+  sectionTitleText: {
+    fontSize: fontScale(15),
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  sectionLinkText: {
+    fontSize: fontScale(12),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+
+  // ── Empty State ──
+  emptyCheckpointBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(28),
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    marginBottom: hp(2),
+  },
+  emptyCheckpointTitle: {
+    fontSize: fontScale(14),
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 4,
+  },
+  emptyCheckpointSub: {
+    fontSize: fontScale(11),
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+
+  // ── Timeline Card ──
   timelineCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(18),
+    borderRadius: moderateScale(20),
     paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(6),
     borderWidth: 1,
     borderColor: '#ECEAFD',
     elevation: 2,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    marginBottom: hp(2),
   },
   timelineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: moderateScale(12),
+    paddingVertical: moderateScale(10),
   },
   timelineRowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: '#F8FAFC',
   },
   timelineIconBox: {
     width: moderateScale(34),
     height: moderateScale(34),
     borderRadius: moderateScale(10),
-    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
   },
   timelineDateText: {
-    fontSize: fontScale(13),
+    fontSize: fontScale(12.5),
     fontWeight: '800',
     color: '#0F172A',
   },
   timelineSubText: {
-    fontSize: fontScale(10.5),
-    color: '#94A3B8',
+    fontSize: fontScale(10),
+    color: '#64748B',
     fontWeight: '500',
     marginTop: 1,
   },
   timelineWeightText: {
-    fontSize: fontScale(14),
+    fontSize: fontScale(13.5),
     fontWeight: '900',
     color: '#0F172A',
   },
   deltaBadge: {
     paddingHorizontal: moderateScale(6),
-    paddingVertical: moderateScale(2),
+    paddingVertical: moderateScale(1),
     borderRadius: moderateScale(4),
     marginTop: 2,
   },
   deltaBadgeGood: {
-    backgroundColor: 'rgba(0, 196, 140, 0.10)',
+    backgroundColor: '#ECFDF5',
   },
   deltaBadgeNeutral: {
     backgroundColor: '#F1F5F9',
@@ -1241,18 +1367,24 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   deltaTextGood: {
-    color: '#00A86B',
+    color: '#059669',
   },
   deltaTextNeutral: {
     color: '#64748B',
   },
 
-  // ── Tape Header & Unit Switcher ──
+  // ── Tape Measurements Tab ──
   tapeHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: hp(1.5),
+    marginBottom: moderateScale(12),
+  },
+  tapeProfileSub: {
+    fontSize: fontScale(10.5),
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 1,
   },
   tapeControlsRight: {
     flexDirection: 'row',
@@ -1261,388 +1393,230 @@ const styles = StyleSheet.create({
   },
   unitToggleBox: {
     flexDirection: 'row',
-    backgroundColor: '#EEF2F6',
+    backgroundColor: '#F1F5F9',
     borderRadius: moderateScale(8),
     padding: 2,
   },
   unitToggleBtn: {
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(5),
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
     borderRadius: moderateScale(6),
   },
   unitToggleBtnActive: {
     backgroundColor: '#6C5CE7',
   },
   unitToggleText: {
-    fontSize: fontScale(11),
+    fontSize: fontScale(10.5),
     fontWeight: '700',
     color: '#64748B',
   },
   unitToggleTextActive: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '800',
   },
   updateTapeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#6C5CE7',
     paddingHorizontal: moderateScale(10),
     paddingVertical: moderateScale(6),
-    borderRadius: moderateScale(8),
+    borderRadius: moderateScale(9),
   },
   updateTapeBtnText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '800',
     color: '#FFFFFF',
-    fontSize: fontScale(11),
-    fontWeight: '800',
   },
 
-  // ── V-Taper Ratio Score Card ──
-  ratioCard: {
-    backgroundColor: '#FAF5FF',
-    borderRadius: moderateScale(18),
-    padding: moderateScale(14),
-    marginBottom: hp(2),
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-  },
-  ratioHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: moderateScale(10),
-  },
-  ratioTitle: {
-    fontSize: fontScale(10),
-    fontWeight: '900',
-    color: '#7E22CE',
-    letterSpacing: 0.4,
-  },
-  ratioBadge: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    paddingHorizontal: moderateScale(8),
-    paddingVertical: moderateScale(2),
-    borderRadius: moderateScale(6),
-  },
-  ratioBadgeText: {
-    fontSize: fontScale(9.5),
-    fontWeight: '800',
-    color: '#D97706',
-  },
-  ratioRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  ratioCol: {
-    flex: 1,
-  },
-  ratioLbl: {
-    fontSize: fontScale(11),
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  ratioVal: {
-    fontSize: fontScale(16),
-    fontWeight: '900',
-    color: '#6C5CE7',
-    marginTop: 1,
-  },
-  ratioIdeal: {
-    fontSize: fontScale(10),
-    color: '#94A3B8',
-    fontWeight: '600',
-  },
-  ratioDesc: {
-    fontSize: fontScale(9),
-    color: '#64748B',
-    marginTop: 2,
-  },
-  ratioDivider: {
-    width: 1,
-    height: moderateScale(36),
-    backgroundColor: '#E9D5FF',
-    marginHorizontal: moderateScale(10),
-  },
-
-  // ── Measurements Grid ──
+  // ── Grid Measurement Cards ──
   measurementsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: moderateScale(10),
   },
   measureCard: {
     width: '48%',
     backgroundColor: '#FFFFFF',
     borderRadius: moderateScale(16),
     padding: moderateScale(14),
-    marginBottom: hp(1.5),
     borderWidth: 1,
     borderColor: '#ECEAFD',
     elevation: 2,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 5,
   },
   measureTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
   },
   measurePart: {
     fontSize: fontScale(11.5),
     fontWeight: '800',
     color: '#0F172A',
+    flex: 1,
+    marginRight: 4,
   },
   measureBadge: {
-    paddingHorizontal: moderateScale(6),
-    paddingVertical: moderateScale(2),
+    paddingHorizontal: moderateScale(5),
+    paddingVertical: moderateScale(1.5),
     borderRadius: moderateScale(4),
   },
   measureBadgeGood: {
-    backgroundColor: 'rgba(0, 196, 140, 0.10)',
+    backgroundColor: '#ECFDF5',
   },
   measureBadgeNeutral: {
     backgroundColor: '#F1F5F9',
   },
+  measureBadgeUnset: {
+    backgroundColor: '#FFFBEB',
+  },
   measureBadgeText: {
-    fontSize: fontScale(9),
+    fontSize: fontScale(8.5),
     fontWeight: '800',
   },
   measureTextGood: {
-    color: '#00A86B',
+    color: '#059669',
   },
   measureTextNeutral: {
     color: '#64748B',
   },
+  measureTextUnset: {
+    color: '#D97706',
+  },
   measureVal: {
-    fontSize: fontScale(18),
+    fontSize: fontScale(20),
     fontWeight: '900',
     color: '#0F172A',
   },
   measureUnit: {
-    fontSize: fontScale(11),
+    fontSize: fontScale(11.5),
     fontWeight: '700',
     color: '#64748B',
   },
   measureStartHint: {
     fontSize: fontScale(9.5),
     color: '#94A3B8',
+    fontWeight: '600',
     marginTop: 2,
   },
-
-  // ── Guidance Box ──
-  guidanceBox: {
-    backgroundColor: '#FFFFFF',
+  measureInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FAF5FF',
     borderRadius: moderateScale(14),
     padding: moderateScale(12),
     borderWidth: 1,
-    borderColor: '#ECEAFD',
-    marginBottom: hp(2),
+    borderColor: '#F3E8FF',
+    marginTop: hp(2),
   },
-  guidanceTitle: {
-    fontSize: fontScale(11),
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  guidanceText: {
-    fontSize: fontScale(10),
-    color: '#64748B',
-    lineHeight: fontScale(15),
-  },
-
-  // ── Modal Grid Inputs ──
-  modalGridInputs: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: moderateScale(10),
-  },
-  modalInputHalf: {
-    width: '48%',
-    marginBottom: moderateScale(10),
-  },
-
-
-  // ── Strength PRs ──
-  prPowerHeroBox: {
-    backgroundColor: '#1E1B4B',
-    borderRadius: moderateScale(18),
-    padding: moderateScale(16),
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: hp(2),
-  },
-  prPowerHeroLabel: {
-    fontSize: fontScale(10),
-    fontWeight: '800',
-    color: '#A5B4FC',
-    letterSpacing: 0.5,
-  },
-  prPowerHeroVal: {
-    fontSize: fontScale(26),
-    fontWeight: '900',
-    color: '#FFFFFF',
-  },
-  prPowerHeroUnit: {
-    fontSize: fontScale(13),
-    fontWeight: '700',
-    color: '#C7D2FE',
-  },
-  prRankBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(6),
-    borderRadius: moderateScale(10),
-  },
-  prRankBadgeText: {
-    fontSize: fontScale(11.5),
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  prCategoryRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: moderateScale(6),
-    marginBottom: hp(1.5),
-  },
-  prCategoryPill: {
-    backgroundColor: '#EEF2F6',
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(5),
-    borderRadius: moderateScale(8),
-  },
-  prCategoryPillActive: {
-    backgroundColor: '#6C5CE7',
-  },
-  prCategoryText: {
-    fontSize: fontScale(10.5),
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  prCategoryTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-  },
-  prsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  prGridCard: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(14),
-    marginBottom: hp(1.5),
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
-    elevation: 2,
-  },
-  prGridTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  prGridExercise: {
-    fontSize: fontScale(12),
-    fontWeight: '800',
-    color: '#0F172A',
+  measureInfoText: {
     flex: 1,
-  },
-  prBadgePill: {
-    backgroundColor: 'rgba(0, 196, 140, 0.10)',
-    paddingHorizontal: moderateScale(5),
-    paddingVertical: moderateScale(2),
-    borderRadius: moderateScale(4),
-  },
-  prBadgeText: {
-    fontSize: fontScale(9),
-    fontWeight: '800',
-    color: '#00A86B',
-  },
-  prGridWeight: {
-    fontSize: fontScale(20),
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  prGridUnit: {
-    fontSize: fontScale(12),
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  prGridReps: {
-    fontSize: fontScale(10),
-    color: '#94A3B8',
+    fontSize: fontScale(11),
+    color: '#6B21A8',
     fontWeight: '600',
-    marginTop: 4,
+    lineHeight: 16,
   },
 
-  // ── Modal ──
+  // ── Modals ──
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: wp(5),
   },
   modalCard: {
+    width: '100%',
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: moderateScale(24),
-    borderTopRightRadius: moderateScale(24),
+    borderRadius: moderateScale(24),
     padding: moderateScale(20),
+    elevation: 8,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: hp(2),
+    alignItems: 'flex-start',
+    marginBottom: hp(1.5),
   },
   modalTitle: {
-    fontSize: fontScale(17),
+    fontSize: fontScale(18),
     fontWeight: '900',
     color: '#0F172A',
   },
+  modalSub: {
+    fontSize: fontScale(11.5),
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+  },
   modalCloseBtn: {
-    width: moderateScale(30),
-    height: moderateScale(30),
-    borderRadius: moderateScale(15),
+    width: moderateScale(28),
+    height: moderateScale(28),
+    borderRadius: moderateScale(14),
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalCloseText: {
-    fontSize: fontScale(14),
-    fontWeight: 'bold',
+    fontSize: fontScale(12),
+    fontWeight: '700',
     color: '#64748B',
   },
   inputGroup: {
-    marginBottom: hp(2),
+    marginBottom: hp(1.5),
   },
   inputLabel: {
-    fontSize: fontScale(12),
-    fontWeight: '700',
-    color: '#334155',
-    marginBottom: 6,
+    fontSize: fontScale(10),
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.4,
+    marginBottom: 4,
   },
   modalInput: {
     backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     borderRadius: moderateScale(12),
-    paddingHorizontal: moderateScale(14),
-    paddingVertical: moderateScale(12),
-    fontSize: fontScale(15),
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(9),
+    fontSize: fontScale(13.5),
     fontWeight: '700',
     color: '#0F172A',
   },
-  saveBtn: {
-    backgroundColor: '#6C5CE7',
-    borderRadius: moderateScale(14),
-    paddingVertical: moderateScale(14),
-    alignItems: 'center',
-    marginTop: hp(1),
+  modalGridInputs: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  modalGridCol: {
+    width: '48%',
     marginBottom: hp(1),
   },
-  saveBtnText: {
+  modalSubmitBtn: {
+    backgroundColor: '#6C5CE7',
+    borderRadius: moderateScale(14),
+    paddingVertical: moderateScale(13),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: hp(1),
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+  },
+  modalSubmitBtnText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '800',
     color: '#FFFFFF',
-    fontSize: fontScale(14),
-    fontWeight: '900',
-    letterSpacing: 0.5,
   },
 });

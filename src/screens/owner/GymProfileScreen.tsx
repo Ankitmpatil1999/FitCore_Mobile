@@ -325,7 +325,6 @@ const styles = StyleSheet.create({
     fontSize: fontScale(13.5),
     fontWeight: '800',
     color: '#0F172A',
-    marginBottom: hp(1),
   },
   menuCard: {
     backgroundColor: '#FFFFFF',

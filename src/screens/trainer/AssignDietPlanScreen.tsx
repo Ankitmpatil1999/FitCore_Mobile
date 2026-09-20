@@ -24,6 +24,7 @@ import {
   updateDietPlanForMember,
   DietPlan,
 } from '../../data/mockData';
+import { apiService } from '../../services/api';
 
 // ── Interactive Scale on Press Component ──
 function AnimatedPressable({
@@ -146,7 +147,18 @@ export default function AssignDietPlanScreen({ route, navigation }: any) {
     setMeals(updated);
   };
 
-  const handleSaveDiet = () => {
+  const handleSaveDiet = async () => {
+    const formattedMeals = Object.entries(meals).map(([mealKey, m]: [string, any]) => ({
+      mealType: m.label || mealKey,
+      time: m.time || '12:00 PM',
+      name: m.name || m.label || 'Meal',
+      calories: parseInt(m.calories, 10) || 400,
+      protein: parseInt(m.protein, 10) || 30,
+      carbs: parseInt(m.carbs, 10) || 40,
+      fats: parseInt(m.fats, 10) || 12,
+      items: Array.isArray(m.items) ? m.items : [],
+    }));
+
     if (memberId) {
       updateDietPlanForMember(memberId, {
         type: 'muscle_gain',
@@ -156,6 +168,21 @@ export default function AssignDietPlanScreen({ route, navigation }: any) {
         waterIntake: 10,
         meals: meals,
       });
+
+      try {
+        await apiService.assignDietPlan({
+          memberId,
+          title: dietName,
+          targetCalories: parseInt(calories, 10) || 2800,
+          proteinGrams: parseInt(protein, 10) || 180,
+          carbsGrams: 220,
+          fatsGrams: 65,
+          waterLiters: 3.5,
+          meals: formattedMeals,
+        });
+      } catch (err) {
+        console.log('Error saving diet plan via API:', err);
+      }
     }
     Alert.alert('✓ Nutrition Plan Assigned', `Diet plan assigned to ${memberName || 'client'}!`);
     navigation.goBack();

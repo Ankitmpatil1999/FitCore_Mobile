@@ -26,8 +26,10 @@ import {
   getPlanById,
   getWorkoutPlanByMember,
   getDaysRemaining,
+  DIET_PLANS,
 } from '../../data/mockData';
 import { apiService } from '../../services/api';
+import { CheckInOutModal } from '../../components/common/CheckInOutModal';
 
 // ── Asset Icons ──
 const gymDumbbellImg = require('../../assets/Icons2/gym.png');
@@ -40,6 +42,8 @@ const kettlebellImg = require('../../assets/Icons2/kettlebell.png');
 const clockImg = require('../../assets/Icons2/clock.png');
 const chartImg = require('../../assets/Icons2/chart.png');
 const activeNotifImg = require('../../assets/Icons2/active.png');
+const barbellImg = require('../../assets/Icons2/barbell.png');
+const payImg = require('../../assets/Icons2/pay.png');
 
 // ── Custom User Icons from src/assets/Icons ──
 const dumbbellIcon = require('../../assets/Icons/dumbbell.png');
@@ -187,13 +191,36 @@ export default function DashboardScreen({ navigation }: any) {
   const [liveData, setLiveData] = useState<any>(null);
   const [liveWorkout, setLiveWorkout] = useState<any>(null);
   const [liveWeekOverview, setLiveWeekOverview] = useState<any>(null);
+  const [hasAssignedDiet, setHasAssignedDiet] = useState(false);
+  const [hasAssignedTrainer, setHasAssignedTrainer] = useState(false);
 
   // ── Live Gym Check-In / Check-Out Stopwatch Timer ──
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [isTodayCompleted, setIsTodayCompleted] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [lastSessionDuration, setLastSessionDuration] = useState<string | null>(null);
+  const [popupModal, setPopupModal] = useState<{
+    visible: boolean;
+    type: 'checkin' | 'checkout';
+    duration?: string;
+    message?: string;
+    timeStr?: string;
+  }>({
+    visible: false,
+    type: 'checkin',
+    duration: '45 min',
+    message: '',
+  });
   const [checkInLoading, setCheckInLoading] = useState(false);
+
+  // ── Full Lifetime & Monthly Attendance History State ──
+  const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [attendanceSummary, setAttendanceSummary] = useState<any>({
+    totalVisits: 0,
+    thisMonthVisits: 0,
+    totalHoursSpent: '0.0 hrs',
+    avgTimePerSession: '0m',
+  });
 
   // ── First-Time Member Gym Experience Selection (Shows Only Once) ──
   const [showExpModal, setShowExpModal] = useState(false);
@@ -206,28 +233,72 @@ export default function DashboardScreen({ navigation }: any) {
   const totalExpMonths = (parseInt(expYears || '0', 10) * 12) + parseInt(expMonths || '0', 10);
   const isExpBeginner = totalExpMonths < 6;
 
+  const dismissExperienceModal = async () => {
+    setShowExpModal(false);
+    const ids = [
+      currentMember?.id,
+      currentUser?.id,
+      currentMember?.phone,
+      currentUser?.phone,
+      'global_member_exp',
+    ].filter(Boolean);
+    try {
+      await Promise.all(ids.map(id => AsyncStorage.setItem(`fitcore_exp_prompt_done_${id}`, 'true')));
+    } catch (e) { }
+  };
+
   useEffect(() => {
     const checkExperiencePrompt = async () => {
       try {
-        const memberId = currentMember?.id || currentUser?.id || 'm1';
-        const alreadyDone = await AsyncStorage.getItem(`fitcore_exp_prompt_done_${memberId}`);
+        const id = currentMember?.id || currentUser?.id || currentMember?.phone || currentUser?.phone;
+        if (!id) return; // Wait until member/user is loaded
+
+        // Check if member already has experience configured
+        if (
+          (currentMember as any)?.hasSetExperience ||
+          (currentMember as any)?.experienceLevel ||
+          (currentMember as any)?.experienceYears !== undefined ||
+          (currentMember as any)?.experienceMonths !== undefined
+        ) {
+          setShowExpModal(false);
+          await dismissExperienceModal();
+          return;
+        }
+
+        const keysToCheck = [
+          `fitcore_exp_prompt_done_${id}`,
+          currentUser?.phone ? `fitcore_exp_prompt_done_${currentUser.phone}` : null,
+          currentMember?.phone ? `fitcore_exp_prompt_done_${currentMember.phone}` : null,
+          currentMember?.id ? `fitcore_exp_prompt_done_${currentMember.id}` : null,
+          currentUser?.id ? `fitcore_exp_prompt_done_${currentUser.id}` : null,
+          'fitcore_exp_prompt_done_global_member_exp',
+        ].filter(Boolean);
+
+        let alreadyDone = false;
+        for (const k of keysToCheck) {
+          const val = await AsyncStorage.getItem(k as string);
+          if (val === 'true') {
+            alreadyDone = true;
+            break;
+          }
+        }
+
         if (!alreadyDone) {
           setShowExpModal(true);
+        } else {
+          setShowExpModal(false);
         }
       } catch (err) {
         // fallback
       }
     };
     checkExperiencePrompt();
-  }, [currentUser?.id, currentMember?.id]);
+  }, [currentUser?.id, currentUser?.phone, currentMember?.id, currentMember?.phone]);
 
   const handleSaveExperience = async () => {
-    setShowExpModal(false);
-    const memberId = currentMember?.id || currentUser?.id || 'm1';
-    try {
-      await AsyncStorage.setItem(`fitcore_exp_prompt_done_${memberId}`, 'true');
-    } catch (e) { }
+    await dismissExperienceModal();
 
+    const memberId = currentMember?.id || currentUser?.id || currentMember?.phone || currentUser?.phone || 'm1';
     const levelQuery = isExpBeginner ? 'beginner' : 'intermediate';
     const formattedJoinDate = `${joinYear}-${joinMonth.padStart(2, '0')}-${joinDay.padStart(2, '0')}`;
 
@@ -236,12 +307,13 @@ export default function DashboardScreen({ navigation }: any) {
       await apiService.updateExperience({
         memberId,
         experienceLevel: levelQuery,
-        experienceKey: isExpBeginner ? '0_to_6_months' : '6_plus_months',
+        experienceYears: parseInt(expYears || '0', 10),
+        experienceMonths: parseInt(expMonths || '0', 10),
         joinedDate: formattedJoinDate,
       });
 
-      // 2. Fetch updated 7-Day workout plan
-      const res: any = await apiService.request(`/members/workout?memberId=${memberId}&level=${levelQuery}`);
+      // 2. Fetch fresh workout plan tailored to this experience level
+      const res: any = await apiService.getMemberWorkout(memberId, undefined, levelQuery);
       if (res.success && res.data) {
         setLiveWorkout(res.data);
       }
@@ -252,17 +324,49 @@ export default function DashboardScreen({ navigation }: any) {
 
   const fetchLiveMemberData = async () => {
     try {
-      const memberId = currentMember?.id || currentUser?.id;
+      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
       if (!memberId) return;
 
-      const [profileRes, workoutRes, attendanceRes] = await Promise.all([
+      const [profileRes, workoutRes, attendanceRes, dietRes]: any[] = await Promise.all([
         apiService.getMemberProfile(memberId),
         apiService.getMemberWorkout(memberId),
         apiService.getAttendanceHistory(memberId),
+        apiService.getMemberDiet(memberId).catch(() => ({ success: false, data: null })),
       ]);
+
+      if (dietRes?.success && (dietRes?.hasDietPlan === true || (dietRes?.data && !String(dietRes?.data?.id).startsWith('default')))) {
+        setHasAssignedDiet(true);
+      } else {
+        const localAssigned = DIET_PLANS.find(dp => (dp as any).memberId === memberId || (dp as any).memberId === currentMember?.id);
+        setHasAssignedDiet(Boolean(localAssigned));
+      }
 
       if (profileRes.success && profileRes.data) {
         setLiveData(profileRes.data);
+        setHasAssignedTrainer(Boolean(
+          profileRes.data.hasAssignedTrainer ||
+          profileRes.data.trainer ||
+          profileRes.data.member?.trainerId ||
+          profileRes.data.member?.assignedTrainerId
+        ));
+        const mem: any = (profileRes.data as any)?.member;
+        if (mem) {
+          if (mem.experienceYears !== undefined) setExpYears(String(mem.experienceYears));
+          if (mem.experienceMonths !== undefined) setExpMonths(String(mem.experienceMonths));
+          if (mem.joinDate) {
+            const parts = String(mem.joinDate).split('-');
+            if (parts.length === 3) {
+              setJoinYear(parts[0]);
+              setJoinMonth(parts[1]);
+              setJoinDay(parts[2]);
+            }
+          }
+          if (mem.hasSetExperience || mem.experienceLevel || mem.experienceYears !== undefined) {
+            const ids = [mem.id, mem.userId, mem.phone, currentMember?.id, currentUser?.id].filter(Boolean);
+            ids.forEach(id => AsyncStorage.setItem(`fitcore_exp_prompt_done_${id}`, 'true').catch(() => { }));
+            setShowExpModal(false);
+          }
+        }
       }
       if (workoutRes.success && workoutRes.data) {
         setLiveWorkout(workoutRes.data);
@@ -272,6 +376,15 @@ export default function DashboardScreen({ navigation }: any) {
         if (attData?.weekOverview) {
           setLiveWeekOverview(attData.weekOverview);
         }
+        if (attData?.records) {
+          setAttendanceRecords(attData.records);
+        }
+        setAttendanceSummary({
+          totalVisits: attData?.totalVisits ?? attData?.records?.length ?? 0,
+          thisMonthVisits: attData?.thisMonthVisits ?? 0,
+          totalHoursSpent: attData?.totalHoursSpent ?? '0.0 hrs',
+          avgTimePerSession: attData?.avgTimePerSession ?? '0m',
+        });
         const todaySession = attData?.todaySession || {};
         const inGym = Boolean(todaySession?.isCheckedIn);
         setIsCheckedIn(inGym);
@@ -298,17 +411,20 @@ export default function DashboardScreen({ navigation }: any) {
   const fallbackWorkoutPlan = currentMember ? getWorkoutPlanByMember(currentMember.id) : undefined;
   const daysLeft = liveData?.member?.daysRemaining !== undefined
     ? liveData.member.daysRemaining
-    : currentMember ? getDaysRemaining(currentMember.expiryDate) : 149;
+    : (currentMember?.expiryDate ? getDaysRemaining(currentMember.expiryDate) : 0);
 
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
   const todayWorkout =
-    liveWorkout?.days?.find((d: any) => d.day === today || d.dayName?.toLowerCase().startsWith(today.toLowerCase())) ||
-    liveWorkout?.days?.[0] ||
-    fallbackWorkoutPlan?.days.find((d: any) => d.day === today);
+    liveWorkout?.days?.find((d: any) =>
+      d?.day?.toLowerCase() === today.toLowerCase() ||
+      d?.dayName?.toLowerCase()?.startsWith(today.toLowerCase())
+    ) ||
+    fallbackWorkoutPlan?.days?.find((d: any) => d?.day?.toLowerCase() === today.toLowerCase()) ||
+    liveWorkout?.days?.[0];
 
-  const firstName = liveData?.member?.name?.split(' ')[0] || currentUser?.name?.split(' ')[0] || 'Member';
-  const gymName = liveData?.gym?.name || currentGym?.name || 'FitCore Club';
-  const planName = liveData?.plan?.name || plan?.name || 'Gold Annual Pass';
+  const firstName = liveData?.member?.name?.split(' ')[0] || currentMember?.name?.split(' ')[0] || currentUser?.name?.split(' ')[0] || 'Member';
+  const gymName = liveData?.gym?.name || (currentMember as any)?.gymName || currentGym?.name || '';
+  const planName = liveData?.plan?.name || liveData?.member?.planName || (currentMember as any)?.planName || 'Active Pass';
 
   const userRoleLabel =
     (currentUser?.role || role) === 'trainer'
@@ -319,8 +435,27 @@ export default function DashboardScreen({ navigation }: any) {
           ? 'Vendor'
           : 'Member';
 
-  const totalExercisesCount = todayWorkout?.exercises?.length || 7;
-  const workoutTitle = todayWorkout?.focus || todayWorkout?.dayName || 'Back & Biceps';
+  // Clean workout title so that if it contains & or + or emoji, it formats cleanly
+  const rawFocus = todayWorkout?.focus || todayWorkout?.dayName || 'Chest';
+  const cleanFocus = rawFocus
+    .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}]/gu, '')
+    .trim();
+  const workoutTitle = cleanFocus;
+
+  // ── Option 2 Split Day & Routine Calculations ──
+  const dayIndexMap: Record<string, { num: string; text: string; splitNum: string }> = {
+    sunday: { num: 'Rest', text: 'Rest & Recovery', splitNum: 'Rest' },
+    monday: { num: 'Day 1', text: 'Day 1 of 6', splitNum: '1 / 6' },
+    tuesday: { num: 'Day 2', text: 'Day 2 of 6', splitNum: '2 / 6' },
+    wednesday: { num: 'Day 3', text: 'Day 3 of 6', splitNum: '3 / 6' },
+    thursday: { num: 'Day 4', text: 'Day 4 of 6', splitNum: '4 / 6' },
+    friday: { num: 'Day 5', text: 'Day 5 of 6', splitNum: '5 / 6' },
+    saturday: { num: 'Day 6', text: 'Day 6 of 6', splitNum: '6 / 6' },
+  };
+  const dayInfo = dayIndexMap[today.toLowerCase()] || { num: 'Day 1', text: 'Day 1 of 6', splitNum: '1 / 6' };
+  const splitDayNum = todayWorkout?.splitDay || dayInfo.splitNum;
+  const splitDayText = todayWorkout?.splitDay || dayInfo.text;
+  const workoutDuration = todayWorkout?.durationMin ? `${todayWorkout.durationMin}m` : '45m';
 
   useEffect(() => {
     let interval: any = null;
@@ -343,38 +478,49 @@ export default function DashboardScreen({ navigation }: any) {
   const secondsStr = seconds.toString().padStart(2, '0');
 
   const handleToggleCheckIn = async () => {
-    const memberId = currentMember?.id || currentUser?.id || 'm1';
-    const gymId = currentGym?.id || '65123456789abcdef0123456';
+    const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1';
+    const gymId = currentUser?.gymId || currentGym?.id || liveData?.gym?.id || liveData?.member?.gymId;
+    const memberName = currentUser?.name || currentMember?.name || liveData?.member?.name || 'Member';
+    const memberPhone = currentUser?.phone || currentMember?.phone || liveData?.member?.phone || '';
 
     if (!isCheckedIn) {
-      // ── Perform Check-In API Call ──
-      try {
-        setCheckInLoading(true);
-        const res: any = await apiService.checkIn(memberId, gymId, 'dashboard_button');
-        if (res?.success) {
-          setIsCheckedIn(true);
-        }
-      } catch (err: any) {
-        console.log('Check-in error:', err);
-      } finally {
-        setCheckInLoading(false);
-      }
+      // 1. Instant UI Feedback (0ms)
+      setIsCheckedIn(true);
+      setPopupModal({
+        visible: true,
+        type: 'checkin',
+        message: `Welcome ${memberName}! Session tracking active. Have an awesome workout!`,
+      });
+
+      // 2. Background Sync
+      apiService.checkIn(
+        memberId,
+        gymId,
+        'dashboard_button',
+        memberName,
+        memberPhone
+      ).then(() => fetchLiveMemberData()).catch((e) => console.log('Check-in sync:', e));
     } else {
-      // ── Perform Check-Out API Call ──
-      try {
-        setCheckInLoading(true);
-        const res: any = await apiService.checkOut(memberId);
-        if (res?.success) {
-          setIsCheckedIn(false);
-          const durationStr = res?.data?.durationFormatted || `${Math.floor(elapsedSeconds / 60)} min`;
-          setLastSessionDuration(durationStr);
-          await fetchLiveMemberData();
-        }
-      } catch (err: any) {
-        console.log('Check-out error:', err);
-      } finally {
-        setCheckInLoading(false);
-      }
+      // 1. Instant UI Feedback (0ms)
+      setIsCheckedIn(false);
+      const durationStr = `${Math.max(1, Math.floor(elapsedSeconds / 60))} min`;
+      setLastSessionDuration(durationStr);
+      setPopupModal({
+        visible: true,
+        type: 'checkout',
+        duration: durationStr,
+        message: `You spent ${durationStr} training today. Outstanding effort!`,
+      });
+
+      // 2. Background Sync
+      apiService.checkOut(memberId, memberPhone)
+        .then((res: any) => {
+          if (res?.data?.durationFormatted) {
+            setLastSessionDuration(res.data.durationFormatted);
+          }
+          fetchLiveMemberData();
+        })
+        .catch((e) => console.log('Check-out sync:', e));
     }
   };
 
@@ -495,7 +641,7 @@ export default function DashboardScreen({ navigation }: any) {
             }}
           >
 
-            {/* ── COMPACT ATTENDANCE CHECK-IN / CHECK-OUT CARD ── */}
+            {/* ── ATTENDANCE CHECK-IN / CHECK-OUT HERO CARD ── */}
             <View style={styles.compactAttendanceCard}>
               <View style={styles.compactAttendanceRow}>
                 {/* Timer Digits & QR Pass link */}
@@ -504,7 +650,6 @@ export default function DashboardScreen({ navigation }: any) {
                   onPress={() => navigation.navigate('Check-In')}
                   activeOpacity={0.75}
                 >
-                  {isCheckedIn && <View style={styles.liveTimerDot} />}
                   <View style={styles.compactDigitBox}>
                     <Text style={styles.compactDigitText}>{hoursStr}</Text>
                   </View>
@@ -516,18 +661,23 @@ export default function DashboardScreen({ navigation }: any) {
                   <View style={styles.compactDigitBox}>
                     <Text style={styles.compactDigitText}>{secondsStr}</Text>
                   </View>
-                  <Image
-                    source={qrIconImg}
-                    style={{ width: moderateScale(16), height: moderateScale(16), tintColor: '#6C5CE7', marginLeft: 6 }}
-                    resizeMode="contain"
-                  />
+                  <View style={styles.qrPassMiniBtn}>
+                    <Image
+                      source={qrIconImg}
+                      style={{ width: moderateScale(16), height: moderateScale(16), tintColor: '#6C5CE7' }}
+                      resizeMode="contain"
+                    />
+                  </View>
                 </TouchableOpacity>
 
-                {/* Solid Check-In / Check-Out Button */}
+                {/* Prominent Check-In / Check-Out Button */}
                 <TouchableOpacity
                   style={[
                     styles.compactActionBtn,
-                    { backgroundColor: isCheckedIn ? '#FF4D6D' : '#00A86B' },
+                    {
+                      backgroundColor: isCheckedIn ? '#EF4444' : '#059669',
+                      shadowColor: isCheckedIn ? '#EF4444' : '#059669',
+                    },
                   ]}
                   onPress={handleToggleCheckIn}
                   disabled={checkInLoading}
@@ -536,15 +686,23 @@ export default function DashboardScreen({ navigation }: any) {
                   {checkInLoading ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.compactActionBtnText}>
-                      {isCheckedIn ? 'Check Out' : 'Check In'}
-                    </Text>
+                    <View style={styles.actionBtnInnerRow}>
+                      <Icon
+                        name={isCheckedIn ? 'log-out-outline' : 'checkmark-circle-outline'}
+                        size={moderateScale(16)}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.compactActionBtnText}>
+                        {isCheckedIn ? 'Check Out' : 'Check In'}
+                      </Text>
+                    </View>
                   )}
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* ── 1. TODAY'S WORKOUT CARD ── */}
+            {/* ── 2. TODAY'S WORKOUT HEADER WITH EXPERIENCE PILL ── */}
             <View style={styles.sectionHeaderRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(8) }}>
                 <Text style={styles.sectionTitleText}>Today's Workout</Text>
@@ -553,9 +711,18 @@ export default function DashboardScreen({ navigation }: any) {
                   onPress={() => setShowExpModal(true)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.expLevelPillText}>
-                    {isExpBeginner ? '🟢 Beginner' : '🔵 Intermediate'} ▾
-                  </Text>
+                  <View style={styles.expLevelPillInner}>
+                    <View
+                      style={[
+                        styles.expLevelDot,
+                        { backgroundColor: isExpBeginner ? '#10B981' : '#3B82F6' },
+                      ]}
+                    />
+                    <Text style={styles.expLevelPillText}>
+                      {isExpBeginner ? 'Beginner' : 'Intermediate'}
+                    </Text>
+                    <Icon name="chevron-down" size={moderateScale(11)} color="#4F46E5" style={{ marginLeft: 2 }} />
+                  </View>
                 </TouchableOpacity>
               </View>
               <TouchableOpacity onPress={() => navigation.navigate('Workout')}>
@@ -563,8 +730,12 @@ export default function DashboardScreen({ navigation }: any) {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.workoutCard}>
-              {/* Top Hero Section: Title + Progress Ring */}
+            <TouchableOpacity
+              style={styles.workoutCard}
+              onPress={() => navigation.navigate('Workout')}
+              activeOpacity={0.88}
+            >
+              {/* Top Hero Section: Title + Focus Badge */}
               <View style={styles.workoutTopRow}>
                 <View style={{ flex: 1, paddingRight: moderateScale(12) }}>
                   <View style={styles.workoutSplitBadge}>
@@ -572,26 +743,29 @@ export default function DashboardScreen({ navigation }: any) {
                   </View>
 
                   <Text style={styles.workoutTitleText}>{workoutTitle}</Text>
-                  {/* <Text style={styles.workoutSubText}>Hypertrophy Split • Intermediate</Text> */}
+                  <Text style={styles.workoutSubText}>Hypertrophy & Strength Split</Text>
                 </View>
 
-                {/* Prominent Circular Animated Progress Ring */}
-                <AnimatedProgressRing percentage={75} />
+                {/* Split Day Badge */}
+                <View style={styles.todaySplitBadge}>
+                  <Text style={styles.todaySplitBadgeNumber}>{splitDayNum}</Text>
+                  <Text style={styles.todaySplitBadgeLabel}>Weekly Split</Text>
+                </View>
               </View>
 
-              {/* Middle Section: Dedicated 3-Column Stat Island */}
+              {/* Middle Section: Dedicated 3-Column Stat Island (Option 2) */}
               <View style={styles.statIslandContainer}>
-                {/* Column 1: Exercises */}
+                {/* Column 1: Split Day */}
                 <View style={styles.statIslandCol}>
                   <View style={styles.statIconValRow}>
                     <Image
-                      source={dumbbellIcon}
-                      style={{ width: moderateScale(15), height: moderateScale(15) }}
+                      source={barbellImg}
+                      style={{ width: moderateScale(15), height: moderateScale(15), tintColor: '#6C5CE7' }}
                       resizeMode="contain"
                     />
-                    <Text style={styles.statIslandVal}>{totalExercisesCount}</Text>
+                    <Text style={styles.statIslandVal}>{splitDayNum}</Text>
                   </View>
-                  <Text style={styles.statIslandLbl}>Exercises</Text>
+                  <Text style={styles.statIslandLbl}>Split Day</Text>
                 </View>
 
                 <View style={styles.statDivider} />
@@ -604,54 +778,58 @@ export default function DashboardScreen({ navigation }: any) {
                       style={{ width: moderateScale(15), height: moderateScale(15) }}
                       resizeMode="contain"
                     />
-                    <Text style={styles.statIslandVal}>45m</Text>
+                    <Text style={styles.statIslandVal}>{workoutDuration}</Text>
                   </View>
-                  <Text style={styles.statIslandLbl}>Duration</Text>
+                  <Text style={styles.statIslandLbl}>Est. Time</Text>
                 </View>
 
                 <View style={styles.statDivider} />
 
-                {/* Column 3: Calories */}
+                {/* Column 3: Workout Session Status */}
                 <View style={styles.statIslandCol}>
                   <View style={styles.statIconValRow}>
                     <Image
-                      source={kcalIcon}
-                      style={{ width: moderateScale(15), height: moderateScale(15) }}
+                      source={isCheckedIn ? activeNotifImg : kettlebellImg}
+                      style={{ width: moderateScale(15), height: moderateScale(15), tintColor: isCheckedIn ? '#10B981' : '#6C5CE7' }}
                       resizeMode="contain"
                     />
-                    <Text style={styles.statIslandVal}>320</Text>
+                    <Text style={[styles.statIslandVal, { color: isCheckedIn ? '#10B981' : '#0F172A', fontSize: fontScale(13.5) }]}>
+                      {isCheckedIn ? 'Active' : 'Ready'}
+                    </Text>
+                    {isCheckedIn && (
+                      <Icon name="flame" size={moderateScale(13)} color="#F97316" style={{ marginLeft: 2 }} />
+                    )}
                   </View>
-                  <Text style={styles.statIslandLbl}>Calories</Text>
+                  <Text style={styles.statIslandLbl}>Status</Text>
                 </View>
               </View>
-
-              {/* Bottom CTA: High Energy Start Button with Pulse */}
-              <Animated.View style={{ transform: [{ scale: pulseAnim }], marginTop: hp(1.5) }}>
-                <TouchableOpacity
-                  style={styles.startWorkoutButton}
-                  onPress={() =>
-                    navigation.navigate('ActiveWorkout', {
-                      workoutId: 't1',
-                      title: workoutTitle,
-                    })
-                  }
-                  activeOpacity={0.85}
-                >
-                  {/* <Icon name="play" size={moderateScale(15)} color="#FFFFFF" style={{ marginRight: 4 }} /> */}
-                  <Text style={styles.startWorkoutButtonText}>START WORKOUT</Text>
-                  {/* <Icon name="arrow-forward" size={moderateScale(15)} color="#FFFFFF" style={{ marginLeft: 6 }} /> */}
-                </TouchableOpacity>
-              </Animated.View>
-            </View>
+            </TouchableOpacity>
 
             {/* ── 4. THIS WEEK OVERVIEW ── */}
             <View style={styles.sectionHeaderRow}>
               <View>
                 <Text style={styles.sectionTitleText}>This Week Overview</Text>
               </View>
+              <TouchableOpacity
+                style={styles.viewHistoryBtn}
+                onPress={() => navigation.navigate('AttendanceHistory')}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={calendarIconImg}
+                  style={{ width: moderateScale(13), height: moderateScale(13), tintColor: '#6C5CE7', marginRight: moderateScale(4) }}
+                  resizeMode="contain"
+                />
+                <Text style={styles.viewHistoryBtnText}>View All History</Text>
+                <Icon name="chevron-forward" size={moderateScale(13)} color="#6C5CE7" />
+              </TouchableOpacity>
             </View>
 
-            <View style={styles.weekOverviewCard}>
+            <TouchableOpacity
+              style={styles.weekOverviewCard}
+              activeOpacity={0.92}
+              onPress={() => navigation.navigate('AttendanceHistory')}
+            >
               {/* 1. 7-Day Visual Attendance & Workout Split Strip */}
               <View style={styles.weekDaysStrip}>
                 {(liveWeekOverview?.days || [
@@ -680,7 +858,7 @@ export default function DashboardScreen({ navigation }: any) {
                         {item.day}
                       </Text>
 
-                      {/* Status Circle / Badge */}
+                      {/* Status Circle / Badge with Vector Icons */}
                       <View
                         style={[
                           styles.weekStatusCircle,
@@ -691,11 +869,11 @@ export default function DashboardScreen({ navigation }: any) {
                         ]}
                       >
                         {isCompleted ? (
-                          <Text style={styles.weekCheckText}>✓</Text>
+                          <Icon name="checkmark-sharp" size={moderateScale(12)} color="#FFFFFF" />
                         ) : isPastMissed ? (
-                          <Text style={styles.weekAbsentText}>✕</Text>
+                          <Icon name="close-sharp" size={moderateScale(12)} color="#EF4444" />
                         ) : isFutureDate ? (
-                          <Text style={{ fontSize: fontScale(10), color: '#CBD5E1' }}>•</Text>
+                          <View style={styles.weekPendingDot} />
                         ) : (
                           <View style={[styles.weekPendingDot, styles.weekTodayDot]} />
                         )}
@@ -717,78 +895,16 @@ export default function DashboardScreen({ navigation }: any) {
                 })}
               </View>
 
-              {/* Divider */}
-              <View style={styles.weekCardDivider} />
-
-              {/* 2. Three High-Contrast Core Stat Pillars */}
-              <View style={styles.weekStatsRow}>
-                {/* 1. Workouts */}
-                <View style={styles.weekStatItem}>
-                  <View style={styles.weekStatIconBox}>
-                    <Image
-                      source={kettlebellImg}
-                      style={{ width: moderateScale(15), height: moderateScale(15), tintColor: '#6C5CE7' }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <View style={styles.weekStatTextWrap}>
-                    <Text style={styles.weekStatValue} numberOfLines={1}>
-                      {liveWeekOverview?.daysAttended ?? 0} <Text style={styles.weekStatTarget}>/ {liveWeekOverview?.targetDays ?? 6}</Text>
-                    </Text>
-                    <Text style={styles.weekStatLabel} numberOfLines={1} adjustsFontSizeToFit>Workouts</Text>
-                  </View>
-                </View>
-
-                <View style={styles.weekStatDivider} />
-
-                {/* 2. Trained Time */}
-                <View style={styles.weekStatItem}>
-                  <View style={[styles.weekStatIconBox, { backgroundColor: 'rgba(56, 189, 248, 0.12)' }]}>
-                    <Image
-                      source={clockImg}
-                      style={{ width: moderateScale(15), height: moderateScale(15), tintColor: '#0284C7' }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <View style={styles.weekStatTextWrap}>
-                    <Text style={styles.weekStatValue} numberOfLines={1}>
-                      {liveWeekOverview?.weeklyTrainedHours ?? '0.0'} <Text style={styles.weekStatTarget}>hrs</Text>
-                    </Text>
-                    <Text style={styles.weekStatLabel} numberOfLines={1} adjustsFontSizeToFit>Time Trained</Text>
-                  </View>
-                </View>
-
-                <View style={styles.weekStatDivider} />
-
-                {/* 3. Calories */}
-                <View style={styles.weekStatItem}>
-                  <View style={[styles.weekStatIconBox, { backgroundColor: 'rgba(239, 68, 68, 0.10)' }]}>
-                    <Image
-                      source={kcalIcon}
-                      style={{ width: moderateScale(15), height: moderateScale(15), tintColor: '#EF4444' }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <View style={styles.weekStatTextWrap}>
-                    <Text style={styles.weekStatValue} numberOfLines={1}>
-                      {(liveWeekOverview?.weeklyCaloriesBurned ?? 0).toLocaleString()}
-                    </Text>
-                    <Text style={styles.weekStatLabel} numberOfLines={1} adjustsFontSizeToFit>Kcal Burned</Text>
-                  </View>
-                </View>
-              </View>
-
-
-              {/* 3. Dynamic Weekly Goal Progress Banner */}
-              <View style={styles.weekGoalBox}>
+              {/* Dynamic Weekly Goal Progress Banner */}
+              <View style={[styles.weekGoalBox, { marginTop: hp(1.4) }]}>
                 <View style={styles.weekGoalHeader}>
                   <Text style={styles.weekGoalTitle}>
-                    WEEKLY TARGET ({Math.min(100, Math.round(((liveWeekOverview?.daysAttended || 0) / (liveWeekOverview?.targetDays || 6)) * 100))}%)
+                    WEEKLY ATTENDANCE ({Math.min(100, Math.round(((liveWeekOverview?.daysAttended || 0) / (liveWeekOverview?.targetDays || 6)) * 100))}%)
                   </Text>
                   <Text style={styles.weekGoalRemaining}>
                     {Math.max(0, (liveWeekOverview?.targetDays || 6) - (liveWeekOverview?.daysAttended || 0)) > 0
                       ? `${Math.max(0, (liveWeekOverview?.targetDays || 6) - (liveWeekOverview?.daysAttended || 0))} Session(s) Left`
-                      : 'Target Reached! 🎉'}
+                      : 'Target Reached!'}
                   </Text>
                 </View>
                 <View style={styles.weekGoalTrack}>
@@ -802,60 +918,106 @@ export default function DashboardScreen({ navigation }: any) {
                   />
                 </View>
               </View>
-            </View>
 
-            {/* ── 5. PROGRESS CARD (DYNAMIC BODY STATS) ── */}
-            <View style={styles.sectionHeaderRow}>
+              {/* Tap to View Details Bar */}
+              <View style={[styles.attTapHintRow, { marginTop: hp(1.2) }]}>
+                <Text style={styles.attTapHintText}>Tap to view full attendance history & dates</Text>
+                <Icon name="arrow-forward" size={moderateScale(12)} color="#6C5CE7" />
+              </View>
+            </TouchableOpacity>
+
+            {/* ── 5. MEMBER QUICK ACCESS SERVICES & SCREENS GRID ── */}
+            <View style={[styles.sectionHeaderRow, { marginTop: hp(1) }]}>
               <View>
-                <Text style={styles.sectionTitleText}>Body Transformation</Text>
+                <Text style={styles.sectionTitleText}>Member Quick Access</Text>
               </View>
             </View>
 
-            <AnimatedPressable
-              style={styles.progressCard}
-              onPress={() => navigation.navigate('Progress')}
-            >
-              {/* Top Row: Current Weight & Target Goal */}
-              <View style={styles.progTopRow}>
-                <View>
-                  <Text style={styles.progSubLabel}>CURRENT WEIGHT</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 2 }}>
-                    <Text style={styles.progMainWeight}>{liveData?.member?.weight || currentMember?.weight || 72.4}</Text>
-                    <Text style={styles.progUnitText}> kg</Text>
-                    <View style={styles.progLossBadge}>
-                      <Text style={styles.progLossBadgeText}>▼ -1.6 kg</Text>
-                    </View>
+            <View style={styles.quickAccessGrid}>
+              {/* 1. Nutrition & Diet - Visible only if assigned by trainer */}
+              {hasAssignedDiet && (
+                <AnimatedPressable
+                  style={styles.quickAccessCard}
+                  onPress={() => navigation.navigate('Diet')}
+                >
+                  <View style={[styles.quickAccessIconBox, { backgroundColor: '#ECFDF5' }]}>
+                    <Image
+                      source={nutritionIconImg}
+                      style={[styles.quickAccessIcon, { tintColor: '#059669' }]}
+                      resizeMode="contain"
+                    />
                   </View>
-                </View>
+                  <Text style={styles.quickAccessTitle} numberOfLines={1}>Diet Plan</Text>
+                  <Text style={styles.quickAccessSub} numberOfLines={1}>Macro Targets</Text>
+                </AnimatedPressable>
+              )}
 
-                <View style={styles.progGoalRight}>
-                  <Text style={styles.progGoalRemaining}>
-                    {Math.max(0, (Number(liveData?.member?.weight || currentMember?.weight || 72.4) - 68.0)).toFixed(1)} kg to target
-                  </Text>
-                </View>
-              </View>
-
-              {/* Dynamic Progress Bar */}
-              <View style={[styles.progTrackSection, { marginBottom: 0 }]}>
-                <View style={styles.progTrackHeader}>
-                  <Text style={styles.progTrackMilestone}>Start: 76.0 kg</Text>
-                  <Text style={styles.progTrackMilestone}>Goal: 68.0 kg</Text>
-                </View>
-                <View style={styles.progTrackBar}>
-                  <View
-                    style={[
-                      styles.progTrackFill,
-                      {
-                        width: `${Math.min(100, Math.max(10, Math.round(((76.0 - Number(liveData?.member?.weight || currentMember?.weight || 72.4)) / 8.0) * 100)))}%`,
-                      },
-                    ]}
+              {/* 4. Body Metrics */}
+              <AnimatedPressable
+                style={styles.quickAccessCard}
+                onPress={() => navigation.navigate('Progress')}
+              >
+                <View style={[styles.quickAccessIconBox, { backgroundColor: '#EFF6FF' }]}>
+                  <Image
+                    source={bodyStatsIconImg}
+                    style={[styles.quickAccessIcon, { tintColor: '#2563EB' }]}
+                    resizeMode="contain"
                   />
                 </View>
-                <Text style={styles.progTrackSubtitle}>
-                  {Math.min(100, Math.max(10, Math.round(((76.0 - Number(liveData?.member?.weight || currentMember?.weight || 72.4)) / 8.0) * 100)))}% of Weight Loss Target Reached
-                </Text>
-              </View>
-            </AnimatedPressable>
+                <Text style={styles.quickAccessTitle} numberOfLines={1}>Body Stats</Text>
+                <Text style={styles.quickAccessSub} numberOfLines={1}>BMI & Weight</Text>
+              </AnimatedPressable>
+
+              {/* 5. Assigned Trainer (Shows ONLY if assigned to member) */}
+              {hasAssignedTrainer && (
+                <AnimatedPressable
+                  style={styles.quickAccessCard}
+                  onPress={() => navigation.navigate('Trainer')}
+                >
+                  <View style={[styles.quickAccessIconBox, { backgroundColor: '#FEF3C7' }]}>
+                    <Image
+                      source={trainerIconImg}
+                      style={[styles.quickAccessIcon, { tintColor: '#D97706' }]}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <Text style={styles.quickAccessTitle} numberOfLines={1}>My Trainer</Text>
+                  <Text style={styles.quickAccessSub} numberOfLines={1}>Direct Guidance</Text>
+                </AnimatedPressable>
+              )}
+
+              {/* 6. Membership & Invoices */}
+              <AnimatedPressable
+                style={styles.quickAccessCard}
+                onPress={() => navigation.navigate('Membership')}
+              >
+                <View style={[styles.quickAccessIconBox, { backgroundColor: '#FDF2F8' }]}>
+                  <Image
+                    source={payImg}
+                    style={[styles.quickAccessIcon, { tintColor: '#EC4899' }]}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={styles.quickAccessTitle} numberOfLines={1}>Membership</Text>
+                <Text style={styles.quickAccessSub} numberOfLines={1}>Plan & Invoices</Text>
+              </AnimatedPressable>
+
+              {/* 8. Supplement Store */}
+              <AnimatedPressable
+                style={styles.quickAccessCard}
+                onPress={() => navigation.navigate('StoreTab')}
+              >
+                <View style={[styles.quickAccessIconBox, { backgroundColor: '#FFF7ED' }]}>
+                  <Image
+                    source={kettlebellImg}
+                    style={[styles.quickAccessIcon, { tintColor: '#EA580C' }]}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={styles.quickAccessTitle} numberOfLines={1}>FitStore</Text>
+                <Text style={styles.quickAccessSub} numberOfLines={1}>Whey & Gear</Text>
+              </AnimatedPressable>
+            </View>
 
           </Animated.View>
 
@@ -867,27 +1029,39 @@ export default function DashboardScreen({ navigation }: any) {
           visible={showExpModal}
           transparent
           animationType="fade"
-          onRequestClose={() => setShowExpModal(false)}
+          onRequestClose={dismissExperienceModal}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
               {/* Modal Header */}
               <View style={styles.modalHeader}>
-                <View>
-                  <Text style={styles.modalTitle}>🏋️ Gym Experience</Text>
-                  <Text style={styles.modalSubtitle}>How long have you been working out?</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(8) }}>
+                  <View style={styles.modalHeaderIconBox}>
+                    <Image
+                      source={barbellImg}
+                      style={{ width: moderateScale(18), height: moderateScale(18), tintColor: '#6C5CE7' }}
+                      resizeMode="contain"
+                    />
+                  </View>
+                  <View>
+                    <Text style={styles.modalTitle}>Gym Experience</Text>
+                    <Text style={styles.modalSubtitle}>How long have you been working out?</Text>
+                  </View>
                 </View>
                 <TouchableOpacity
                   style={styles.modalCloseBtn}
-                  onPress={() => setShowExpModal(false)}
+                  onPress={dismissExperienceModal}
                 >
-                  <Text style={styles.modalCloseText}>✕</Text>
+                  <Icon name="close" size={moderateScale(18)} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
               {/* 1. Direct Typing: Workout Experience (Month & Year) */}
               <View style={styles.dateSectionBox}>
-                <Text style={styles.dateSectionLabel}>⏱️ HOW LONG HAVE YOU BEEN WORKING OUT?</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <Icon name="time-outline" size={moderateScale(15)} color="#6C5CE7" />
+                  <Text style={styles.dateSectionLabel}>HOW LONG HAVE YOU BEEN WORKING OUT?</Text>
+                </View>
                 <View style={styles.dateInputsRow}>
                   <View style={styles.dateCol}>
                     <Text style={styles.dateColLbl}>Years</Text>
@@ -916,7 +1090,10 @@ export default function DashboardScreen({ navigation }: any) {
 
               {/* Date Joined Inputs: Day / Month / Year */}
               <View style={styles.dateSectionBox}>
-                <Text style={styles.dateSectionLabel}>📅 GYM JOINED DATE</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+                  <Icon name="calendar-outline" size={moderateScale(15)} color="#6C5CE7" />
+                  <Text style={styles.dateSectionLabel}>GYM JOINED DATE</Text>
+                </View>
                 <View style={styles.dateInputsRow}>
                   <View style={styles.dateCol}>
                     <Text style={styles.dateColLbl}>Day</Text>
@@ -967,6 +1144,18 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
           </View>
         </Modal>
+
+        {/* ── HIGH-FIDELITY CHECK-IN & CHECK-OUT POPUP MODAL ── */}
+        <CheckInOutModal
+          visible={popupModal.visible}
+          type={popupModal.type}
+          memberName={firstName}
+          gymName={gymName || 'FitCore Gym'}
+          duration={popupModal.duration || lastSessionDuration || `${Math.max(1, Math.floor(elapsedSeconds / 60))} min`}
+          message={popupModal.message}
+          timeStr={popupModal.timeStr}
+          onClose={() => setPopupModal(prev => ({ ...prev, visible: false }))}
+        />
       </View>
     </SafeAreaView>
   );
@@ -1215,19 +1404,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ── Compact Attendance Check-In / Check-Out Card ──
+  // ── Attendance Check-In / Check-Out Hero Card ──
   compactAttendanceCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: moderateScale(18),
-    paddingVertical: moderateScale(14),
-    paddingHorizontal: moderateScale(16),
-    marginBottom: hp(1.8),
-    borderWidth: 1,
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(12),
+    marginBottom: hp(2),
+    borderWidth: 1.2,
     borderColor: '#ECEAFD',
     elevation: 3,
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.06,
     shadowRadius: 8,
   },
   compactAttendanceRow: {
@@ -1238,67 +1427,70 @@ const styles = StyleSheet.create({
   compactClockRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(5),
+    gap: moderateScale(2.5),
   },
   liveTimerDot: {
-    width: moderateScale(8),
-    height: moderateScale(8),
-    borderRadius: moderateScale(4),
+    width: moderateScale(7),
+    height: moderateScale(7),
+    borderRadius: moderateScale(3.5),
     backgroundColor: '#00C48C',
-    marginRight: 2,
+    marginRight: moderateScale(2),
   },
   compactDigitBox: {
-    width: moderateScale(44),
-    height: moderateScale(42),
+    width: moderateScale(36),
+    height: moderateScale(40),
     backgroundColor: '#F8F7FF',
-    borderRadius: moderateScale(12),
+    borderRadius: moderateScale(8),
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
   },
   compactDigitText: {
-    fontSize: fontScale(17),
-    fontWeight: '800',
+    fontSize: fontScale(15),
+    fontWeight: '900',
     color: '#0F172A',
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
   compactColon: {
-    fontSize: fontScale(15),
-    fontWeight: '800',
-    color: '#94A3B8',
+    fontSize: fontScale(14),
+    fontWeight: '900',
+    color: '#A29BFE',
+  },
+  qrPassMiniBtn: {
+    width: moderateScale(34),
+    height: moderateScale(40),
+    backgroundColor: '#F3F0FF',
+    borderRadius: moderateScale(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: moderateScale(3),
+    borderWidth: 1,
+    borderColor: '#E0DBFC',
   },
   compactActionBtn: {
-    paddingHorizontal: moderateScale(13),
-    paddingVertical: moderateScale(7.5),
+    paddingHorizontal: moderateScale(14),
+    height: moderateScale(40),
     borderRadius: moderateScale(10),
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    marginLeft: moderateScale(6),
+    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.22,
+    shadowRadius: 5,
   },
-  compactActionBtnText: {
-    fontSize: fontScale(11.5),
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
-  compactStatusRow: {
+  actionBtnInnerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: moderateScale(8),
-    paddingLeft: moderateScale(4),
+    gap: moderateScale(4),
   },
-  compactStatusText: {
-    fontSize: fontScale(13.5),
+  compactActionBtnText: {
+    fontSize: fontScale(12.5),
     fontWeight: '800',
-  },
-  compactLastSessionText: {
-    fontSize: fontScale(11.5),
-    color: '#64748B',
-    marginLeft: moderateScale(6),
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 
   // ── Section Header ──
@@ -1473,25 +1665,29 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0F172A',
   },
-  startWorkoutButton: {
-    flexDirection: 'row',
+  todaySplitBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#6C5CE7',
+    backgroundColor: '#F3F0FF',
     borderRadius: moderateScale(14),
-    height: moderateScale(46),
-    elevation: 4,
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
   },
-  startWorkoutButtonText: {
-    fontSize: fontScale(13.5),
+  todaySplitBadgeNumber: {
+    fontSize: fontScale(15),
+    fontWeight: '900',
+    color: '#6C5CE7',
+    lineHeight: fontScale(18),
+    textAlign: 'center',
+  },
+  todaySplitBadgeLabel: {
+    fontSize: fontScale(9.5),
     fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
+    color: '#64748B',
+    marginTop: 1,
+    textAlign: 'center',
   },
 
   // ── 3. QUICK ACTIONS ──
@@ -1931,15 +2127,33 @@ const styles = StyleSheet.create({
   expLevelPill: {
     backgroundColor: '#EEF2FF',
     paddingHorizontal: moderateScale(9),
-    paddingVertical: moderateScale(3),
+    paddingVertical: moderateScale(3.5),
     borderRadius: moderateScale(10),
     borderWidth: 1,
     borderColor: '#E0E7FF',
+  },
+  expLevelPillInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  expLevelDot: {
+    width: moderateScale(6),
+    height: moderateScale(6),
+    borderRadius: moderateScale(3),
   },
   expLevelPillText: {
     fontSize: fontScale(10.5),
     fontWeight: '700',
     color: '#4F46E5',
+  },
+  modalHeaderIconBox: {
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(8),
+    backgroundColor: '#F3F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalOverlay: {
     flex: 1,
@@ -2082,5 +2296,325 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.3,
+  },
+
+  // ── Member Quick Access Grid ──
+  quickAccessGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: moderateScale(10),
+    marginTop: hp(0.5),
+    marginBottom: hp(1.5),
+  },
+  quickAccessCard: {
+    width: '48%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(18),
+    padding: moderateScale(14),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    elevation: 2,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+  },
+  quickAccessIconBox: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: moderateScale(10),
+  },
+  quickAccessIcon: {
+    width: moderateScale(20),
+    height: moderateScale(20),
+  },
+  quickAccessTitle: {
+    fontSize: fontScale(13.5),
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  quickAccessSub: {
+    fontSize: fontScale(10.5),
+    fontWeight: '600',
+    color: '#64748B',
+  },
+
+  // ── This Week Overview Header & Quick Summary Styles ──
+  viewHistoryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingVertical: moderateScale(4),
+    paddingHorizontal: moderateScale(10),
+    borderRadius: moderateScale(20),
+  },
+  viewHistoryBtnText: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+    color: '#6C5CE7',
+    marginRight: 2,
+  },
+  attQuickSummaryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(12),
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(8),
+    marginTop: hp(1.2),
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  attQuickCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  attQuickVal: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  attQuickUnit: {
+    fontSize: fontScale(10),
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  attQuickLabel: {
+    fontSize: fontScale(8.5),
+    fontWeight: '700',
+    color: '#64748B',
+    marginTop: 2,
+    letterSpacing: 0.2,
+  },
+  attQuickDivider: {
+    width: 1,
+    height: moderateScale(24),
+    backgroundColor: '#E2E8F0',
+  },
+  attTapHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(6),
+    marginTop: hp(0.8),
+  },
+  attTapHintText: {
+    fontSize: fontScale(10),
+    fontWeight: '700',
+    color: '#6C5CE7',
+  },
+
+  // ── Full Attendance History Modal & Sheet ──
+  attModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+  },
+  attModalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: moderateScale(28),
+    borderTopRightRadius: moderateScale(28),
+    paddingHorizontal: wp(5),
+    paddingTop: hp(2.5),
+    maxHeight: hp(85),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  attModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: hp(1.5),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  attModalTitle: {
+    fontSize: fontScale(18),
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  attModalSubtitle: {
+    fontSize: fontScale(11.5),
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  attStatsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: moderateScale(8),
+    marginVertical: hp(1.5),
+  },
+  attStatCard: {
+    width: '48.5%',
+    borderRadius: moderateScale(14),
+    padding: moderateScale(10),
+    borderWidth: 1,
+  },
+  attStatIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(4),
+    marginBottom: 4,
+  },
+  attStatCardTitle: {
+    fontSize: fontScale(9.5),
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  attStatCardVal: {
+    fontSize: fontScale(15),
+    fontWeight: '900',
+    color: '#0F172A',
+  },
+  attStatCardUnit: {
+    fontSize: fontScale(10.5),
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  attStatCardSub: {
+    fontSize: fontScale(9.5),
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  attFilterTabsRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(3),
+    marginBottom: hp(1.5),
+  },
+  attFilterTab: {
+    flex: 1,
+    paddingVertical: moderateScale(8),
+    alignItems: 'center',
+    borderRadius: moderateScale(10),
+  },
+  attFilterTabActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  attFilterTabText: {
+    fontSize: fontScale(11.5),
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  attFilterTabTextActive: {
+    color: '#6C5CE7',
+    fontWeight: '800',
+  },
+  attLogsScroll: {
+    maxHeight: hp(46),
+  },
+  attEmptyBox: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: hp(4),
+    paddingHorizontal: wp(6),
+  },
+  attEmptyTitle: {
+    fontSize: fontScale(15),
+    fontWeight: '800',
+    color: '#334155',
+    marginTop: hp(1.2),
+  },
+  attEmptySub: {
+    fontSize: fontScale(11.5),
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: hp(0.5),
+    lineHeight: 18,
+  },
+  attRecordCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(14),
+    padding: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: moderateScale(10),
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  attRecordHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: moderateScale(8),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  attRecordDateBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+  },
+  attRecordDateText: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  attStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(4),
+    paddingVertical: moderateScale(3),
+    paddingHorizontal: moderateScale(8),
+    borderRadius: moderateScale(20),
+  },
+  attStatusPillDone: {
+    backgroundColor: '#ECFDF5',
+  },
+  attStatusPillLive: {
+    backgroundColor: '#EEF2FF',
+  },
+  attStatusPillText: {
+    fontSize: fontScale(9.5),
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  attRecordDetailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: moderateScale(8),
+  },
+  attTimeCol: {
+    alignItems: 'center',
+  },
+  attTimeLbl: {
+    fontSize: fontScale(8.5),
+    fontWeight: '700',
+    color: '#94A3B8',
+    marginBottom: 2,
+    letterSpacing: 0.2,
+  },
+  attTimeVal: {
+    fontSize: fontScale(11.5),
+    fontWeight: '700',
+    color: '#334155',
+  },
+  attTimeValHighlight: {
+    fontSize: fontScale(11.5),
+    fontWeight: '800',
+    color: '#6C5CE7',
   },
 });

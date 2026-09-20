@@ -20,6 +20,7 @@ import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { TRAINERS, MEMBERS, Trainer } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
+import apiService from '../../services/api';
 
 // ── Interactive Scale on Press Component ──
 function AnimatedPressable({
@@ -81,13 +82,56 @@ export default function TrainersScreen() {
   const [fSalary, setFSalary] = useState('');
   const [fTimings, setFTimings] = useState('');
   const [fPhone, setFPhone] = useState('');
+  const [fJoinDate, setFJoinDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [fAvail, setFAvail] = useState(true);
+
+  // ── Leave Requests State ──
+  const [leaveRequests, setLeaveRequests] = useState<any[]>([]);
+  const [loadingLeaves, setLoadingLeaves] = useState(false);
+  const [processingLeaveId, setProcessingLeaveId] = useState<string | null>(null);
+  const [rejectingLeaveReq, setRejectingLeaveReq] = useState<any | null>(null);
+  const [ownerRejectNote, setOwnerRejectNote] = useState('');
+
+  const loadLeaveRequests = async () => {
+    try {
+      setLoadingLeaves(true);
+      const res: any = await apiService.getTrainerLeaveRequests(gymId);
+      if (res?.success && Array.isArray(res.data)) {
+        setLeaveRequests(res.data);
+      }
+    } catch (err) {
+      console.log('Error loading leave requests:', err);
+    } finally {
+      setLoadingLeaves(false);
+    }
+  };
+
+  const handleDecision = async (id: string, status: 'approved' | 'rejected', customNote?: string) => {
+    setProcessingLeaveId(id);
+    try {
+      const noteToSend = customNote || (status === 'approved' ? 'Approved by Gym Owner' : 'Declined by Gym Owner');
+      const res: any = await apiService.updateTrainerLeaveRequest(id, status, noteToSend);
+      if (res?.success) {
+        Alert.alert(status === 'approved' ? 'Leave Approved ✅' : 'Leave Rejected ❌', `The trainer leave request has been ${status}. Attendance records and calendars updated.`);
+        setRejectingLeaveReq(null);
+        setOwnerRejectNote('');
+        loadLeaveRequests();
+      } else {
+        Alert.alert('Action Failed', res?.message || 'Unable to update leave request');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Network error updating leave');
+    } finally {
+      setProcessingLeaveId(null);
+    }
+  };
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
+    loadLeaveRequests();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -102,7 +146,7 @@ export default function TrainersScreen() {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [gymId]);
 
   const resetForm = () => {
     setFName('');
@@ -111,14 +155,16 @@ export default function TrainersScreen() {
     setFSalary('');
     setFTimings('');
     setFPhone('');
+    setFJoinDate(new Date().toISOString().split('T')[0]);
     setFAvail(true);
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!fName.trim() || !fSpec.trim()) {
       Alert.alert('Required', 'Name and specialization are required.');
       return;
     }
+    const chosenJoinDate = fJoinDate.trim() || new Date().toISOString().split('T')[0];
     const newTrainer: Trainer = {
       id: `t${Date.now()}`,
       gymId: gymId,
@@ -132,10 +178,26 @@ export default function TrainersScreen() {
       assignedMemberIds: [],
       certifications: 'ISSA / ACE Certified',
       phone: fPhone.trim() || '9876543210',
-      joinDate: new Date().toISOString().split('T')[0],
+      joinDate: chosenJoinDate,
     };
+
+    try {
+      await apiService.createOwnerTrainer({
+        gymId: gymId,
+        name: fName.trim(),
+        phone: fPhone.trim() || '9876543210',
+        specialty: fSpec.trim(),
+        experience: fExp.trim() || '3+ years',
+        salary: fSalary.trim() || '35,000',
+        shift: fTimings.trim() || '06:00 AM – 02:00 PM',
+        joinDate: chosenJoinDate,
+      });
+    } catch (err) {
+      console.log('Error creating trainer in backend DB:', err);
+    }
+
     setTrainers((prev) => [...prev, newTrainer]);
-    Alert.alert('✓ Added', `${fName} has been added as coach!`);
+    Alert.alert('✓ Added', `${fName} has been added as coach starting from ${chosenJoinDate}!`);
     setAddModal(false);
     resetForm();
   };
@@ -175,8 +237,85 @@ export default function TrainersScreen() {
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+          
+          {/* ════════════════════════════════════════════════════════════════
+              1. TRAINER LEAVE REQUESTS (APPROVAL / REJECTION BANNER)
+          ════════════════════════════════════════════════════════════════ */}
+          {leaveRequests.filter((r) => r.status === 'pending').length > 0 && (
+            <View style={styles.pendingLeavesContainer}>
+              <View style={styles.pendingLeavesHeader}>
+                <View style={styles.pendingLeavesTitleBox}>
+                  <View style={styles.pendingLeavesPulseDot} />
+                  <Text style={styles.pendingLeavesTitle}>
+                    Pending Leave Requests ({leaveRequests.filter((r) => r.status === 'pending').length})
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={loadLeaveRequests} activeOpacity={0.7}>
+                  <AppIcon name="refresh" size={moderateScale(15)} color="#6366F1" />
+                </TouchableOpacity>
+              </View>
+
+              {leaveRequests
+                .filter((r) => r.status === 'pending')
+                .map((req: any) => (
+                  <View key={req._id || req.id} style={styles.leaveApprovalCard}>
+                    <View style={styles.leaveCardTopRow}>
+                      <View style={styles.leaveTrainerBadge}>
+                        <AppIcon name="person" size={moderateScale(13)} color="#4338CA" />
+                        <Text style={styles.leaveTrainerName}>{req.trainerName || 'Coach'}</Text>
+                      </View>
+                      <View style={styles.leaveDurationPill}>
+                        <AppIcon name="calendar" size={moderateScale(12)} color="#D97706" />
+                        <Text style={styles.leaveDurationText}>
+                          {req.startDate} {req.startDate !== req.endDate ? `→ ${req.endDate}` : ''}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.leaveReasonText}>
+                      <Text style={{ fontWeight: '700', color: '#334155' }}>Reason: </Text>
+                      {req.reason}
+                    </Text>
+
+                    <View style={styles.leaveActionBtnsRow}>
+                      <TouchableOpacity
+                        style={styles.rejectBtn}
+                        onPress={() => {
+                          setRejectingLeaveReq(req);
+                          setOwnerRejectNote('');
+                        }}
+                        disabled={processingLeaveId === (req._id || req.id)}
+                        activeOpacity={0.8}
+                      >
+                        <AppIcon name="close-circle" size={moderateScale(14)} color="#E11D48" />
+                        <Text style={styles.rejectBtnText}>Reject</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.approveBtn}
+                        onPress={() => handleDecision(req._id || req.id, 'approved')}
+                        disabled={processingLeaveId === (req._id || req.id)}
+                        activeOpacity={0.8}
+                      >
+                        <AppIcon name="checkmark-circle" size={moderateScale(14)} color="#FFFFFF" />
+                        <Text style={styles.approveBtnText}>
+                          {processingLeaveId === (req._id || req.id) ? 'Updating...' : 'Approve Leave'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))}
+            </View>
+          )}
+
+          {/* Section title for trainers list */}
+          <View style={styles.trainersListHeader}>
+            <Text style={styles.trainersListTitle}>Gym Coaches & Roster</Text>
+          </View>
+
           {trainers.map((trainer) => {
             const assignedCount = MEMBERS.filter((m) => trainer.assignedMemberIds.includes(m.id)).length || 14;
+            const isLiveFloor = trainer.available;
 
             return (
               <AnimatedPressable
@@ -186,7 +325,7 @@ export default function TrainersScreen() {
               >
                 <View style={styles.trainerAvatar}>
                   <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
-                  {trainer.available && <View style={styles.onlineDot} />}
+                  {isLiveFloor && <View style={styles.onlineDot} />}
                 </View>
 
                 <View style={styles.trainerInfoCol}>
@@ -195,28 +334,39 @@ export default function TrainersScreen() {
                     <View
                       style={[
                         styles.availBadge,
-                        { backgroundColor: trainer.available ? 'rgba(0, 196, 140, 0.10)' : 'rgba(148, 163, 184, 0.15)' },
+                        { backgroundColor: isLiveFloor ? 'rgba(0, 196, 140, 0.12)' : 'rgba(148, 163, 184, 0.15)' },
                       ]}
                     >
+                      <View style={[styles.miniStatusDot, { backgroundColor: isLiveFloor ? '#00C48C' : '#94A3B8' }]} />
                       <Text
                         style={[
                           styles.availBadgeText,
-                          { color: trainer.available ? '#00C48C' : '#64748B' },
+                          { color: isLiveFloor ? '#00C48C' : '#64748B' },
                         ]}
                       >
-                        {trainer.available ? 'Available' : 'On Leave'}
+                        {isLiveFloor ? 'On Floor (06:15 AM)' : 'Off Duty'}
                       </Text>
                     </View>
                   </View>
 
                   <Text style={styles.trainerSpec}>{trainer.specialization}</Text>
 
+                  {/* Punch & Floor Hours summary */}
+                  <View style={styles.trainerPunchRow}>
+                    <Text style={styles.trainerPunchTime}>
+                      🕒 {isLiveFloor ? 'Shift In: 06:15 AM (Active)' : 'Last Shift: 06:00 AM – 02:30 PM'}
+                    </Text>
+                    <Text style={styles.trainerHoursBadge}>
+                      {isLiveFloor ? 'Floor: 2.8 hrs' : '8h 30m'}
+                    </Text>
+                  </View>
+
                   <View style={styles.trainerMetaRow}>
                     <Text style={styles.trainerMetaText}>⭐ 4.9 Rating</Text>
                     <Text style={styles.trainerMetaDivider}>•</Text>
                     <Text style={styles.trainerMetaText}>🏋️ {assignedCount} Clients</Text>
                     <Text style={styles.trainerMetaDivider}>•</Text>
-                    <Text style={styles.trainerMetaText}>⏳ {trainer.experience}</Text>
+                    <Text style={styles.trainerMetaText}>📅 22 Days Present</Text>
                   </View>
                 </View>
 
@@ -273,6 +423,17 @@ export default function TrainersScreen() {
                 />
               </View>
 
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Joining Date (YYYY-MM-DD) *</Text>
+                <TextInput
+                  style={styles.modalInput}
+                  value={fJoinDate}
+                  onChangeText={setFJoinDate}
+                  placeholder="e.g. 2026-09-16"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
               <TouchableOpacity
                 style={styles.submitBtn}
                 onPress={handleAdd}
@@ -284,12 +445,12 @@ export default function TrainersScreen() {
           </View>
         </Modal>
 
-        {/* ── TRAINER DETAIL MODAL ── */}
-        <Modal visible={!!detailTrainer} transparent animationType="fade">
+        {/* ── TRAINER DETAIL & ATTENDANCE LOGS MODAL ── */}
+        <Modal visible={!!detailTrainer} transparent animationType="slide">
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Coach Profile</Text>
+                <Text style={styles.modalTitle}>Coach Attendance & Duty Roster</Text>
                 <TouchableOpacity onPress={() => setDetailTrainer(null)}>
                   <AppIcon name="close" size={moderateScale(22)} color="#0F172A" />
                 </TouchableOpacity>
@@ -306,8 +467,51 @@ export default function TrainersScreen() {
                 </View>
               </View>
 
+              {/* Monthly Attendance Summary for Owner */}
+              <View style={styles.ownerAttSummaryGrid}>
+                <View style={styles.attBox}>
+                  <Text style={styles.attBoxVal}>22 Days</Text>
+                  <Text style={styles.attBoxLabel}>Present (Sep)</Text>
+                </View>
+                <View style={styles.attBox}>
+                  <Text style={styles.attBoxVal}>168.5 hrs</Text>
+                  <Text style={styles.attBoxLabel}>Working Hours</Text>
+                </View>
+                <View style={styles.attBox}>
+                  <Text style={[styles.attBoxVal, { color: '#FF4D6D' }]}>2 Leaves</Text>
+                  <Text style={styles.attBoxLabel}>Chhutti (Sutti)</Text>
+                </View>
+                <View style={styles.attBox}>
+                  <Text style={[styles.attBoxVal, { color: '#00C48C' }]}>95%</Text>
+                  <Text style={styles.attBoxLabel}>Punctuality</Text>
+                </View>
+              </View>
+
+              {/* Daily Shift Logs Table */}
+              <Text style={styles.shiftLogsTitle}>Recent Daily Shift Logs</Text>
+              <ScrollView style={{ maxHeight: hp(22) }} showsVerticalScrollIndicator={false}>
+                {[
+                  { date: 'Today (17 Sep)', in: '06:15 AM', out: 'Active (On Floor)', hours: 'Live 2.8h', status: 'present' },
+                  { date: 'Yesterday (16 Sep)', in: '06:00 AM', out: '02:30 PM', hours: '8h 30m', status: 'present' },
+                  { date: '15 Sep 2026', in: '06:05 AM', out: '02:35 PM', hours: '8h 30m', status: 'present' },
+                  { date: '14 Sep 2026', in: '06:00 AM', out: '10:30 AM', hours: '4h 30m', status: 'half_day' },
+                  { date: '12 Sep 2026', in: '--:--', out: '--:--', hours: '0h (Leave)', status: 'leave' },
+                ].map((item, idx) => (
+                  <View key={idx} style={styles.shiftLogRow}>
+                    <View style={{ flex: 1.2 }}>
+                      <Text style={styles.logDate}>{item.date}</Text>
+                      <Text style={styles.logHours}>{item.hours}</Text>
+                    </View>
+                    <View style={{ flex: 1.5, alignItems: 'flex-end' }}>
+                      <Text style={styles.logTimes}>In: {item.in}</Text>
+                      <Text style={styles.logTimes}>Out: {item.out}</Text>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+
               <View style={styles.toggleRow}>
-                <Text style={styles.toggleLabel}>Availability Status</Text>
+                <Text style={styles.toggleLabel}>Floor Availability</Text>
                 <Switch
                   value={detailTrainer?.available ?? true}
                   onValueChange={() => {
@@ -316,6 +520,52 @@ export default function TrainersScreen() {
                   trackColor={{ false: '#ECEAFD', true: '#6C5CE7' }}
                   thumbColor="#FFFFFF"
                 />
+              </View>
+            </View>
+          </View>
+        {/* ── REJECT LEAVE MODAL WITH CUSTOM REASON ── */}
+        <Modal visible={!!rejectingLeaveReq} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <View style={styles.modalHeader}>
+                <Text style={[styles.modalTitle, { color: '#E11D48' }]}>Reject Leave Request</Text>
+                <TouchableOpacity onPress={() => setRejectingLeaveReq(null)}>
+                  <AppIcon name="close" size={moderateScale(22)} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              <Text style={{ fontSize: fontScale(13), color: '#334155', marginBottom: 12 }}>
+                Reject leave for <Text style={{ fontWeight: '800' }}>{rejectingLeaveReq?.trainerName || 'Coach'}</Text> ({rejectingLeaveReq?.startDate} {rejectingLeaveReq?.startDate !== rejectingLeaveReq?.endDate ? `to ${rejectingLeaveReq?.endDate}` : ''})?
+              </Text>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Reason for Rejection (Visible to Trainer):</Text>
+                <TextInput
+                  style={[styles.modalInput, { height: moderateScale(70), textAlignVertical: 'top', paddingTop: 8 }]}
+                  value={ownerRejectNote}
+                  onChangeText={setOwnerRejectNote}
+                  placeholder="e.g. Need coverage for peak evening batch, please reschedule..."
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                />
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: hp(1) }}>
+                <TouchableOpacity
+                  style={[styles.submitBtn, { flex: 1, backgroundColor: '#F1F5F9' }]}
+                  onPress={() => setRejectingLeaveReq(null)}
+                >
+                  <Text style={[styles.submitBtnText, { color: '#475569' }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.submitBtn, { flex: 1.5, backgroundColor: '#E11D48' }]}
+                  onPress={() => handleDecision(rejectingLeaveReq?._id || rejectingLeaveReq?.id, 'rejected', ownerRejectNote)}
+                  disabled={processingLeaveId === (rejectingLeaveReq?._id || rejectingLeaveReq?.id)}
+                >
+                  <Text style={styles.submitBtnText}>
+                    {processingLeaveId === (rejectingLeaveReq?._id || rejectingLeaveReq?.id) ? 'Rejecting...' : 'Confirm Reject'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -544,12 +794,45 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
 
+  miniStatusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
+  trainerPunchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8F7FF',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(6),
+    marginVertical: 4,
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  trainerPunchTime: {
+    fontSize: fontScale(10),
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  trainerHoursBadge: {
+    fontSize: fontScale(9.5),
+    fontWeight: '800',
+    color: '#6C5CE7',
+    backgroundColor: '#ECEAFD',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: 1,
+    borderRadius: moderateScale(4),
+  },
+
   // Detail Modal
   detailProfileRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: moderateScale(14),
-    marginBottom: hp(2),
+    marginBottom: hp(1.5),
   },
   detailAvatar: {
     width: moderateScale(54),
@@ -582,6 +865,64 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
+
+  ownerAttSummaryGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8F7FF',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(10),
+    marginBottom: hp(1.5),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  attBox: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  attBoxVal: {
+    fontSize: fontScale(12.5),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  attBoxLabel: {
+    fontSize: fontScale(9.5),
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '600',
+  },
+
+  shiftLogsTitle: {
+    fontSize: fontScale(12.5),
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 8,
+  },
+  shiftLogRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: moderateScale(8),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  logDate: {
+    fontSize: fontScale(11.5),
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  logHours: {
+    fontSize: fontScale(10),
+    color: '#6C5CE7',
+    fontWeight: '700',
+    marginTop: 1,
+  },
+  logTimes: {
+    fontSize: fontScale(10.5),
+    color: '#64748B',
+    fontWeight: '600',
+  },
+
   toggleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -589,10 +930,138 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(12),
     borderTopWidth: 1,
     borderTopColor: '#F3F2FE',
+    marginTop: hp(1),
   },
   toggleLabel: {
     fontSize: fontScale(13.5),
     fontWeight: '700',
     color: '#0F172A',
+  },
+
+  // ── Pending Leaves Approval Styles ──
+  pendingLeavesContainer: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.5,
+    borderColor: '#FCA5A5',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(14),
+    marginBottom: hp(2),
+  },
+  pendingLeavesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(10),
+  },
+  pendingLeavesTitleBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  pendingLeavesPulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
+  pendingLeavesTitle: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
+    color: '#991B1B',
+  },
+  leaveApprovalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(12),
+    padding: moderateScale(12),
+    marginBottom: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+  },
+  leaveCardTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  leaveTrainerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(6),
+  },
+  leaveTrainerName: {
+    fontSize: fontScale(12),
+    fontWeight: '800',
+    color: '#4338CA',
+  },
+  leaveDurationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(6),
+  },
+  leaveDurationText: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+    color: '#B45309',
+  },
+  leaveReasonText: {
+    fontSize: fontScale(12),
+    color: '#475569',
+    marginBottom: moderateScale(10),
+  },
+  leaveActionBtnsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: moderateScale(8),
+  },
+  rejectBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFE4E6',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(7),
+    borderRadius: moderateScale(8),
+  },
+  rejectBtnText: {
+    fontSize: fontScale(11.5),
+    fontWeight: '700',
+    color: '#E11D48',
+  },
+  approveBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#059669',
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(7),
+    borderRadius: moderateScale(8),
+    elevation: 1,
+  },
+  approveBtnText: {
+    fontSize: fontScale(11.5),
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  trainersListHeader: {
+    marginBottom: moderateScale(8),
+    marginTop: moderateScale(4),
+  },
+  trainersListTitle: {
+    fontSize: fontScale(13.5),
+    fontWeight: '800',
+    color: '#334155',
   },
 });

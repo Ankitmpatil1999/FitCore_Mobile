@@ -29,86 +29,108 @@ interface Message {
   time: string;
 }
 
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: '1',
-    from: 'trainer',
-    text: "Good morning Arjun! 💪 How did yesterday's workout go? Did you complete all sets on deadlifts?",
-    time: '08:05 AM',
-  },
-  {
-    id: '2',
-    from: 'member',
-    text: 'Good morning Coach! Yes, completed all sets cleanly at 80kg.',
-    time: '08:30 AM',
-  },
-  {
-    id: '3',
-    from: 'trainer',
-    text: "Great progress! Make sure to hit 140g protein and keep hydration high today. 🥗",
-    time: '08:35 AM',
-  },
-  {
-    id: '4',
-    from: 'member',
-    text: 'Will do! Should we schedule a form check tomorrow?',
-    time: '08:40 AM',
-  },
-  {
-    id: '5',
-    from: 'trainer',
-    text: "Yes, let's do 06:30 AM tomorrow! We will check your squat depth. 🏋️‍♂️",
-    time: '08:45 AM',
-  },
-];
-
 import { apiService } from '../../services/api';
 
 export default function TrainerChatScreen({ navigation }: any) {
   const { currentMember, currentUser } = useAppContext();
-  const [liveTrainer, setLiveTrainer] = useState<any>(currentMember ? getTrainerById(currentMember.trainerId) : undefined);
+  const [liveTrainer, setLiveTrainer] = useState<any>(currentMember?.trainerId ? getTrainerById(currentMember.trainerId) : undefined);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+  const trainerId = String(liveTrainer?.id || liveTrainer?._id || currentMember?.trainerId || 't1');
+
+  const [isTrainerOnline, setIsTrainerOnline] = useState(false);
+
+  // ── 1. Fetch Assigned Trainer & Chat History from Backend API ──
+  const fetchChatData = async () => {
+    try {
+      // 1a. Load Live Assigned Trainer info
+      const userId = currentMember?.id || currentUser?.id || currentMember?.phone;
+      const profileRes: any = await apiService.getMemberProfile(userId);
+      if (profileRes?.success && profileRes?.data?.trainer) {
+        setLiveTrainer(profileRes.data.trainer);
+      }
+
+      // 1b. Load Real Message History from MongoDB
+      const chatRes: any = await apiService.getTrainerChatMessages(memberId, trainerId);
+      if (chatRes?.success && Array.isArray(chatRes.data)) {
+        setMessages(chatRes.data);
+      }
+
+      // 1c. Mark Trainer Messages as Read
+      await apiService.markTrainerChatAsRead(memberId, trainerId, 'member');
+
+      // 1d. Heartbeat Member online presence
+      await apiService.sendPresenceHeartbeat(memberId, 'member', true);
+
+      // 1e. Check Trainer Online status
+      const presRes: any = await apiService.getUserPresence(trainerId);
+      if (presRes?.success) {
+        setIsTrainerOnline(!!presRes.isOnline);
+      }
+    } catch (e) {
+      console.log('Error loading trainer chat data:', e);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadTrainer() {
-      try {
-        const userId = currentMember?.id || currentUser?.id;
-        const res: any = await apiService.getMemberProfile(userId);
-        if (res.success && res.data?.trainer) {
-          setLiveTrainer(res.data.trainer);
+    fetchChatData();
+    // Auto-poll every 3.5s for real-time incoming messages & presence from Trainer
+    const interval = setInterval(() => {
+      apiService.getTrainerChatMessages(memberId, trainerId).then((res: any) => {
+        if (res?.success && Array.isArray(res.data)) {
+          setMessages((prev) => {
+            if (res.data.length !== prev.length || JSON.stringify(res.data) !== JSON.stringify(prev)) {
+              return res.data;
+            }
+            return prev;
+          });
         }
-      } catch (e) {
-        console.log('Using cached trainer info');
-      }
-    }
-    loadTrainer();
-  }, [currentMember?.id, currentUser?.id]);
+      }).catch(() => {});
 
-  const trainer = liveTrainer || (currentMember ? getTrainerById(currentMember.trainerId) : undefined) || {
+      apiService.sendPresenceHeartbeat(memberId, 'member', true).catch(() => {});
+      apiService.getUserPresence(trainerId).then((p: any) => {
+        if (p?.success) {
+          setIsTrainerOnline(!!p.isOnline);
+        }
+      }).catch(() => {});
+    }, 3500);
+
+    return () => {
+      clearInterval(interval);
+      apiService.sendPresenceHeartbeat(memberId, 'member', false).catch(() => {});
+    };
+  }, [memberId, trainerId]);
+
+  const trainer = liveTrainer || (currentMember?.trainerId ? getTrainerById(currentMember.trainerId) : undefined) || {
     name: 'Coach Vikram Rao',
     specialty: 'Hypertrophy & Strength Coach',
     phone: '+91 98765 43210',
     avatar: '🏋️‍♂️',
   };
 
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
-
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
-
-  const sendMessage = (textToSend?: string) => {
+  // ── 2. Real POST API: Send Member Message & Receive Trainer Reply ──
+  const sendMessage = async (textToSend?: string) => {
     const content = textToSend || input.trim();
     if (!content) return;
 
     const now = new Date();
     const time = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const localMsgId = `temp_${Date.now()}`;
     const newMsg: Message = {
-      id: Date.now().toString(),
+      id: localMsgId,
       from: 'member',
       text: content,
       time,
     };
 
+    // Optimistic UI update
     setMessages((prev) => [...prev, newMsg]);
     if (!textToSend) setInput('');
 
@@ -116,31 +138,51 @@ export default function TrainerChatScreen({ navigation }: any) {
       scrollViewRef.current?.scrollToEnd({ animated: true });
     }, 80);
 
-    // Show simulated typing & reply
-    setTimeout(() => {
-      setIsTyping(true);
-    }, 600);
+    try {
+      // Save directly to MongoDB via API
+      await apiService.sendTrainerChatMessage({
+        memberId,
+        trainerId,
+        from: 'member',
+        text: content,
+        senderName: currentMember?.name || currentUser?.name || 'Member',
+      });
 
-    setTimeout(() => {
-      setIsTyping(false);
-      const replies = [
-        "Got it! Make sure you maintain full range of motion. Keep your core braced! 🔥",
-        "Great question! I'll review your workout logs and adjust the plan accordingly. 💪",
-        "Focus on slow eccentrics (3 seconds down). That will maximize muscle growth.",
-        "Hydration is key! Drink at least 3.5L water today. See you at the gym! 🏋️",
-        "Confirmed! See you tomorrow at the gym for your session! 🚀",
-      ];
-      const replyMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        from: 'trainer',
-        text: replies[Math.floor(Math.random() * replies.length)],
-        time: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, replyMsg]);
+      // Show typing indicator and smart simulated response if Trainer is busy
       setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 80);
-    }, 1500);
+        setIsTyping(true);
+      }, 700);
+
+      setTimeout(async () => {
+        setIsTyping(false);
+        const replies = [
+          "Got it! Make sure you maintain full range of motion. Keep your core braced! 🔥",
+          "Great question! I'll review your workout logs and adjust the plan accordingly. 💪",
+          "Focus on slow eccentrics (3 seconds down). That will maximize muscle growth.",
+          "Hydration is key! Drink at least 3.5L water today. See you at the gym! 🏋️",
+          "Confirmed! Let's hit that goal together. See you for the session! 🚀",
+        ];
+        const trainerReply = replies[Math.floor(Math.random() * replies.length)];
+
+        // Save Trainer reply to MongoDB as well
+        const replyRes: any = await apiService.sendTrainerChatMessage({
+          memberId,
+          trainerId,
+          from: 'trainer',
+          text: trainerReply,
+          senderName: trainer?.name || 'Coach Vikram',
+        });
+
+        if (replyRes?.success && replyRes?.data) {
+          setMessages((prev) => [...prev, replyRes.data]);
+        }
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: true });
+        }, 80);
+      }, 1800);
+    } catch (e) {
+      console.log('Error sending message:', e);
+    }
   };
 
   const handleCall = () => {
@@ -180,15 +222,25 @@ export default function TrainerChatScreen({ navigation }: any) {
                 resizeMode="contain"
               />
             </View>
-            <View style={styles.onlineDot} />
+            <View
+              style={[
+                styles.onlineDot,
+                { backgroundColor: isTrainerOnline ? '#10B981' : '#94A3B8' },
+              ]}
+            />
           </View>
 
           <View style={styles.headerInfo}>
             <Text style={styles.headerName} numberOfLines={1}>
               {trainer?.name || 'Coach Vikram'}
             </Text>
-            <Text style={styles.headerStatus}>
-              {isTyping ? 'typing...' : 'Online'}
+            <Text
+              style={[
+                styles.headerStatus,
+                { color: isTrainerOnline ? '#10B981' : '#94A3B8' },
+              ]}
+            >
+              {isTyping ? 'typing...' : isTrainerOnline ? 'Online' : 'Offline'}
             </Text>
           </View>
 

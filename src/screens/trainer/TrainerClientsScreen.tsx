@@ -63,10 +63,11 @@ function AnimatedPressable({
 }
 
 export default function TrainerClientsScreen({ navigation }: any) {
-  const { currentTrainer } = useAppContext();
-  const trainerId = currentTrainer?.id || 't1';
+  const { currentTrainer, currentGym, currentUser } = useAppContext();
+  const trainerId = currentTrainer?.id || currentUser?.id || 't1';
+  const gymId = currentGym?.id || currentTrainer?.gymId;
 
-  const allClients = getMembersByTrainer(trainerId);
+  const allClients = getMembersByTrainer(trainerId, gymId);
   const [search, setSearch] = useState('');
   const [goalFilter, setGoalFilter] = useState<string>('all');
 

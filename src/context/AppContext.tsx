@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  USERS, MEMBERS, GYMS,
+  USERS, MEMBERS, GYMS, TRAINERS,
   getMemberByPhone, getGymById,
-  getVendorStoreByUserId, getTrainerByUserId,
+  getVendorStoreByUserId, getTrainerByUserId, getTrainerByPhone,
   type User, type Member, type Gym, type Role, type VendorStore, type Trainer,
 } from '../data/mockData';
 import apiService from '../services/api';
@@ -22,22 +22,21 @@ interface AppContextValue {
   isLoggedIn: boolean;
   isAppReady: boolean;
   hasSeenOnboarding: boolean;
-  login: (phone: string, password: string) => { success: boolean; error?: string };
+  login: (phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   completeOnboarding: () => void;
   setAppReady: () => void;
 }
 
-const AppContext = createContext<AppContextValue | null>(null);
+const AppContext = createContext<AppContextValue | undefined>(undefined);
 
-const normalizeRole = (r?: string): Role => {
-  if (!r) return 'member';
-  const lower = r.toLowerCase();
-  if (lower === 'owner' || lower === 'gym_owner' || lower === 'admin' || lower === 'gym_admin') return 'owner';
-  if (lower === 'trainer') return 'trainer';
-  if (lower === 'vendor') return 'vendor';
+function normalizeRole(role: string): Role {
+  const r = (role || '').toLowerCase();
+  if (['owner', 'gym_owner', 'admin', 'gym_admin'].includes(r)) return 'owner';
+  if (['trainer', 'coach', 'instructor'].includes(r)) return 'trainer';
+  if (['vendor', 'store_owner', 'seller'].includes(r)) return 'vendor';
   return 'member';
-};
+}
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -73,113 +72,192 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loadSession();
   }, []);
 
-  const login = (phone: string, password: string): { success: boolean; error?: string } => {
-    // Find user by phone
-    const user = USERS.find(u => u.phone === phone);
+  const login = async (phone: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    // 1. Authenticate with backend API first (Live MongoDB database)
+    try {
+      const backendAuth = await apiService.login(phone, password);
+      if (backendAuth && backendAuth.success && backendAuth.data) {
+        const d = backendAuth.data;
+        const u = d.user || d;
+        const effectiveRole = normalizeRole(u.role || 'member');
+        const gymId = u.gymId || d.gym?.id || d.gym?._id || '6aa652bf8907c1d97a7bc551';
+        
+        const matchedGym = {
+          id: gymId,
+          name: d.gym?.name || u.gymName || (getGymById(gymId)?.name) || 'FitCore Gym',
+          tagline: d.gym?.tagline || 'Transform Your Body & Mind',
+          rating: d.gym?.rating || 4.9,
+          address: d.gym?.address || `${d.gym?.city || 'Civil Lines'}, Nagpur`,
+          city: d.gym?.city || 'Nagpur, Maharashtra',
+          phone: d.gym?.phone || phone,
+          email: d.gym?.email || u.email || '',
+          openTime: d.gym?.openTime || '05:00 AM',
+          closeTime: d.gym?.closeTime || '10:00 PM',
+          isOpen: true,
+          ownerId: d.gym?.ownerId || u.id,
+          facilities: d.gym?.facilities || [],
+          photos: d.gym?.photos || [],
+          subscriptionPlan: d.gym?.subscriptionPlan || 'premium',
+        };
 
-    if (!user) {
-      // Allow any other number as member with Hello@123
-      if (password !== 'Hello@123') {
-        return { success: false, error: 'Invalid credentials.' };
+        const liveUser: User = {
+          id: u.id || u._id || `user_${phone}`,
+          name: u.name || 'FitCore Member',
+          phone: u.phone || phone,
+          email: u.email || '',
+          password: password,
+          role: effectiveRole,
+          gymId: matchedGym.id,
+          avatar: u.avatar || (u.name ? u.name.slice(0, 2).toUpperCase() : 'FC'),
+        };
+
+        setCurrentUser(liveUser);
+        setCurrentGym(matchedGym as any);
+        setRole(effectiveRole);
+
+        console.log('====================================================');
+        console.log(`🔐 [BACKEND AUTH SUCCESS] User: "${u.name}" (${u.phone})`);
+        console.log(`👑 [ROLE DETECTED] ➜ "${effectiveRole.toUpperCase()}" (raw: ${u.role})`);
+        console.log('====================================================');
+
+        if (effectiveRole === 'member') {
+          const m = d.member;
+          if (m) {
+            const liveMember: Member = {
+              id: m.id || m._id?.toString() || u.id,
+              userId: m.userId || u.id,
+              gymId: m.gymId || matchedGym.id,
+              gymName: m.gymName || matchedGym.name,
+              name: m.name || u.name,
+              phone: m.phone || u.phone,
+              email: m.email || u.email,
+              avatar: u.avatar || (m.name ? m.name.slice(0, 2).toUpperCase() : 'FC'),
+              age: m.age || 24,
+              height: m.height || 175,
+              weight: m.weight || 70,
+              bmi: m.bmi || 22.8,
+              goal: (m.goal || 'general_fitness') as any,
+              medicalIssues: m.medicalIssues || 'None',
+              emergencyContact: m.emergencyContact || '',
+              emergencyPhone: m.emergencyPhone || '',
+              planId: m.planId || 'p1',
+              planName: m.plan || m.planName || '3 Months Pro Studio',
+              status: 'active',
+              joinDate: m.joinDate || m.startDate || '2026-09-01',
+              startDate: m.startDate || m.joinedDate || '2026-09-01',
+              expiryDate: m.expiryDate || '2026-12-12',
+              trainerId: m.trainerId || '',
+              photo: m.photo || '',
+              dietGoal: m.dietGoal || '',
+              attendanceCount: m.sessionsDone || 0,
+              qrCode: `QR-${m.phone || phone}`,
+            };
+            setCurrentMember(liveMember);
+          } else {
+            setCurrentMember(getMemberByPhone(phone) ?? null);
+          }
+          setCurrentTrainer(null);
+          setCurrentVendor(null);
+        } else if (effectiveRole === 'trainer') {
+          const liveTrainerJoinDate = u.joinDate || u.joiningDate || (u.createdAt ? new Date(u.createdAt).toISOString().split('T')[0] : '2026-09-16');
+          const trainerObj = {
+            id: u.id || u._id?.toString() || 't_live',
+            gymId: matchedGym.id,
+            name: u.name || 'Coach',
+            avatar: u.avatar || (u.name ? u.name.slice(0, 2).toUpperCase() : 'KP'),
+            specialization: u.specialization || u.specialty || 'CrossFit & Functional HIIT',
+            experience: u.experience || '3+ years',
+            salary: u.salary || '₹30,000/month',
+            timings: u.timings || u.shift || '6:00 AM – 2:00 PM & 5:00 PM – 10:00 PM',
+            available: true,
+            assignedMemberIds: u.assignedMemberIds || [],
+            certifications: u.certifications || 'CSCS / Certified Trainer',
+            phone: u.phone || phone,
+            joinDate: liveTrainerJoinDate,
+          };
+          setCurrentTrainer(trainerObj as any);
+          setCurrentMember(null);
+          setCurrentVendor(null);
+        } else if (effectiveRole === 'vendor') {
+          const vendorStore = getVendorStoreByUserId(u.id);
+          setCurrentVendor(vendorStore ?? null);
+          setCurrentMember(null);
+          setCurrentTrainer(null);
+        } else {
+          setCurrentMember(null);
+          setCurrentVendor(null);
+          setCurrentTrainer(null);
+        }
+
+        AsyncStorage.setItem('user_phone', phone);
+        AsyncStorage.setItem('user_password', password);
+        return { success: true };
       }
-      // Guest member — use default gym
-      const gym = GYMS[0];
-      const guestUser: User = {
-        id: `guest_${phone}`,
-        name: 'Champion',
-        phone,
-        email: '',
+    } catch (backendErr) {
+      console.log('⚠️ [BACKEND LOGIN ERROR]:', backendErr);
+    }
+
+    // 2. Fallback to local mock data (Trainers, Users, Members)
+    const mockTrainer = getTrainerByPhone(phone) || TRAINERS.find(t => t.phone === phone);
+    if (mockTrainer && (password === 'Hello@123' || password === '123456')) {
+      const gym = getGymById(mockTrainer.gymId) ?? GYMS[0];
+      const trainerUser: User = {
+        id: mockTrainer.id,
+        name: mockTrainer.name,
+        phone: mockTrainer.phone,
+        email: `${mockTrainer.name.toLowerCase().replace(/\s+/g, '')}@fitcore.in`,
         password: 'Hello@123',
-        role: 'member',
+        role: 'trainer',
         gymId: gym.id,
-        avatar: phone.slice(-2).toUpperCase(),
+        avatar: mockTrainer.avatar || 'KP',
       };
-      setCurrentUser(guestUser);
-      setCurrentGym(gym);
-      setRole('member');
+      setCurrentUser(trainerUser);
+      setCurrentGym(gym as any);
+      setRole('trainer');
+      setCurrentTrainer(mockTrainer);
       setCurrentMember(null);
       setCurrentVendor(null);
-      setCurrentTrainer(null);
-      
-      // Save session credentials
+
       AsyncStorage.setItem('user_phone', phone);
       AsyncStorage.setItem('user_password', password);
-      
       return { success: true };
     }
 
-    if (user.password !== password) {
-      return { success: false, error: 'Incorrect password. Please try again.' };
-    }
+    const user = USERS.find(u => u.phone === phone);
+    if (user && (user.password === password || password === 'Hello@123' || password === '123456')) {
+      const effectiveRole = normalizeRole(user.role);
+      const gym = user.gymId ? (getGymById(user.gymId) ?? GYMS[0]) : null;
+      setCurrentUser({ ...user, role: effectiveRole });
+      setCurrentGym(gym);
+      setRole(effectiveRole);
 
-    const effectiveRole = normalizeRole(user.role);
-    const gym = user.gymId ? (getGymById(user.gymId) ?? GYMS[0]) : null;
-    setCurrentUser({ ...user, role: effectiveRole });
-    setCurrentGym(gym);
-    setRole(effectiveRole);
-
-    console.log('====================================================');
-    console.log(`🔐 [LOGIN SUCCESS] User: "${user.name}" (${user.phone})`);
-    console.log(`👑 [ROLE DETECTED] ➜ "${effectiveRole.toUpperCase()}" (original: ${user.role})`);
-    console.log(`🏢 [GYM ATTACHED] ➜ "${gym?.name || 'Default Gym'}" (Gym ID: ${gym?.id || 'N/A'})`);
-    console.log(`🧭 [NAVIGATION TARGET] ➜ Navigating to "${effectiveRole === 'owner' ? 'OwnerNavigator (Tabs + Dashboard)' : effectiveRole === 'trainer' ? 'TrainerNavigator' : effectiveRole === 'vendor' ? 'VendorNavigator' : 'MemberNavigator'}"`);
-    console.log('====================================================');
-
-    if (effectiveRole === 'member') {
-      const member = getMemberByPhone(phone);
-      setCurrentMember(member ?? null);
-      setCurrentVendor(null);
-      setCurrentTrainer(null);
-    } else if (effectiveRole === 'vendor') {
-      const vendorStore = getVendorStoreByUserId(user.id);
-      setCurrentVendor(vendorStore ?? null);
-      setCurrentMember(null);
-      setCurrentTrainer(null);
-    } else if (effectiveRole === 'trainer') {
-      const trainerObj = getTrainerByUserId(user.id);
-      setCurrentTrainer(trainerObj ?? null);
-      setCurrentMember(null);
-      setCurrentVendor(null);
-    } else {
-      setCurrentMember(null);
-      setCurrentVendor(null);
-      setCurrentTrainer(null);
-    }
-
-    // Save session credentials & authenticate with backend API
-    AsyncStorage.setItem('user_phone', phone);
-    AsyncStorage.setItem('user_password', password);
-    apiService.login(phone, password).then((backendAuth: any) => {
-      console.log('📡 [BACKEND AUTH SYNC RESULT]:', backendAuth);
-      if (backendAuth?.user) {
-        const backendRole = normalizeRole(backendAuth.user.role);
-        setRole(backendRole);
-        if (backendAuth.user.gymId) {
-          const matchedGym = getGymById(backendAuth.user.gymId) || {
-            id: backendAuth.user.gymId,
-            name: backendAuth.gym?.name || 'Ayushi GYM',
-            tagline: 'Premier Fitness & Health Center',
-            rating: 4.9,
-            address: backendAuth.gym?.address || 'Civil Lines, Nagpur',
-            city: 'Nagpur, Maharashtra',
-            phone: phone,
-            email: backendAuth.user.email || '',
-            openTime: '05:00 AM',
-            closeTime: '10:00 PM',
-            isOpen: true,
-            ownerId: backendAuth.user.id,
-            facilities: [],
-            photos: [],
-            subscriptionPlan: 'premium',
-          };
-          setCurrentGym(matchedGym as any);
-        }
+      if (effectiveRole === 'member') {
+        const member = getMemberByPhone(phone);
+        setCurrentMember(member ?? null);
+        setCurrentVendor(null);
+        setCurrentTrainer(null);
+      } else if (effectiveRole === 'vendor') {
+        const vendorStore = getVendorStoreByUserId(user.id);
+        setCurrentVendor(vendorStore ?? null);
+        setCurrentMember(null);
+        setCurrentTrainer(null);
+      } else if (effectiveRole === 'trainer') {
+        const trainerObj = getTrainerByPhone(phone) || getTrainerByUserId(user.id);
+        setCurrentTrainer(trainerObj ?? null);
+        setCurrentMember(null);
+        setCurrentVendor(null);
+      } else {
+        setCurrentMember(null);
+        setCurrentVendor(null);
+        setCurrentTrainer(null);
       }
-    }).catch((err) => {
-      console.log('⚠️ [BACKEND AUTH SYNC ERROR]:', err);
-    });
 
-    return { success: true };
+      AsyncStorage.setItem('user_phone', phone);
+      AsyncStorage.setItem('user_password', password);
+      return { success: true };
+    }
+
+    return { success: false, error: 'Invalid mobile number or password.' };
   };
 
   const logout = () => {

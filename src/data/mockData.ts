@@ -199,24 +199,31 @@ export interface Member {
   id: string;
   userId: string;
   gymId: string;
+  gymName?: string;
   name: string;
   phone: string;
   email: string;
-  avatar: string;
-  age: number;
-  height: number; // cm
-  weight: number; // kg
-  bmi: number;
+  avatar?: string;
+  age?: number;
+  gender?: string;
+  height?: number; // cm
+  weight?: number; // kg
+  bmi?: number;
   goal: GoalType;
-  medicalIssues: string;
-  emergencyContact: string;
-  emergencyPhone: string;
+  medicalIssues?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
   planId: string;
+  planName?: string;
   status: MemberStatus;
-  joinDate: string;
+  joinDate?: string;
+  startDate?: string;
   expiryDate: string;
-  trainerId: string;
-  photo: string;
+  trainerId?: string;
+  photo?: string;
+  dietGoal?: string;
+  attendanceCount?: number;
+  qrCode?: string;
 }
 
 export const USERS: User[] = [
@@ -235,6 +242,16 @@ export const USERS: User[] = [
     name: 'Ayushi Singh',
     phone: '1234567890',
     email: 'ayushi@gmail.com',
+    password: 'Hello@123',
+    role: 'owner',
+    gymId: '6a934afd13a1b16c3767d90f',
+    avatar: 'AS',
+  },
+  {
+    id: 'owner_ayushi',
+    name: 'Ayushi Sharma',
+    phone: '7894561230',
+    email: 'owner789@fitcore.in',
     password: 'Hello@123',
     role: 'owner',
     gymId: '6a934afd13a1b16c3767d90f',
@@ -319,6 +336,16 @@ export const USERS: User[] = [
     role: 'trainer',
     gymId: 'g1',
     avatar: 'AJ',
+  },
+  {
+    id: 'trainer3',
+    name: 'Kunal Pande',
+    phone: '8888888888',
+    email: 'kunal@fitcore.in',
+    password: 'Hello@123',
+    role: 'trainer',
+    gymId: 'g1',
+    avatar: 'KP',
   },
 ];
 
@@ -526,6 +553,21 @@ export const TRAINERS: Trainer[] = [
     certifications: 'ACSM Certified',
     phone: '9333444555',
     joinDate: '2023-08-01',
+  },
+  {
+    id: 't4',
+    gymId: 'gym1',
+    name: 'Kunal Pande',
+    avatar: 'KP',
+    specialization: 'CrossFit & Functional HIIT',
+    experience: '3+ years',
+    salary: '₹30,000/month',
+    timings: '6:00 AM – 2:00 PM & 5:00 PM – 10:00 PM',
+    available: true,
+    assignedMemberIds: ['m1', 'm2'],
+    certifications: 'CSCS / Certified Trainer',
+    phone: '8888888888',
+    joinDate: '2026-08-01',
   },
 ];
 
@@ -1945,10 +1987,22 @@ export function getTrainerByPhone(phone: string): Trainer | undefined {
   return TRAINERS.find(t => t.phone === phone);
 }
 
-export function getMembersByTrainer(trainerId: string): Member[] {
+export function getMembersByTrainer(trainerId: string, gymId?: string): Member[] {
   const cleanId = trainerId.startsWith('trainer') ? 't' + trainerId.replace('trainer', '') : trainerId;
   const trainer = TRAINERS.find(t => t.id === cleanId || t.id === trainerId);
-  return MEMBERS.filter(m => m.trainerId === cleanId || m.trainerId === trainerId || (trainer && trainer.assignedMemberIds.includes(m.id)));
+  const targetGymId = gymId || trainer?.gymId;
+
+  return MEMBERS.filter(m => {
+    // If targetGymId exists, ensure member belongs to this gym
+    if (targetGymId) {
+      const g1 = m.gymId ? m.gymId.replace('gym', 'g') : '';
+      const g2 = targetGymId.replace('gym', 'g');
+      if (g1 && g2 && g1 !== g2 && m.gymId !== targetGymId) {
+        return false;
+      }
+    }
+    return m.trainerId === cleanId || m.trainerId === trainerId || (trainer && trainer.assignedMemberIds.includes(m.id));
+  });
 }
 
 export interface PTSession {
@@ -1963,14 +2017,24 @@ export interface PTSession {
 }
 
 export const PT_SESSIONS: PTSession[] = [
-  { id: 'pt1', trainerId: 't1', memberId: 'm1', memberName: 'Arjun Mehta', date: '2026-06-30', time: '06:00 AM', focus: 'Legs Day Form Correction', status: 'scheduled' },
-  { id: 'pt2', trainerId: 't1', memberId: 'm3', memberName: 'Rahul Desai', date: '2026-06-30', time: '08:00 AM', focus: 'Deadlift Form check', status: 'scheduled' },
-  { id: 'pt3', trainerId: 't1', memberId: 'm6', memberName: 'Ananya Jain', date: '2026-07-01', time: '05:00 PM', focus: 'HIIT Conditioning', status: 'scheduled' },
+  { id: 'pt1', trainerId: 't1', memberId: 'm1', memberName: 'Arjun Mehta', date: '2026-09-17', time: '06:00 AM', focus: 'Legs Day Form Correction', status: 'scheduled' },
+  { id: 'pt2', trainerId: 't1', memberId: 'm3', memberName: 'Rahul Desai', date: '2026-09-17', time: '08:00 AM', focus: 'Deadlift Form check', status: 'scheduled' },
+  { id: 'pt3', trainerId: 't1', memberId: 'm6', memberName: 'Ananya Jain', date: '2026-09-18', time: '05:00 PM', focus: 'HIIT Conditioning', status: 'scheduled' },
 ];
 
-export function getPTBookingsForTrainer(trainerId: string): PTSession[] {
+export function getPTBookingsForTrainer(trainerId: string, gymId?: string): PTSession[] {
   const cleanId = trainerId.startsWith('trainer') ? 't' + trainerId.replace('trainer', '') : trainerId;
-  return PT_SESSIONS.filter(s => s.trainerId === cleanId || s.trainerId === trainerId);
+  const trainerMembers = getMembersByTrainer(trainerId, gymId);
+  const validMemberIds = trainerMembers.map(m => m.id);
+
+  return PT_SESSIONS.filter(s => {
+    const matchTrainer = (s.trainerId === cleanId || s.trainerId === trainerId);
+    if (!matchTrainer) return false;
+    if (validMemberIds.length > 0) {
+      return validMemberIds.includes(s.memberId);
+    }
+    return true;
+  });
 }
 
 export function addPTBooking(session: Omit<PTSession, 'id' | 'status'>) {
@@ -1994,7 +2058,7 @@ export function updateWorkoutPlanForMember(memberId: string, days: WorkoutDay[])
     WORKOUT_PLANS.push({
       id: `wp_${Date.now()}`,
       gymId: member.gymId,
-      trainerId: member.trainerId,
+      trainerId: member.trainerId || 'trainer1',
       memberId: memberId,
       name: 'Custom Assigned Workout Plan',
       goal: member.goal,

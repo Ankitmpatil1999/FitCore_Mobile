@@ -2,6 +2,10 @@
 # FitCore Root .gitignore - Prevent Data, Secret, Binary & Document Leaks
 # ==============================================================================
 
+# ── Standalone Projects (fitcore-web & FitCoreB live in their own repos) ────
+FitCoreB/
+fitcore-web/
+
 # ── Local Database Storage (CRITICAL: NEVER COMMIT DB FILES) ────────────────
 mongodb_data/
 *.wt

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Image,
@@ -6,6 +6,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
+import { apiService } from '../../services/api';
+import { useAppContext } from '../../context/AppContext';
+import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 
 const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 
@@ -55,7 +58,33 @@ const MOCK_NOTIFICATIONS = [
 ];
 
 export default function NotificationsScreen({ navigation }: any) {
+  const { role, currentUser, currentMember, currentGym } = useAppContext();
   const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+
+  useEffect(() => {
+    async function loadNotifications() {
+      try {
+        const gymId = currentGym?.id || (currentMember as any)?.gymId || currentUser?.gymId;
+        const userId = (currentMember as any)?.id || (currentMember as any)?._id || currentUser?.id;
+        const res: any = await apiService.getNotifications(role || 'member', gymId, userId);
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          const mapped = res.data.map((n: any, idx: number) => ({
+            id: n.id || n._id || String(idx),
+            title: n.title,
+            body: n.message || n.body,
+            time: n.time || n.date || 'Recently',
+            read: n.isRead || false,
+            icon: n.icon || (n.type === 'checkin' ? 'checkmark-circle' : n.type === 'checkout' ? 'flame' : n.type === 'renewal' || n.type === 'admission' ? 'document' : 'megaphone'),
+            color: n.color || (n.type === 'checkin' ? Colors.success : n.type === 'checkout' ? '#FF5C5C' : Colors.primaryGreen),
+          }));
+          setNotifications(mapped);
+        }
+      } catch (e) {
+        console.log('Using default notifications list');
+      }
+    }
+    loadNotifications();
+  }, [role, currentUser, currentMember, currentGym]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 

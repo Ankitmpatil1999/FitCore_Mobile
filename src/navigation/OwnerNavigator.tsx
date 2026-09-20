@@ -13,28 +13,30 @@ import ProductStoreScreen from '../screens/owner/ProductStoreScreen';
 import OwnerAnalytics from '../screens/owner/OwnerAnalytics';
 import MembershipPlansScreen from '../screens/owner/MembershipPlansScreen';
 import GymProfileScreen from '../screens/owner/GymProfileScreen';
+import OwnerWorkoutPlansScreen from '../screens/owner/OwnerWorkoutPlansScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
 function OwnerTabNavigator() {
   const insets = useSafeAreaInsets();
-  const bottomInset = insets.bottom > 0 ? insets.bottom : 8;
+  const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
 
   return (
     <Tab.Navigator
+      initialRouteName="Dashboard"
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
         tabBarStyle: [
           styles.tabBar,
           {
-            height: Platform.OS === 'android' ? 68 + bottomInset : 64 + bottomInset,
-            paddingBottom: bottomInset + 4,
+            height: 60 + bottomInset,
+            paddingBottom: bottomInset,
           },
         ],
         tabBarItemStyle: styles.tabBarItem,
-        tabBarActiveTintColor: '#4F46E5',
+        tabBarActiveTintColor: '#6C5CE7',
         tabBarInactiveTintColor: '#94A3B8',
         tabBarLabelStyle: styles.tabBarLabel,
       }}
@@ -43,13 +45,13 @@ function OwnerTabNavigator() {
         name="Dashboard"
         component={OwnerDashboard}
         options={{
-          tabBarLabel: 'Dashboard',
+          tabBarLabel: 'Home',
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.iconWrapper, focused && styles.iconWrapperActive]}>
+            <View style={styles.iconWrapper}>
               <AppIcon
-                name="dashboard"
+                name="home"
                 size={22}
-                color={focused ? '#4F46E5' : '#94A3B8'}
+                color={focused ? '#6C5CE7' : '#94A3B8'}
               />
             </View>
           ),
@@ -61,59 +63,59 @@ function OwnerTabNavigator() {
         options={{
           tabBarLabel: 'Members',
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.iconWrapper, focused && styles.iconWrapperActive]}>
+            <View style={styles.iconWrapper}>
               <AppIcon
                 name="members"
                 size={22}
-                color={focused ? '#4F46E5' : '#94A3B8'}
+                color={focused ? '#6C5CE7' : '#94A3B8'}
               />
             </View>
           ),
         }}
       />
       <Tab.Screen
-        name="Attendance"
+        name="Packages"
+        component={MembershipPlansScreen}
+        options={{
+          tabBarLabel: 'Packages',
+          tabBarIcon: ({ focused }) => (
+            <View style={styles.iconWrapper}>
+              <AppIcon
+                name="plan"
+                size={22}
+                color={focused ? '#6C5CE7' : '#94A3B8'}
+              />
+            </View>
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Reports"
         component={OwnerAnalytics}
         options={{
-          tabBarLabel: 'Live QR',
+          tabBarLabel: 'Reports',
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.iconWrapper, focused && styles.iconWrapperActive]}>
+            <View style={styles.iconWrapper}>
               <AppIcon
-                name="attendance"
+                name="chart"
                 size={22}
-                color={focused ? '#4F46E5' : '#94A3B8'}
+                color={focused ? '#6C5CE7' : '#94A3B8'}
               />
             </View>
           ),
         }}
       />
       <Tab.Screen
-        name="Finance"
-        component={PaymentsScreen}
-        options={{
-          tabBarLabel: 'Finance',
-          tabBarIcon: ({ focused }) => (
-            <View style={[styles.iconWrapper, focused && styles.iconWrapperActive]}>
-              <AppIcon
-                name="finance"
-                size={22}
-                color={focused ? '#4F46E5' : '#94A3B8'}
-              />
-            </View>
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Profile"
+        name="More"
         component={GymProfileScreen}
         options={{
-          tabBarLabel: 'Profile',
+          tabBarLabel: 'More',
           tabBarIcon: ({ focused }) => (
-            <View style={[styles.iconWrapper, focused && styles.iconWrapperActive]}>
+            <View style={styles.iconWrapper}>
               <AppIcon
                 name="gym"
                 size={22}
-                color={focused ? '#4F46E5' : '#94A3B8'}
+                color={focused ? '#6C5CE7' : '#94A3B8'}
               />
             </View>
           ),
@@ -133,6 +135,8 @@ export default function OwnerNavigator() {
       <Stack.Screen name="Plans" component={MembershipPlansScreen} />
       <Stack.Screen name="Shop" component={ProductStoreScreen} />
       <Stack.Screen name="Analytics" component={OwnerAnalytics} />
+      <Stack.Screen name="GymProfile" component={GymProfileScreen} />
+      <Stack.Screen name="WorkoutPlans" component={OwnerWorkoutPlansScreen} />
     </Stack.Navigator>
   );
 }
@@ -141,13 +145,13 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    paddingTop: 6,
-    elevation: 20,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+    borderTopColor: '#ECEAFD',
+    paddingTop: 8,
+    elevation: 10,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
   },
   tabBarItem: {
     justifyContent: 'center',
@@ -155,19 +159,15 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   tabBarLabel: {
-    fontSize: 11,
-    fontWeight: '700',
+    fontSize: 10.5,
+    fontWeight: '600',
     marginTop: 2,
-    letterSpacing: -0.2,
+    marginBottom: 2,
   },
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 38,
-    height: 30,
-    borderRadius: 15,
-  },
-  iconWrapperActive: {
-    backgroundColor: 'rgba(79, 70, 229, 0.12)',
+    width: 32,
+    height: 32,
   },
 });

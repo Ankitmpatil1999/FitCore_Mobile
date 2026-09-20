@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography } from '../theme';
 
@@ -21,12 +22,21 @@ const TAB_CONFIG: Record<string, { icon: string; iconOutline: string }> = {
 };
 
 export default function VendorNavigator() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 60 + bottomInset,
+            paddingBottom: bottomInset,
+          },
+        ],
         tabBarItemStyle: styles.tabBarItem,
         tabBarActiveTintColor: '#6C5CE7',
         tabBarInactiveTintColor: '#94A3B8',
@@ -60,26 +70,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#ECEAFD',
-    height: 76,
-    paddingBottom: 10,
     paddingTop: 8,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    elevation: 8,
+    elevation: 10,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 10,
   },
   tabBarItem: {
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingVertical: 2,
   },
   tabBarLabel: {
     fontSize: 10.5,
     fontWeight: '600',
     marginTop: 2,
+    marginBottom: 2,
   },
   iconWrapper: {
     alignItems: 'center',
@@ -88,3 +95,4 @@ const styles = StyleSheet.create({
     height: 32,
   },
 });
+

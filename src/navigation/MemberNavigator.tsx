@@ -1,7 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StyleSheet, View, Image } from 'react-native';
+import { StyleSheet, View, Image, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors } from '../theme';
 
@@ -13,7 +14,6 @@ import ProfileScreen from '../screens/member/ProfileScreen';
 
 // Stack screens
 import ExerciseDetailScreen from '../screens/member/ExerciseDetailScreen';
-import ActiveWorkoutScreen from '../screens/member/ActiveWorkoutScreen';
 import DietScreen from '../screens/member/DietScreen';
 import MyGymScreen from '../screens/member/MyGymScreen';
 import MembershipScreen from '../screens/member/MembershipScreen';
@@ -22,6 +22,11 @@ import TrainerChatScreen from '../screens/member/TrainerChatScreen';
 import NotificationsScreen from '../screens/member/NotificationsScreen';
 import ClassesScreen from '../screens/member/ClassesScreen';
 import CartCheckoutScreen from '../screens/member/CartCheckoutScreen';
+import AttendanceHistoryScreen from '../screens/member/AttendanceHistoryScreen';
+import HelpSupportScreen from '../screens/member/HelpSupportScreen';
+import LegalWebviewScreen from '../screens/member/LegalWebviewScreen';
+import DeleteAccountScreen from '../screens/member/DeleteAccountScreen';
+import AboutScreen from '../screens/member/AboutScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -34,13 +39,22 @@ const progressIcon = require('../assets/Icons2/bar-chart.png');
 const meIcon = require('../assets/Icons2/user.png');
 
 function MemberTabNavigator() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
+
   return (
     <Tab.Navigator
       initialRouteName="Home"
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 60 + bottomInset,
+            paddingBottom: bottomInset,
+          },
+        ],
         tabBarItemStyle: styles.tabBarItem,
         tabBarActiveTintColor: '#6C5CE7',
         tabBarInactiveTintColor: '#94A3B8',
@@ -158,7 +172,6 @@ export default function MemberNavigator() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="MainTabs" component={MemberTabNavigator} />
       <Stack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} />
-      <Stack.Screen name="ActiveWorkout" component={ActiveWorkoutScreen} />
       <Stack.Screen name="Check-In" component={CheckInScreen} />
       <Stack.Screen name="My Gym" component={MyGymScreen} />
       <Stack.Screen name="Membership" component={MembershipScreen} />
@@ -166,10 +179,16 @@ export default function MemberNavigator() {
       <Stack.Screen name="Diet" component={DietScreen} />
       <Stack.Screen name="Shop" component={ShopScreen} />
       <Stack.Screen name="Trainer Chat" component={TrainerChatScreen} />
+      <Stack.Screen name="Trainer" component={TrainerChatScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
       <Stack.Screen name="Classes" component={ClassesScreen} />
       <Stack.Screen name="Book Slot" component={ClassesScreen} />
       <Stack.Screen name="CartCheckout" component={CartCheckoutScreen} />
+      <Stack.Screen name="AttendanceHistory" component={AttendanceHistoryScreen} />
+      <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+      <Stack.Screen name="LegalWebview" component={LegalWebviewScreen} />
+      <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
+      <Stack.Screen name="About" component={AboutScreen} />
     </Stack.Navigator>
   );
 }
@@ -179,26 +198,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#ECEAFD',
-    height: 76,
-    paddingBottom: 10,
     paddingTop: 8,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    elevation: 8,
+    elevation: 10,
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: -3 },
     shadowOpacity: 0.05,
     shadowRadius: 10,
   },
   tabBarItem: {
-    height: 52,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 2,
   },
   tabBarLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '600',
     marginTop: 2,
     marginBottom: 2,

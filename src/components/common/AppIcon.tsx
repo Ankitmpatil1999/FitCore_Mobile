@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, ImageStyle, StyleProp, View, Text, StyleSheet } from 'react-native';
+import VectorIcon from 'react-native-vector-icons/Ionicons';
 
 // Asset dictionary
 const ICONS = {
@@ -50,9 +51,12 @@ const ICONS = {
   clock: require('../../assets/Icons2/clock.png'),
   calendar: require('../../assets/Icons2/calendar.png'),
   'calendar-outline': require('../../assets/Icons2/calendar.png'),
-  notifications: require('../../assets/Icons/Aleart.png'),
-  'notifications-outline': require('../../assets/Icons/Aleart.png'),
-  alert: require('../../assets/Icons/Aleart.png'),
+  notifications: require('../../assets/Icons2/bell.png'),
+  'notifications-outline': require('../../assets/Icons2/bell.png'),
+  bell: require('../../assets/Icons2/bell.png'),
+  'bell-outline': require('../../assets/Icons2/bell.png'),
+  broadcast: require('../../assets/Icons2/bell.png'),
+  alert: require('../../assets/Icons2/bell.png'),
   whatsapp: require('../../assets/Icons2/whatsapp.png'),
   'logo-whatsapp': require('../../assets/Icons2/whatsapp.png'),
   edit: require('../../assets/Icons/edit.png'),
@@ -97,6 +101,7 @@ interface AppIconProps {
 }
 
 export default function AppIcon({ name, size = 20, color, style }: AppIconProps) {
+
   // Vector glyph helpers for geometric icons
   if (name === 'close' || name === 'close-circle' || name === 'close-outline') {
     return (
@@ -182,3 +187,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+

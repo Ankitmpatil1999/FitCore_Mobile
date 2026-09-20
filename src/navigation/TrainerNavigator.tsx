@@ -1,8 +1,8 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import { StyleSheet, View, Image } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons';
+import { StyleSheet, View, Image, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../theme';
 
 import TrainerDashboard from '../screens/trainer/TrainerDashboard';
@@ -12,8 +12,10 @@ import AssignWorkoutScreen from '../screens/trainer/AssignWorkoutPlanScreen';
 import AssignDietScreen from '../screens/trainer/AssignDietPlanScreen';
 import TrainerChatScreen from '../screens/trainer/TrainerChatScreen';
 import ScheduleSessionsScreen from '../screens/trainer/ScheduleSessionsScreen';
-import UploadVideosScreen from '../screens/trainer/UploadVideosScreen';
 import TrainerProfileScreen from '../screens/trainer/TrainerProfileScreen';
+import TrainerAttendanceScreen from '../screens/trainer/TrainerAttendanceScreen';
+import TrainerReviewsScreen from '../screens/trainer/TrainerReviewsScreen';
+import TrainerLeaveRequestScreen from '../screens/trainer/TrainerLeaveRequestScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -24,12 +26,21 @@ const plansIcon = require('../assets/Bottom bar/plan.png');
 const profileIcon = require('../assets/Bottom bar/gym.png');
 
 function TrainerTabNavigator() {
+  const insets = useSafeAreaInsets();
+  const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
+
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarShowLabel: true,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [
+          styles.tabBar,
+          {
+            height: 60 + bottomInset,
+            paddingBottom: bottomInset,
+          },
+        ],
         tabBarItemStyle: styles.tabBarItem,
         tabBarActiveTintColor: '#6C5CE7',
         tabBarInactiveTintColor: '#94A3B8',
@@ -125,7 +136,9 @@ export default function TrainerNavigator() {
       <Stack.Screen name="AssignDiet" component={AssignDietScreen} />
       <Stack.Screen name="ScheduleSessions" component={ScheduleSessionsScreen} />
       <Stack.Screen name="TrainerChat" component={TrainerChatScreen} />
-      <Stack.Screen name="UploadVideos" component={UploadVideosScreen} />
+      <Stack.Screen name="TrainerAttendance" component={TrainerAttendanceScreen} />
+      <Stack.Screen name="TrainerReviews" component={TrainerReviewsScreen} />
+      <Stack.Screen name="TrainerLeaveRequest" component={TrainerLeaveRequestScreen} />
     </Stack.Navigator>
   );
 }
@@ -135,26 +148,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#ECEAFD',
-    height: 76,
-    paddingBottom: 10,
     paddingTop: 8,
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    elevation: 8,
+    elevation: 10,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.04,
+    shadowOpacity: 0.05,
     shadowRadius: 10,
   },
   tabBarItem: {
-    height: 52,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 2,
   },
   tabBarLabel: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '600',
     marginTop: 2,
     marginBottom: 2,
@@ -170,3 +177,4 @@ const styles = StyleSheet.create({
     height: 22,
   },
 });
+

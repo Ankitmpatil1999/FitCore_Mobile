@@ -468,7 +468,6 @@ const styles = StyleSheet.create({
     fontSize: fontScale(12),
     fontWeight: '700',
     color: '#0F172A',
-    marginBottom: 6,
   },
   modalInput: {
     backgroundColor: '#F8FAFC',

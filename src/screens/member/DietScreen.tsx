@@ -164,7 +164,7 @@ export default function DietScreen({ navigation }: any) {
   useEffect(() => {
     const fetchDiet = async () => {
       try {
-        const memberId = currentMember?.id || currentUser?.id;
+        const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
         const res: any = await apiService.getMemberDiet(memberId);
         if (res.success && res.data) {
           const data = res.data;

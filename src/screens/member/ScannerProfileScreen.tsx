@@ -18,6 +18,7 @@ import { useAppContext } from '../../context/AppContext';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { getPlanById, getDaysRemaining } from '../../data/mockData';
 import { apiService } from '../../services/api';
+import { CheckInOutModal } from '../../components/common/CheckInOutModal';
 
 const qrAssetImg = require('../../assets/Icons2/qr.png');
 const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
@@ -25,14 +26,26 @@ const clockImg = require('../../assets/Icons2/clock.png');
 
 export default function CheckInScreen({ navigation }: any) {
   const { currentMember, currentUser, currentGym } = useAppContext();
-  const plan = currentMember ? getPlanById(currentMember.planId) : undefined;
-  const daysLeft = currentMember ? getDaysRemaining(currentMember.expiryDate) : 149;
+  const daysLeft = currentMember?.expiryDate ? getDaysRemaining(currentMember.expiryDate) : 0;
 
   const [activeTab, setActiveTab] = useState<'qr' | 'history'>('qr');
   const [qrToken, setQrToken] = useState<string>('FITCORE_PASS:LIVE_TOKEN');
   const [refreshCountdown, setRefreshCountdown] = useState<number>(60);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const [popupModal, setPopupModal] = useState<{
+    visible: boolean;
+    type: 'checkin' | 'checkout';
+    duration?: string;
+    message?: string;
+    timeStr?: string;
+  }>({
+    visible: false,
+    type: 'checkin',
+    duration: '45 min',
+    message: '',
+  });
 
   // Live Attendance State
   const [attendanceData, setAttendanceData] = useState<any>({
@@ -139,38 +152,89 @@ export default function CheckInScreen({ navigation }: any) {
     ]).start();
   }, []);
 
-  // ── Handle Check-In ──
+  // ── Instant Optimistic Check-In ──
   const handleCheckIn = async () => {
     if (actionLoading) return;
+    const memberName = currentUser?.name || currentMember?.name || 'Member';
+    const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1';
+    const gymId = currentUser?.gymId || currentGym?.id || '6a934afd13a1b16c3767d90f';
+    const memberPhone = currentUser?.phone || currentMember?.phone || '';
+    const nowTimeFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    // 1. Instant Optimistic UI Update (0ms)
+    setAttendanceData((prev: any) => ({
+      ...prev,
+      todaySession: {
+        ...prev?.todaySession,
+        isCheckedIn: true,
+        isCheckedOut: false,
+        checkInFormatted: nowTimeFormatted,
+        durationFormatted: '0 min',
+      },
+      totalSessions: (prev?.totalSessions || 0) + 1,
+    }));
+    setPopupModal({
+      visible: true,
+      type: 'checkin',
+      message: `Welcome ${memberName}! Checked in successfully for your workout.`,
+    });
+
+    // 2. Background API Sync
     try {
       setActionLoading(true);
-      const memberId = currentMember?.id || currentUser?.id || 'm1';
-      const gymId = currentGym?.id || '65123456789abcdef0123456';
-      const res: any = await apiService.checkIn(memberId, gymId, 'qr_code');
-
-      if (res.success) {
-        await loadAttendanceHistory();
-      }
+      await apiService.checkIn(
+        memberId,
+        gymId,
+        'qr_code',
+        memberName,
+        memberPhone
+      );
+      loadAttendanceHistory();
     } catch (err: any) {
-      console.log('Check-in error:', err);
+      console.log('Background check-in sync:', err);
     } finally {
       setActionLoading(false);
     }
   };
 
-  // ── Handle Check-Out ──
+  // ── Instant Optimistic Check-Out ──
   const handleCheckOut = async () => {
     if (actionLoading) return;
+    const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1';
+    const memberPhone = currentUser?.phone || currentMember?.phone || '';
+    const nowTimeFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    // 1. Instant Optimistic UI Update (0ms)
+    setAttendanceData((prev: any) => ({
+      ...prev,
+      todaySession: {
+        ...prev?.todaySession,
+        isCheckedIn: true,
+        isCheckedOut: true,
+        checkOutFormatted: nowTimeFormatted,
+      },
+    }));
+    setPopupModal({
+      visible: true,
+      type: 'checkout',
+      duration: 'Session Complete',
+      message: 'Checked out successfully! Session ended.',
+    });
+
+    // 2. Background API Sync
     try {
       setActionLoading(true);
-      const memberId = currentMember?.id || currentUser?.id || 'm1';
-      const res: any = await apiService.checkOut(memberId);
-
-      if (res.success) {
-        await loadAttendanceHistory();
+      const res: any = await apiService.checkOut(memberId, memberPhone);
+      if (res?.data?.durationFormatted) {
+        setPopupModal((prev: any) => ({
+          ...prev,
+          duration: res.data.durationFormatted,
+          message: `Checked out successfully! Session ended. Total time: ${res.data.durationFormatted}`,
+        }));
       }
+      loadAttendanceHistory();
     } catch (err: any) {
-      console.log('Check-out error:', err);
+      console.log('Background check-out sync:', err);
     } finally {
       setActionLoading(false);
     }
@@ -278,8 +342,8 @@ export default function CheckInScreen({ navigation }: any) {
                 {/* Gym Header */}
                 <View style={styles.passHeader}>
                   <View>
-                    <Text style={styles.passGymTitle}>{currentGym?.name ?? 'FitCore Elite Gym'}</Text>
-                    <Text style={styles.passPlanText}>{plan?.name ?? 'Annual Gold Pass'} Member</Text>
+                    <Text style={styles.passGymTitle}>{currentGym?.name || currentMember?.gymName || 'FitCore Gym'}</Text>
+                    <Text style={styles.passPlanText}>{currentMember?.planName || 'Active Membership'} Member</Text>
                   </View>
                   <View style={styles.passStatusBadge}>
                     <Text style={styles.passStatusText}>ACTIVE PASS</Text>
@@ -306,12 +370,14 @@ export default function CheckInScreen({ navigation }: any) {
                 <View style={styles.passFooter}>
                   <View style={styles.passAvatar}>
                     <Text style={styles.passAvatarText}>
-                      {currentUser?.avatar ?? 'AP'}
+                      {currentUser?.avatar || (currentMember?.name ? currentMember.name.slice(0, 2).toUpperCase() : 'FC')}
                     </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.passMemberName}>{currentUser?.name ?? 'Arjun Patil'}</Text>
-                    <Text style={styles.passMemberId}>ID: FC-892019 • Valid {daysLeft} days remaining</Text>
+                    <Text style={styles.passMemberName}>{currentMember?.name || currentUser?.name || 'Member'}</Text>
+                    <Text style={styles.passMemberId}>
+                      ID: {currentMember?.userId || (currentUser?.phone ? `#FC-${currentUser.phone.slice(-4)}` : 'FC-MEM')} • Valid {daysLeft} days remaining
+                    </Text>
                   </View>
                   <Icon name="shield-checkmark" size={moderateScale(22)} color="#6C5CE7" />
                 </View>
@@ -429,6 +495,18 @@ export default function CheckInScreen({ navigation }: any) {
 
           <View style={{ height: hp(6) }} />
         </ScrollView>
+
+        {/* ── HIGH-FIDELITY CHECK-IN & CHECK-OUT POPUP MODAL ── */}
+        <CheckInOutModal
+          visible={popupModal.visible}
+          type={popupModal.type}
+          memberName={currentUser?.name || currentMember?.name || 'Member'}
+          gymName={currentGym?.name || 'FitCore Gym'}
+          duration={popupModal.duration || '45 min'}
+          message={popupModal.message}
+          timeStr={popupModal.timeStr}
+          onClose={() => setPopupModal(prev => ({ ...prev, visible: false }))}
+        />
       </View>
     </SafeAreaView>
   );

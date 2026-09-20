@@ -13,11 +13,15 @@ import {
   Animated,
   Easing,
   TouchableWithoutFeedback,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
+import { useAppContext } from '../../context/AppContext';
+import apiService from '../../services/api';
 
 // ── Interactive Scale on Press Component ──
 function AnimatedPressable({
@@ -62,8 +66,6 @@ function AnimatedPressable({
   );
 }
 
-const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
-
 interface PaymentRecord {
   id: string;
   name: string;
@@ -87,13 +89,9 @@ const INITIAL_TRANSACTIONS: PaymentRecord[] = [
   { id: 'TX-1008', name: 'Rahul Desai', amount: 999, type: 'received', method: 'cash', status: 'completed', date: '14 Aug', description: '1 Month Pass', category: 'Membership' },
 ];
 
-import { RefreshControl, ActivityIndicator } from 'react-native';
-import apiService from '../../services/api';
-import { useAppContext } from '../../context/AppContext';
-
 export default function PaymentsScreen({ navigation }: any) {
   const { currentGym, currentUser } = useAppContext();
-  const gymId = currentGym?.id || (currentUser as any)?.gymId || 'g1';
+  const gymId = currentGym?.id || (currentUser as any)?.gymId || '6a934afd13a1b16c3767d90f';
 
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,7 +121,7 @@ export default function PaymentsScreen({ navigation }: any) {
       const combined: PaymentRecord[] = [];
 
       // 1. Members revenue payments
-      if (memRes.success && Array.isArray(memRes.data)) {
+      if (memRes.success && Array.isArray(memRes.data) && memRes.data.length > 0) {
         memRes.data.forEach((m: any, idx: number) => {
           const amt = Number(m.amountPaid || m.planPrice || 2499);
           combined.push({
@@ -141,7 +139,7 @@ export default function PaymentsScreen({ navigation }: any) {
       }
 
       // 2. Expenses
-      if (expRes.success && Array.isArray(expRes.data)) {
+      if (expRes.success && Array.isArray(expRes.data) && expRes.data.length > 0) {
         expRes.data.forEach((e: any, idx: number) => {
           combined.push({
             id: `EXP-${e._id || e.id || idx}`,
@@ -157,11 +155,7 @@ export default function PaymentsScreen({ navigation }: any) {
         });
       }
 
-      if (combined.length > 0) {
-        setPayments(combined);
-      } else {
-        setPayments(INITIAL_TRANSACTIONS);
-      }
+      setPayments(combined.length > 0 ? combined : INITIAL_TRANSACTIONS);
     } catch (err) {
       console.log('Error fetching finance:', err);
       setPayments(INITIAL_TRANSACTIONS);
@@ -242,6 +236,7 @@ export default function PaymentsScreen({ navigation }: any) {
       setIsSubmitting(false);
     }
   };
+
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -455,8 +450,13 @@ export default function PaymentsScreen({ navigation }: any) {
                 style={styles.submitBtn}
                 onPress={handleAddTransaction}
                 activeOpacity={0.85}
+                disabled={isSubmitting}
               >
-                <Text style={styles.submitBtnText}>SAVE TRANSACTION</Text>
+                {isSubmitting ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitBtnText}>SAVE TRANSACTION</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>

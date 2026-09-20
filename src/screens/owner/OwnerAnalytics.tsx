@@ -272,6 +272,7 @@ export default function OwnerAnalytics({ navigation }: any) {
             })}
           </View>
 
+
           {/* ── REVENUE BAR CHART ── */}
           {activeTab === 'revenue' && (
             <View style={styles.chartCard}>

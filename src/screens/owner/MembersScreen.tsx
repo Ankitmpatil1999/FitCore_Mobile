@@ -20,16 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
-import {
-  MEMBERS,
-  MEMBERSHIP_PLANS,
-  TRAINERS,
-  Member,
-  MemberStatus,
-  getPlanById,
-  getTrainerById,
-  getDaysRemaining,
-} from '../../data/mockData';
+import { MEMBERS } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 import apiService from '../../services/api';
 
@@ -76,14 +67,13 @@ function AnimatedPressable({
   );
 }
 
-const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 const whatsappIconImg = require('../../assets/Icons2/whatsapp.png');
 
 type FilterType = 'all' | 'active' | 'expiring' | 'expired' | 'leads';
 
 export default function MembersScreen({ navigation }: any) {
   const { currentGym, currentUser } = useAppContext();
-  const gymId = currentGym?.id || (currentUser as any)?.gymId || 'g1';
+  const gymId = currentGym?.id || (currentUser as any)?.gymId || '6a934afd13a1b16c3767d90f';
 
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,7 +160,7 @@ export default function MembersScreen({ navigation }: any) {
     try {
       const res = await apiService.createOwnerMember({
         gymId,
-        gymName: currentGym?.name || 'Ayushi GYM',
+        gymName: currentGym?.name || 'FitCore Gym',
         name: fName.trim(),
         phone: fPhone.trim(),
         email: fEmail.trim() || `${fName.toLowerCase().replace(/\s+/g, '')}@gmail.com`,
@@ -192,6 +182,80 @@ export default function MembersScreen({ navigation }: any) {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleRenewMember = (member: any) => {
+    Alert.alert(
+      'Renew Member Subscription',
+      `Select membership package to renew ${member.name}:`,
+      [
+        {
+          text: '1 Month Pass (₹999)',
+          onPress: () => processRenewal(member, 30, '1 Month Pass', 999),
+        },
+        {
+          text: '3 Month Pass (₹2,499)',
+          onPress: () => processRenewal(member, 90, '3 Month Pass', 2499),
+        },
+        {
+          text: '6 Month Pass (₹3,999)',
+          onPress: () => processRenewal(member, 180, '6 Month Pass', 3999),
+        },
+        {
+          text: '12 Month Pass (₹6,999)',
+          onPress: () => processRenewal(member, 365, '12 Month Pass', 6999),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const processRenewal = async (member: any, days: number, planTitle: string, amount: number) => {
+    const currentExpiry = member.expiryDate ? new Date(member.expiryDate).getTime() : Date.now();
+    const baseDate = currentExpiry > Date.now() ? currentExpiry : Date.now();
+    const newExpiry = new Date(baseDate + days * 86400000).toISOString().split('T')[0];
+
+    const updated = members.map((m) => {
+      if (m.id === member.id || m._id === member._id || m.phone === member.phone) {
+        return {
+          ...m,
+          plan: planTitle,
+          planName: planTitle,
+          planPrice: amount,
+          expiryDate: newExpiry,
+          status: 'active',
+          daysRemaining: days,
+        };
+      }
+      return m;
+    });
+
+    setMembers(updated);
+    setDetailMember((prev: any) => prev ? {
+      ...prev,
+      plan: planTitle,
+      planName: planTitle,
+      planPrice: amount,
+      expiryDate: newExpiry,
+      status: 'active',
+      daysRemaining: days,
+    } : null);
+
+    try {
+      const memberId = member._id || member.id || member.userId || member.phone;
+      await apiService.renewMemberSubscription({
+        memberId: String(memberId),
+        packageName: planTitle,
+        durationDays: days,
+        planPrice: amount,
+        paymentMode: 'UPI / Online',
+      });
+      fetchMembers();
+    } catch (e) {
+      console.log('Online renewal sync notice:', e);
+    }
+
+    Alert.alert('✓ Membership Renewed', `Successfully renewed ${member.name}'s membership for ${days} days (${planTitle}) until ${newExpiry}!`);
   };
 
   return (
@@ -377,8 +441,13 @@ export default function MembersScreen({ navigation }: any) {
                 style={styles.submitBtn}
                 onPress={handleAdd}
                 activeOpacity={0.85}
+                disabled={isSubmitting}
               >
-                <Text style={styles.submitBtnText}>CONFIRM ENROLLMENT</Text>
+                {isSubmitting ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitBtnText}>CONFIRM ENROLLMENT</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -397,7 +466,9 @@ export default function MembersScreen({ navigation }: any) {
 
               <View style={styles.detailProfileRow}>
                 <View style={styles.detailAvatar}>
-                  <Text style={styles.detailAvatarText}>{detailMember?.avatar ?? 'M'}</Text>
+                  <Text style={styles.detailAvatarText}>
+                    {detailMember?.avatar ?? (detailMember?.name ? detailMember.name.slice(0, 2).toUpperCase() : 'MB')}
+                  </Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.detailName}>{detailMember?.name}</Text>
@@ -405,6 +476,28 @@ export default function MembersScreen({ navigation }: any) {
                   <Text style={styles.detailEmail}>{detailMember?.email}</Text>
                 </View>
               </View>
+
+              {/* Member Plan & Validity Pill */}
+              <View style={styles.detailPlanBox}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.detailPlanLabel}>ACTIVE PLAN</Text>
+                  <Text style={styles.detailPlanName}>{detailMember?.plan || detailMember?.planName || '3 Month Pass'}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.detailPlanLabel}>EXPIRES</Text>
+                  <Text style={styles.detailPlanExpiry}>{detailMember?.expiryDate || '12 Dec 2026'}</Text>
+                </View>
+              </View>
+
+              {/* Owner Renew Membership Action */}
+              <TouchableOpacity
+                style={styles.ownerRenewBtn}
+                onPress={() => handleRenewMember(detailMember)}
+                activeOpacity={0.88}
+              >
+                <Image source={require('../../assets/Icons2/pay.png')} style={{ width: moderateScale(16), height: moderateScale(16), tintColor: '#FFFFFF' }} resizeMode="contain" />
+                <Text style={styles.ownerRenewBtnText}>RENEW / EXTEND MEMBERSHIP</Text>
+              </TouchableOpacity>
 
               <View style={styles.detailActionRow}>
                 <TouchableOpacity
@@ -744,5 +837,55 @@ const styles = StyleSheet.create({
     fontSize: fontScale(13),
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  detailPlanBox: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(14),
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    marginBottom: hp(1.5),
+  },
+  detailPlanLabel: {
+    fontSize: fontScale(9),
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  detailPlanName: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  detailPlanExpiry: {
+    fontSize: fontScale(12),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  ownerRenewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(8),
+    backgroundColor: '#6C5CE7',
+    borderRadius: moderateScale(14),
+    paddingVertical: moderateScale(12),
+    marginBottom: hp(1.2),
+    elevation: 2,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+  },
+  ownerRenewBtnText: {
+    fontSize: fontScale(12),
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
 });
