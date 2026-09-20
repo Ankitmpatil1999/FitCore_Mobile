@@ -193,6 +193,8 @@ export interface User {
   role: Role;
   gymId: string;
   avatar: string; // initials
+  gender?: string;
+  joinDate?: string;
 }
 
 export interface Member {
@@ -208,6 +210,8 @@ export interface Member {
   gender?: string;
   height?: number; // cm
   weight?: number; // kg
+  startWeight?: number;
+  goalWeight?: number;
   bmi?: number;
   goal: GoalType;
   medicalIssues?: string;
@@ -215,6 +219,7 @@ export interface Member {
   emergencyPhone?: string;
   planId: string;
   planName?: string;
+  planPrice?: number;
   status: MemberStatus;
   joinDate?: string;
   startDate?: string;

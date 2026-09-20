@@ -523,6 +523,8 @@ export default function TrainersScreen() {
               </View>
             </View>
           </View>
+        </Modal>
+
         {/* ── REJECT LEAVE MODAL WITH CUSTOM REASON ── */}
         <Modal visible={!!rejectingLeaveReq} transparent animationType="fade">
           <View style={styles.modalOverlay}>
