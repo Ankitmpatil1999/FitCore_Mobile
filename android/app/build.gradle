@@ -84,10 +84,10 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "0.0.1"
         externalNativeBuild {
             cmake {
-                arguments "-DANDROID_STL=c++_shared", "-j2"
+                arguments "-DANDROID_STL=c++_shared"
             }
         }
     }
