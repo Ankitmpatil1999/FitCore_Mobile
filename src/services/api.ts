@@ -835,38 +835,6 @@ class ApiService {
       body: JSON.stringify({ phone: phoneOrMemberId, memberId: phoneOrMemberId, reason: reason || 'User in-app deletion' }),
     });
   }
-
-  // ── TRAINER LEAVE REQUESTS ──────────────────────────────────────────────────
-
-  /**
-   * Trainer submits a new leave request to the gym owner.
-   * The gymId ensures the request only goes to the correct gym's owner.
-   */
-  async createTrainerLeaveRequest(data: {
-    trainerId: string;
-    trainerName: string;
-    gymId: string;
-    startDate: string;
-    endDate: string;
-    reason: string;
-  }) {
-    return this.request('/gym-admin/trainers/leave-request', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  /**
-   * Fetch leave request history for a specific trainer at their gym.
-   * @param gymId  - the gym this trainer belongs to
-   * @param trainerId - filter to only this trainer's requests
-   */
-  async getTrainerLeaveRequests(gymId?: string, trainerId?: string) {
-    const params = new URLSearchParams();
-    if (gymId) params.append('gymId', gymId);
-    if (trainerId) params.append('trainerId', trainerId);
-    return this.request(`/gym-admin/trainers/leave-requests?${params.toString()}`);
-  }
 }
 
 
