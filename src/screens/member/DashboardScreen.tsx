@@ -40,8 +40,8 @@ const nutritionIconImg = require('../../assets/Icons2/healthy.png');
 const bodyStatsIconImg = require('../../assets/Icons2/healthy (1).png');
 const kettlebellImg = require('../../assets/Icons2/kettlebell.png');
 const clockImg = require('../../assets/Icons2/clock.png');
-const chartImg = require('../../assets/Icons2/chart.png');
 const activeNotifImg = require('../../assets/Icons2/active.png');
+const bellNotifImg = require('../../assets/Icons2/bell.png');
 const barbellImg = require('../../assets/Icons2/barbell.png');
 const payImg = require('../../assets/Icons2/pay.png');
 
@@ -89,6 +89,108 @@ function AnimatedPressable({
     >
       <Animated.View style={[{ transform: [{ scale: scaleValue }] }, style]}>
         {children}
+      </Animated.View>
+    </TouchableWithoutFeedback>
+  );
+}
+
+// ── Interactive Quick Access Card with Micro-Animations & Centered Layout ──
+function QuickAccessCard({
+  title,
+  subtitle,
+  tag,
+  icon,
+  iconBg,
+  iconColor,
+  tagColor,
+  tagBg,
+  onPress,
+}: {
+  title: string;
+  subtitle: string;
+  tag: string;
+  icon: any;
+  iconBg: string;
+  iconColor: string;
+  tagColor: string;
+  tagBg: string;
+  onPress: () => void;
+}) {
+  const scaleValue = useRef(new Animated.Value(1)).current;
+  const glowOpacity = useRef(new Animated.Value(0)).current;
+
+  const onPressIn = () => {
+    Animated.parallel([
+      Animated.spring(scaleValue, {
+        toValue: 0.94,
+        useNativeDriver: true,
+        speed: 50,
+        bounciness: 4,
+      }),
+      Animated.timing(glowOpacity, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const onPressOut = () => {
+    Animated.parallel([
+      Animated.spring(scaleValue, {
+        toValue: 1,
+        useNativeDriver: true,
+        speed: 40,
+        bounciness: 8,
+      }),
+      Animated.timing(glowOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  return (
+    <TouchableWithoutFeedback onPressIn={onPressIn} onPressOut={onPressOut} onPress={onPress}>
+      <Animated.View
+        style={[
+          styles.quickAccessCard,
+          { transform: [{ scale: scaleValue }] },
+        ]}
+      >
+        {/* Ambient Card Background Glow on Press */}
+        <Animated.View
+          style={[
+            styles.quickAccessCardGlow,
+            { backgroundColor: iconBg, opacity: glowOpacity },
+          ]}
+        />
+
+        {/* Centered Squircle Icon Container */}
+        <View style={[styles.quickAccessIconBox, { backgroundColor: iconBg, borderColor: iconColor + '30' }]}>
+          <Image
+            source={icon}
+            style={[styles.quickAccessIcon, { tintColor: iconColor }]}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Centered Content */}
+        <Text style={styles.quickAccessTitle} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={styles.quickAccessSub} numberOfLines={1}>
+          {subtitle}
+        </Text>
+
+        {/* Centered Micro-Tag Indicator */}
+        <View style={[styles.quickAccessTagPill, { backgroundColor: tagBg }]}>
+          <View style={[styles.quickAccessTagDot, { backgroundColor: tagColor }]} />
+          <Text style={[styles.quickAccessTagText, { color: tagColor }]} numberOfLines={1}>
+            {tag}
+          </Text>
+        </View>
       </Animated.View>
     </TouchableWithoutFeedback>
   );
@@ -222,56 +324,58 @@ export default function DashboardScreen({ navigation }: any) {
     avgTimePerSession: '0m',
   });
 
-  // ── First-Time Member Gym Experience Selection (Shows Only Once) ──
-  const [showExpModal, setShowExpModal] = useState(false);
-  const [expYears, setExpYears] = useState('0');
-  const [expMonths, setExpMonths] = useState('1');
-  const [joinDay, setJoinDay] = useState(new Date().getDate().toString().padStart(2, '0'));
-  const [joinMonth, setJoinMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
-  const [joinYear, setJoinYear] = useState(new Date().getFullYear().toString());
+  // ── Unread Notifications State ──
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
-  const totalExpMonths = (parseInt(expYears || '0', 10) * 12) + parseInt(expMonths || '0', 10);
-  const isExpBeginner = totalExpMonths < 6;
+  // ── First-Time Member Fitness Onboarding (Weight, Height, Goal) ──
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [onboardingWeight, setOnboardingWeight] = useState('');
+  const [onboardingHeight, setOnboardingHeight] = useState('');
+  const [onboardingGoal, setOnboardingGoal] = useState<'Weight Loss' | 'Weight Gain' | 'Muscle Building' | 'Stay Fit'>('Weight Loss');
+  const [isOnboardingSaving, setIsOnboardingSaving] = useState(false);
 
-  const dismissExperienceModal = async () => {
-    setShowExpModal(false);
+  // Dynamic calculated BMI
+  const parsedWeight = parseFloat(onboardingWeight) || 0;
+  const parsedHeight = parseFloat(onboardingHeight) || 0;
+  const calculatedBMI = (parsedWeight > 0 && parsedHeight > 0)
+    ? Math.round((parsedWeight / Math.pow(parsedHeight / 100, 2)) * 10) / 10
+    : null;
+
+  const dismissOnboardingModal = async () => {
+    setShowOnboardingModal(false);
     const ids = [
       currentMember?.id,
       currentUser?.id,
       currentMember?.phone,
       currentUser?.phone,
-      'global_member_exp',
+      'global_member_onboarding',
     ].filter(Boolean);
     try {
-      await Promise.all(ids.map(id => AsyncStorage.setItem(`fitcore_exp_prompt_done_${id}`, 'true')));
+      await Promise.all(ids.map(id => AsyncStorage.setItem(`fitcore_onboarding_done_${id}`, 'true')));
     } catch (e) { }
   };
 
   useEffect(() => {
-    const checkExperiencePrompt = async () => {
+    const checkOnboardingPrompt = async () => {
       try {
         const id = currentMember?.id || currentUser?.id || currentMember?.phone || currentUser?.phone;
-        if (!id) return; // Wait until member/user is loaded
+        if (!id) return;
 
-        // Check if member already has experience configured
-        if (
-          (currentMember as any)?.hasSetExperience ||
-          (currentMember as any)?.experienceLevel ||
-          (currentMember as any)?.experienceYears !== undefined ||
-          (currentMember as any)?.experienceMonths !== undefined
-        ) {
-          setShowExpModal(false);
-          await dismissExperienceModal();
+        // Check if member already has height & weight in live profile
+        const mem: any = (liveData as any)?.member || currentMember;
+        if (mem?.weight && mem?.height) {
+          setShowOnboardingModal(false);
+          await dismissOnboardingModal();
           return;
         }
 
         const keysToCheck = [
-          `fitcore_exp_prompt_done_${id}`,
-          currentUser?.phone ? `fitcore_exp_prompt_done_${currentUser.phone}` : null,
-          currentMember?.phone ? `fitcore_exp_prompt_done_${currentMember.phone}` : null,
-          currentMember?.id ? `fitcore_exp_prompt_done_${currentMember.id}` : null,
-          currentUser?.id ? `fitcore_exp_prompt_done_${currentUser.id}` : null,
-          'fitcore_exp_prompt_done_global_member_exp',
+          `fitcore_onboarding_done_${id}`,
+          currentUser?.phone ? `fitcore_onboarding_done_${currentUser.phone}` : null,
+          currentMember?.phone ? `fitcore_onboarding_done_${currentMember.phone}` : null,
+          currentMember?.id ? `fitcore_onboarding_done_${currentMember.id}` : null,
+          currentUser?.id ? `fitcore_onboarding_done_${currentUser.id}` : null,
+          'fitcore_onboarding_done_global_member_onboarding',
         ].filter(Boolean);
 
         let alreadyDone = false;
@@ -284,41 +388,52 @@ export default function DashboardScreen({ navigation }: any) {
         }
 
         if (!alreadyDone) {
-          setShowExpModal(true);
+          setShowOnboardingModal(true);
         } else {
-          setShowExpModal(false);
+          setShowOnboardingModal(false);
         }
       } catch (err) {
         // fallback
       }
     };
-    checkExperiencePrompt();
-  }, [currentUser?.id, currentUser?.phone, currentMember?.id, currentMember?.phone]);
+    checkOnboardingPrompt();
+  }, [currentUser?.id, currentUser?.phone, currentMember?.id, currentMember?.phone, liveData]);
 
-  const handleSaveExperience = async () => {
-    await dismissExperienceModal();
+  const handleSaveFitnessProfile = async () => {
+    const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+    const w = parseFloat(onboardingWeight);
+    const h = parseFloat(onboardingHeight);
 
-    const memberId = currentMember?.id || currentUser?.id || currentMember?.phone || currentUser?.phone || 'm1';
-    const levelQuery = isExpBeginner ? 'beginner' : 'intermediate';
-    const formattedJoinDate = `${joinYear}-${joinMonth.padStart(2, '0')}-${joinDay.padStart(2, '0')}`;
+    if (!w || w <= 0) {
+      Alert.alert('Missing Weight', 'Please enter your current body weight in kg.');
+      return;
+    }
+    if (!h || h <= 0) {
+      Alert.alert('Missing Height', 'Please enter your height in cm.');
+      return;
+    }
 
+    setIsOnboardingSaving(true);
     try {
-      // 1. Save to MongoDB database
-      await apiService.updateExperience({
+      const payload: any = {
         memberId,
-        experienceLevel: levelQuery,
-        experienceYears: parseInt(expYears || '0', 10),
-        experienceMonths: parseInt(expMonths || '0', 10),
-        joinedDate: formattedJoinDate,
-      });
-
-      // 2. Fetch fresh workout plan tailored to this experience level
-      const res: any = await apiService.getMemberWorkout(memberId, undefined, levelQuery);
-      if (res.success && res.data) {
-        setLiveWorkout(res.data);
+        weight: w,
+        height: h,
+        goal: onboardingGoal,
+      };
+      if (calculatedBMI) {
+        payload.bmi = calculatedBMI;
       }
-    } catch (e) {
-      console.log('Error updating workout plan:', e);
+
+      await apiService.savePersonalDetails(payload);
+      await dismissOnboardingModal();
+
+      // Refresh live member data
+      fetchLiveMemberData();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message || 'Failed to save fitness details.');
+    } finally {
+      setIsOnboardingSaving(false);
     }
   };
 
@@ -351,20 +466,13 @@ export default function DashboardScreen({ navigation }: any) {
         ));
         const mem: any = (profileRes.data as any)?.member;
         if (mem) {
-          if (mem.experienceYears !== undefined) setExpYears(String(mem.experienceYears));
-          if (mem.experienceMonths !== undefined) setExpMonths(String(mem.experienceMonths));
-          if (mem.joinDate) {
-            const parts = String(mem.joinDate).split('-');
-            if (parts.length === 3) {
-              setJoinYear(parts[0]);
-              setJoinMonth(parts[1]);
-              setJoinDay(parts[2]);
-            }
-          }
-          if (mem.hasSetExperience || mem.experienceLevel || mem.experienceYears !== undefined) {
+          if (mem.weight) setOnboardingWeight(String(mem.weight));
+          if (mem.height) setOnboardingHeight(String(mem.height));
+          if (mem.goal) setOnboardingGoal(mem.goal);
+          if (mem.weight && mem.height) {
             const ids = [mem.id, mem.userId, mem.phone, currentMember?.id, currentUser?.id].filter(Boolean);
-            ids.forEach(id => AsyncStorage.setItem(`fitcore_exp_prompt_done_${id}`, 'true').catch(() => { }));
-            setShowExpModal(false);
+            ids.forEach(id => AsyncStorage.setItem(`fitcore_onboarding_done_${id}`, 'true').catch(() => { }));
+            setShowOnboardingModal(false);
           }
         }
       }
@@ -397,6 +505,57 @@ export default function DashboardScreen({ navigation }: any) {
         if (todaySession?.todayDurationFormatted) {
           setLastSessionDuration(todaySession.todayDurationFormatted);
         }
+      }
+
+      // Fetch dynamic unread notifications count
+      const gymId = currentGym?.id || (currentMember as any)?.gymId || currentUser?.gymId;
+      const targetUserId = (currentMember as any)?.id || (currentMember as any)?._id || (currentMember as any)?.userId || currentUser?.id || 'default_user';
+
+      try {
+        const notifKeys = [
+          'fitcore_read_notifs_all',
+          `fitcore_read_notifs_${targetUserId}`,
+          (currentMember as any)?.id ? `fitcore_read_notifs_${(currentMember as any).id}` : null,
+          (currentMember as any)?._id ? `fitcore_read_notifs_${(currentMember as any)._id}` : null,
+          (currentMember as any)?.userId ? `fitcore_read_notifs_${(currentMember as any).userId}` : null,
+          currentUser?.id ? `fitcore_read_notifs_${currentUser.id}` : null,
+          currentUser?.phone ? `fitcore_read_notifs_${currentUser.phone}` : null,
+          (currentMember as any)?.phone ? `fitcore_read_notifs_${(currentMember as any).phone}` : null,
+        ].filter(Boolean) as string[];
+
+        const storedResults = await Promise.all(notifKeys.map(k => AsyncStorage.getItem(k).catch(() => null)));
+        const allReadTimeStr = await AsyncStorage.getItem('fitcore_all_notifs_read_timestamp').catch(() => null);
+        const allReadTime = allReadTimeStr ? Number(allReadTimeStr) : 0;
+
+        const locallyReadIds = new Set<string>();
+        storedResults.forEach(res => {
+          if (res) {
+            try {
+              const arr = JSON.parse(res);
+              if (Array.isArray(arr)) arr.forEach(i => locallyReadIds.add(String(i)));
+            } catch (e) {}
+          }
+        });
+
+        const notifRes: any = await apiService.getNotifications('member', gymId, targetUserId);
+        if (notifRes?.success && Array.isArray(notifRes.data)) {
+          const unread = notifRes.data.filter((n: any) => {
+            const notifId = String(n.id || n._id || '');
+            const createdAtTime = n.createdAt ? new Date(n.createdAt).getTime() : 0;
+            const isRead = Boolean(
+              n.isRead ||
+              n.read ||
+              locallyReadIds.has(notifId) ||
+              (allReadTime > 0 && createdAtTime > 0 && createdAtTime <= allReadTime)
+            );
+            return !isRead;
+          }).length;
+          setUnreadNotifCount(unread);
+        } else {
+          setUnreadNotifCount(0);
+        }
+      } catch (err) {
+        setUnreadNotifCount(0);
       }
     } catch (err) {
       console.log('Using local fallback state for Dashboard');
@@ -586,7 +745,7 @@ export default function DashboardScreen({ navigation }: any) {
   }, []);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right',]}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
       <View style={styles.root}>
         {/* ── AMBIENT BACKGROUND GLOW PARTICLES ── */}
@@ -612,9 +771,13 @@ export default function DashboardScreen({ navigation }: any) {
                 style={{ width: moderateScale(22), height: moderateScale(22) }}
                 resizeMode="contain"
               />
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText}>3</Text>
-              </View>
+              {unreadNotifCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                  </Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -702,29 +865,9 @@ export default function DashboardScreen({ navigation }: any) {
             </View>
 
             {/* ── 1. TODAY'S WORKOUT CARD ── */}
-            {/* ── 2. TODAY'S WORKOUT HEADER WITH EXPERIENCE PILL ── */}
+            {/* ── TODAY'S WORKOUT HEADER ── */}
             <View style={styles.sectionHeaderRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(8) }}>
-                <Text style={styles.sectionTitleText}>Today's Workout</Text>
-                <TouchableOpacity
-                  style={styles.expLevelPill}
-                  onPress={() => setShowExpModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.expLevelPillInner}>
-                    <View
-                      style={[
-                        styles.expLevelDot,
-                        { backgroundColor: isExpBeginner ? '#10B981' : '#3B82F6' },
-                      ]}
-                    />
-                    <Text style={styles.expLevelPillText}>
-                      {isExpBeginner ? 'Beginner' : 'Intermediate'}
-                    </Text>
-                    <Icon name="chevron-down" size={moderateScale(11)} color="#4F46E5" style={{ marginLeft: 2 }} />
-                  </View>
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.sectionTitleText}>Today's Workout</Text>
               <TouchableOpacity onPress={() => navigation.navigate('Workout')}>
                 <Text style={styles.sectionLinkText}>View all</Text>
               </TouchableOpacity>
@@ -763,7 +906,9 @@ export default function DashboardScreen({ navigation }: any) {
                       style={{ width: moderateScale(15), height: moderateScale(15), tintColor: '#6C5CE7' }}
                       resizeMode="contain"
                     />
-                    <Text style={styles.statIslandVal}>{splitDayNum}</Text>
+                    <Text style={styles.statIslandVal} numberOfLines={1}>
+                      {splitDayNum ? splitDayNum.replace(' of ', '/') : 'Day 1/6'}
+                    </Text>
                   </View>
                   <Text style={styles.statIslandLbl}>Split Day</Text>
                 </View>
@@ -778,7 +923,7 @@ export default function DashboardScreen({ navigation }: any) {
                       style={{ width: moderateScale(15), height: moderateScale(15) }}
                       resizeMode="contain"
                     />
-                    <Text style={styles.statIslandVal}>{workoutDuration}</Text>
+                    <Text style={styles.statIslandVal} numberOfLines={1}>{workoutDuration}</Text>
                   </View>
                   <Text style={styles.statIslandLbl}>Est. Time</Text>
                 </View>
@@ -793,7 +938,7 @@ export default function DashboardScreen({ navigation }: any) {
                       style={{ width: moderateScale(15), height: moderateScale(15), tintColor: isCheckedIn ? '#10B981' : '#6C5CE7' }}
                       resizeMode="contain"
                     />
-                    <Text style={[styles.statIslandVal, { color: isCheckedIn ? '#10B981' : '#0F172A', fontSize: fontScale(13.5) }]}>
+                    <Text style={[styles.statIslandVal, { color: isCheckedIn ? '#10B981' : '#0F172A' }]} numberOfLines={1}>
                       {isCheckedIn ? 'Active' : 'Ready'}
                     </Text>
                     {isCheckedIn && (
@@ -833,24 +978,32 @@ export default function DashboardScreen({ navigation }: any) {
               {/* 1. 7-Day Visual Attendance & Workout Split Strip */}
               <View style={styles.weekDaysStrip}>
                 {(liveWeekOverview?.days || [
-                  { day: 'Mon', focus: 'Chest', done: true },
-                  { day: 'Tue', focus: 'Triceps', done: true },
-                  { day: 'Wed', focus: 'Back', done: true },
-                  { day: 'Thu', focus: 'Biceps', done: true },
-                  { day: 'Fri', focus: 'Shoulders', done: true },
-                  { day: 'Sat', focus: 'Legs', done: false },
-                  { day: 'Sun', focus: 'Full Body', done: false },
+                  { day: 'Mon', focus: 'Chest', done: false, attended: false, checkInCount: 0 },
+                  { day: 'Tue', focus: 'Triceps', done: false, attended: false, checkInCount: 0 },
+                  { day: 'Wed', focus: 'Back', done: false, attended: false, checkInCount: 0 },
+                  { day: 'Thu', focus: 'Biceps', done: false, attended: false, checkInCount: 0 },
+                  { day: 'Fri', focus: 'Shoulders', done: false, attended: false, checkInCount: 0 },
+                  { day: 'Sat', focus: 'Legs', done: false, attended: false, checkInCount: 0 },
+                  { day: 'Sun', focus: 'Full Body', done: false, attended: false, checkInCount: 0 },
                 ]).map((item: any, idx: number) => {
+                  const memberJoinDate = (liveData as any)?.member?.joinDate || currentMember?.joinDate || (currentMember as any)?.createdAt || null;
+                  const joinDateClean = memberJoinDate ? String(memberJoinDate).slice(0, 10) : null;
+                  const isBeforeJoined = item.isBeforeJoined !== undefined
+                    ? Boolean(item.isBeforeJoined)
+                    : Boolean(joinDateClean && item.date && item.date < joinDateClean);
+                  const isSunday = item.day === 'Sun';
+
                   const todayShortName = new Date().toLocaleDateString('en-US', { weekday: 'short' });
                   const daysOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                   const todayIdx = daysOrder.indexOf(todayShortName);
                   const itemIdx = daysOrder.indexOf(item.day);
                   const isCurrentDay = item.isToday !== undefined ? Boolean(item.isToday) : itemIdx === todayIdx;
                   const isFutureDate = item.isFuture !== undefined ? Boolean(item.isFuture) : itemIdx > todayIdx;
+                  const hasAttended = Boolean(item.attended || (item.done && item.checkInCount > 0) || item.checkInCount > 0);
                   const isCompleted = isCurrentDay
-                    ? Boolean(isCheckedIn || item.attended || elapsedSeconds > 0)
-                    : Boolean(item.attended || item.done);
-                  const isPastMissed = !isCurrentDay && !isFutureDate && !isCompleted;
+                    ? Boolean(isCheckedIn || hasAttended)
+                    : hasAttended;
+                  const isPastMissed = !isCurrentDay && !isFutureDate && !isCompleted && !isBeforeJoined && !isSunday;
 
                   return (
                     <View key={idx} style={[styles.weekDayCol, isCurrentDay && styles.weekDayColToday]}>
@@ -865,14 +1018,16 @@ export default function DashboardScreen({ navigation }: any) {
                           isCompleted && styles.weekStatusDone,
                           isCurrentDay && !isCompleted && styles.weekStatusToday,
                           isPastMissed && styles.weekStatusAbsent,
-                          isFutureDate && { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
+                          (isFutureDate || isBeforeJoined || isSunday) && { backgroundColor: '#F8FAFC', borderColor: '#E2E8F0' },
                         ]}
                       >
                         {isCompleted ? (
                           <Icon name="checkmark-sharp" size={moderateScale(12)} color="#FFFFFF" />
                         ) : isPastMissed ? (
                           <Icon name="close-sharp" size={moderateScale(12)} color="#EF4444" />
-                        ) : isFutureDate ? (
+                        ) : isSunday ? (
+                          <View style={[styles.weekPendingDot, { backgroundColor: '#CBD5E1' }]} />
+                        ) : isFutureDate || isBeforeJoined ? (
                           <View style={styles.weekPendingDot} />
                         ) : (
                           <View style={[styles.weekPendingDot, styles.weekTodayDot]} />
@@ -885,10 +1040,10 @@ export default function DashboardScreen({ navigation }: any) {
                           isCompleted && { color: '#00C48C', fontWeight: '800' },
                           isCurrentDay && !isCompleted && styles.weekFocusTextToday,
                           isPastMissed && { color: '#EF4444', fontWeight: '700' },
-                          isFutureDate && { color: '#94A3B8' },
+                          (isFutureDate || isBeforeJoined || isSunday) && { color: '#94A3B8' },
                         ]}
                       >
-                        {isCompleted ? 'Done' : isPastMissed ? 'Absent' : isCurrentDay ? 'Today' : 'Gym'}
+                        {isCompleted ? 'Done' : isBeforeJoined ? '—' : isSunday ? 'Gym' : isPastMissed ? 'Absent' : isCurrentDay ? 'Today' : 'Gym'}
                       </Text>
                     </View>
                   );
@@ -927,219 +1082,227 @@ export default function DashboardScreen({ navigation }: any) {
             </TouchableOpacity>
 
             {/* ── 5. MEMBER QUICK ACCESS SERVICES & SCREENS GRID ── */}
-            <View style={[styles.sectionHeaderRow, { marginTop: hp(1) }]}>
+            <View style={[styles.sectionHeaderRow, { marginTop: hp(1.2) }]}>
               <View>
                 <Text style={styles.sectionTitleText}>Member Quick Access</Text>
+                <Text style={styles.sectionSubHeading}>Shortcuts & gym utilities</Text>
+              </View>
+              <View style={styles.quickAccessHeaderBadge}>
+                <Text style={styles.quickAccessHeaderBadgeText}>4 Services</Text>
               </View>
             </View>
 
             <View style={styles.quickAccessGrid}>
-              {/* 1. Nutrition & Diet - Visible only if assigned by trainer */}
-              {hasAssignedDiet && (
-                <AnimatedPressable
-                  style={styles.quickAccessCard}
-                  onPress={() => navigation.navigate('Diet')}
-                >
-                  <View style={[styles.quickAccessIconBox, { backgroundColor: '#ECFDF5' }]}>
-                    <Image
-                      source={nutritionIconImg}
-                      style={[styles.quickAccessIcon, { tintColor: '#059669' }]}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text style={styles.quickAccessTitle} numberOfLines={1}>Diet Plan</Text>
-                  <Text style={styles.quickAccessSub} numberOfLines={1}>Macro Targets</Text>
-                </AnimatedPressable>
-              )}
-
-              {/* 4. Body Metrics */}
-              <AnimatedPressable
-                style={styles.quickAccessCard}
+              {/* 1. Body Metrics */}
+              <QuickAccessCard
+                title="Body Stats"
+                subtitle="BMI & Weight"
+                tag="Live Metrics"
+                icon={bodyStatsIconImg}
+                iconBg="#EFF6FF"
+                iconColor="#2563EB"
+                tagBg="#EFF6FF"
+                tagColor="#2563EB"
                 onPress={() => navigation.navigate('Progress')}
-              >
-                <View style={[styles.quickAccessIconBox, { backgroundColor: '#EFF6FF' }]}>
-                  <Image
-                    source={bodyStatsIconImg}
-                    style={[styles.quickAccessIcon, { tintColor: '#2563EB' }]}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.quickAccessTitle} numberOfLines={1}>Body Stats</Text>
-                <Text style={styles.quickAccessSub} numberOfLines={1}>BMI & Weight</Text>
-              </AnimatedPressable>
+              />
 
-              {/* 5. Assigned Trainer (Shows ONLY if assigned to member) */}
-              {hasAssignedTrainer && (
-                <AnimatedPressable
-                  style={styles.quickAccessCard}
-                  onPress={() => navigation.navigate('Trainer')}
-                >
-                  <View style={[styles.quickAccessIconBox, { backgroundColor: '#FEF3C7' }]}>
-                    <Image
-                      source={trainerIconImg}
-                      style={[styles.quickAccessIcon, { tintColor: '#D97706' }]}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <Text style={styles.quickAccessTitle} numberOfLines={1}>My Trainer</Text>
-                  <Text style={styles.quickAccessSub} numberOfLines={1}>Direct Guidance</Text>
-                </AnimatedPressable>
-              )}
-
-              {/* 6. Membership & Invoices */}
-              <AnimatedPressable
-                style={styles.quickAccessCard}
+              {/* 2. Membership & Invoices */}
+              <QuickAccessCard
+                title="Membership"
+                subtitle="Plan & Invoices"
+                tag="Active Plan"
+                icon={payImg}
+                iconBg="#FDF2F8"
+                iconColor="#EC4899"
+                tagBg="#FDF2F8"
+                tagColor="#EC4899"
                 onPress={() => navigation.navigate('Membership')}
-              >
-                <View style={[styles.quickAccessIconBox, { backgroundColor: '#FDF2F8' }]}>
-                  <Image
-                    source={payImg}
-                    style={[styles.quickAccessIcon, { tintColor: '#EC4899' }]}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.quickAccessTitle} numberOfLines={1}>Membership</Text>
-                <Text style={styles.quickAccessSub} numberOfLines={1}>Plan & Invoices</Text>
-              </AnimatedPressable>
+              />
 
-              {/* 8. Supplement Store */}
-              <AnimatedPressable
-                style={styles.quickAccessCard}
-                onPress={() => navigation.navigate('StoreTab')}
-              >
-                <View style={[styles.quickAccessIconBox, { backgroundColor: '#FFF7ED' }]}>
-                  <Image
-                    source={kettlebellImg}
-                    style={[styles.quickAccessIcon, { tintColor: '#EA580C' }]}
-                    resizeMode="contain"
-                  />
-                </View>
-                <Text style={styles.quickAccessTitle} numberOfLines={1}>FitStore</Text>
-                <Text style={styles.quickAccessSub} numberOfLines={1}>Whey & Gear</Text>
-              </AnimatedPressable>
+              {/* 3. Nutrition & Diet */}
+              <QuickAccessCard
+                title="Diet Plan"
+                subtitle="Macro Targets"
+                tag="Nutrition"
+                icon={nutritionIconImg}
+                iconBg="#ECFDF5"
+                iconColor="#059669"
+                tagBg="#ECFDF5"
+                tagColor="#059669"
+                onPress={() => navigation.navigate('Diet')}
+              />
+
+              {/* 4. My Trainer / Classes */}
+              <QuickAccessCard
+                title={hasAssignedTrainer ? 'My Trainer' : 'Gym Classes'}
+                subtitle={hasAssignedTrainer ? 'Direct Guidance' : 'Book Sessions'}
+                tag={hasAssignedTrainer ? '1-on-1 Coach' : 'Live Bookings'}
+                icon={hasAssignedTrainer ? trainerIconImg : calendarIconImg}
+                iconBg="#FEF3C7"
+                iconColor="#D97706"
+                tagBg="#FEF3C7"
+                tagColor="#D97706"
+                onPress={() => navigation.navigate(hasAssignedTrainer ? 'Trainer' : 'Classes')}
+              />
             </View>
 
           </Animated.View>
 
-          <View style={{ height: hp(12) }} />
+          <View style={{ height: hp(1.5) }} />
         </ScrollView>
 
-        {/* ── GYM EXPERIENCE SELECTION MODAL (DAY / MONTH / YEAR & LEVELS) ── */}
+        {/* ── FIRST-TIME MEMBER BASIC FITNESS PROFILE MODAL (WEIGHT, HEIGHT, GOAL) ── */}
         <Modal
-          visible={showExpModal}
+          visible={showOnboardingModal}
           transparent
           animationType="fade"
-          onRequestClose={dismissExperienceModal}
+          onRequestClose={dismissOnboardingModal}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalCard}>
               {/* Modal Header */}
               <View style={styles.modalHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(8) }}>
-                  <View style={styles.modalHeaderIconBox}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(10), flex: 1 }}>
+                  <View style={styles.onboardingIconBox}>
                     <Image
-                      source={barbellImg}
-                      style={{ width: moderateScale(18), height: moderateScale(18), tintColor: '#6C5CE7' }}
+                      source={bodyStatsIconImg}
+                      style={{ width: moderateScale(20), height: moderateScale(20), tintColor: '#6C5CE7' }}
                       resizeMode="contain"
                     />
                   </View>
-                  <View>
-                    <Text style={styles.modalTitle}>Gym Experience</Text>
-                    <Text style={styles.modalSubtitle}>How long have you been working out?</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.modalTitle}>Fitness Profile Setup</Text>
+                    <Text style={styles.modalSubtitle}>Quick stats to personalize your workouts</Text>
                   </View>
                 </View>
                 <TouchableOpacity
                   style={styles.modalCloseBtn}
-                  onPress={dismissExperienceModal}
+                  onPress={dismissOnboardingModal}
+                  activeOpacity={0.7}
                 >
                   <Icon name="close" size={moderateScale(18)} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
-              {/* 1. Direct Typing: Workout Experience (Month & Year) */}
-              <View style={styles.dateSectionBox}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  <Icon name="time-outline" size={moderateScale(15)} color="#6C5CE7" />
-                  <Text style={styles.dateSectionLabel}>HOW LONG HAVE YOU BEEN WORKING OUT?</Text>
-                </View>
-                <View style={styles.dateInputsRow}>
-                  <View style={styles.dateCol}>
-                    <Text style={styles.dateColLbl}>Years</Text>
-                    <TextInput
-                      style={styles.dateInput}
-                      value={expYears}
-                      onChangeText={setExpYears}
-                      placeholder="0"
-                      keyboardType="numeric"
-                      maxLength={2}
-                    />
+              {/* 1. Weight & Height Dual Input Row */}
+              <View style={styles.statsInputsRow}>
+                {/* Weight Input */}
+                <View style={styles.statInputCard}>
+                  <View style={styles.statCardHeader}>
+                    <Icon name="speedometer-outline" size={moderateScale(14)} color="#6C5CE7" />
+                    <Text style={styles.statCardLabel}>WEIGHT</Text>
                   </View>
-                  <View style={styles.dateCol}>
-                    <Text style={styles.dateColLbl}>Months</Text>
+                  <View style={styles.statInputWrapper}>
                     <TextInput
-                      style={styles.dateInput}
-                      value={expMonths}
-                      onChangeText={setExpMonths}
-                      placeholder="0"
-                      keyboardType="numeric"
-                      maxLength={2}
+                      style={styles.statNumInput}
+                      value={onboardingWeight}
+                      onChangeText={setOnboardingWeight}
+                      placeholder="70"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="decimal-pad"
+                      maxLength={5}
                     />
+                    <View style={styles.statUnitBadge}>
+                      <Text style={styles.statUnitText}>kg</Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Height Input */}
+                <View style={styles.statInputCard}>
+                  <View style={styles.statCardHeader}>
+                    <Icon name="resize-outline" size={moderateScale(14)} color="#6C5CE7" />
+                    <Text style={styles.statCardLabel}>HEIGHT</Text>
+                  </View>
+                  <View style={styles.statInputWrapper}>
+                    <TextInput
+                      style={styles.statNumInput}
+                      value={onboardingHeight}
+                      onChangeText={setOnboardingHeight}
+                      placeholder="175"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="decimal-pad"
+                      maxLength={5}
+                    />
+                    <View style={styles.statUnitBadge}>
+                      <Text style={styles.statUnitText}>cm</Text>
+                    </View>
                   </View>
                 </View>
               </View>
 
-              {/* Date Joined Inputs: Day / Month / Year */}
-              <View style={styles.dateSectionBox}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  <Icon name="calendar-outline" size={moderateScale(15)} color="#6C5CE7" />
-                  <Text style={styles.dateSectionLabel}>GYM JOINED DATE</Text>
+              {/* Live BMI Banner if Calculated */}
+              {calculatedBMI ? (
+                <View style={styles.bmiPreviewBanner}>
+                  <Icon name="fitness-outline" size={moderateScale(15)} color="#10B981" />
+                  <Text style={styles.bmiPreviewText}>
+                    Calculated BMI: <Text style={{ fontWeight: '800', color: '#0F172A' }}>{calculatedBMI}</Text>
+                    {' • '}
+                    <Text style={{ color: calculatedBMI < 18.5 ? '#F59E0B' : calculatedBMI <= 24.9 ? '#10B981' : '#EF4444', fontWeight: '700' }}>
+                      {calculatedBMI < 18.5 ? 'Underweight' : calculatedBMI <= 24.9 ? 'Normal Weight' : 'Overweight'}
+                    </Text>
+                  </Text>
                 </View>
-                <View style={styles.dateInputsRow}>
-                  <View style={styles.dateCol}>
-                    <Text style={styles.dateColLbl}>Day</Text>
-                    <TextInput
-                      style={styles.dateInput}
-                      value={joinDay}
-                      onChangeText={setJoinDay}
-                      placeholder="DD"
-                      keyboardType="numeric"
-                      maxLength={2}
-                    />
-                  </View>
-                  <Text style={styles.dateSlash}>/</Text>
-                  <View style={styles.dateCol}>
-                    <Text style={styles.dateColLbl}>Month</Text>
-                    <TextInput
-                      style={styles.dateInput}
-                      value={joinMonth}
-                      onChangeText={setJoinMonth}
-                      placeholder="MM"
-                      keyboardType="numeric"
-                      maxLength={2}
-                    />
-                  </View>
-                  <Text style={styles.dateSlash}>/</Text>
-                  <View style={[styles.dateCol, { flex: 1.3 }]}>
-                    <Text style={styles.dateColLbl}>Year</Text>
-                    <TextInput
-                      style={styles.dateInput}
-                      value={joinYear}
-                      onChangeText={setJoinYear}
-                      placeholder="YYYY"
-                      keyboardType="numeric"
-                      maxLength={4}
-                    />
-                  </View>
+              ) : null}
+
+              {/* 2. Fitness Goal Selector (2x2 Grid) */}
+              <View style={styles.goalSectionBox}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: moderateScale(8) }}>
+                  <Icon name="trophy-outline" size={moderateScale(14)} color="#6C5CE7" />
+                  <Text style={styles.goalSectionLabel}>PRIMARY FITNESS GOAL</Text>
+                </View>
+
+                <View style={styles.goalGrid}>
+                  {[
+                    { id: 'Weight Loss', label: 'Weight Loss', sub: 'Burn fat & lean', iconName: 'flame-outline' },
+                    { id: 'Weight Gain', label: 'Weight Gain', sub: 'Gain mass & bulk', iconName: 'trending-up-outline' },
+                    { id: 'Muscle Building', label: 'Muscle Gain', sub: 'Build pure muscle', iconName: 'barbell-outline' },
+                    { id: 'Stay Fit', label: 'Stay Fit', sub: 'Active & healthy', iconName: 'flash-outline' },
+                  ].map((item) => {
+                    const isSelected = onboardingGoal === item.id;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={[styles.goalOptionCard, isSelected && styles.goalOptionCardActive]}
+                        onPress={() => setOnboardingGoal(item.id as any)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={[styles.goalIconCircle, isSelected && styles.goalIconCircleActive]}>
+                          <Icon
+                            name={item.iconName}
+                            size={moderateScale(15)}
+                            color={isSelected ? '#6C5CE7' : '#64748B'}
+                          />
+                        </View>
+                        <Text style={[styles.goalOptionTitle, isSelected && styles.goalOptionTitleActive]}>
+                          {item.label}
+                        </Text>
+                        <Text style={styles.goalOptionSub} numberOfLines={1}>
+                          {item.sub}
+                        </Text>
+                        {isSelected && (
+                          <View style={styles.goalSelectedCheck}>
+                            <Icon name="checkmark-circle" size={moderateScale(13)} color="#6C5CE7" />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 
-              {/* Confirm CTA */}
+              {/* Save Button */}
               <TouchableOpacity
-                style={styles.confirmExpBtn}
-                onPress={handleSaveExperience}
+                style={[styles.confirmExpBtn, isOnboardingSaving && { opacity: 0.7 }]}
+                onPress={handleSaveFitnessProfile}
+                disabled={isOnboardingSaving}
                 activeOpacity={0.85}
               >
-                <Text style={styles.confirmExpBtnText}>Save & Continue</Text>
+                {isOnboardingSaving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.confirmExpBtnText}>Save & Continue  →</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -1591,7 +1754,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   statIslandVal: {
-    fontSize: fontScale(15.5),
+    fontSize: fontScale(13.5),
     fontWeight: '900',
     color: '#0F172A',
   },
@@ -1668,23 +1831,23 @@ const styles = StyleSheet.create({
   todaySplitBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F3F0FF',
-    borderRadius: moderateScale(14),
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(8),
+    backgroundColor: '#F5F3FF',
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(9),
+    paddingVertical: moderateScale(5),
     borderWidth: 1,
     borderColor: '#ECEAFD',
   },
   todaySplitBadgeNumber: {
-    fontSize: fontScale(15),
-    fontWeight: '900',
+    fontSize: fontScale(11.5),
+    fontWeight: '800',
     color: '#6C5CE7',
-    lineHeight: fontScale(18),
+    lineHeight: fontScale(14),
     textAlign: 'center',
   },
   todaySplitBadgeLabel: {
-    fontSize: fontScale(9.5),
-    fontWeight: '700',
+    fontSize: fontScale(8.5),
+    fontWeight: '600',
     color: '#64748B',
     marginTop: 1,
     textAlign: 'center',
@@ -2231,58 +2394,159 @@ const styles = StyleSheet.create({
   autoPlanTextInt: {
     color: '#2563EB',
   },
-  dateSectionBox: {
+  onboardingIconBox: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  statsInputsRow: {
+    flexDirection: 'row',
+    gap: moderateScale(10),
+    marginBottom: hp(1.2),
+  },
+  statInputCard: {
+    flex: 1,
     backgroundColor: '#F8FAFC',
     borderRadius: moderateScale(14),
-    padding: moderateScale(12),
-    marginBottom: hp(1.8),
+    padding: moderateScale(11),
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  dateSectionLabel: {
-    fontSize: fontScale(10),
+  statCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(5),
+    marginBottom: moderateScale(5),
+  },
+  statCardLabel: {
+    fontSize: fontScale(9.5),
     fontWeight: '800',
     color: '#64748B',
     letterSpacing: 0.4,
-    marginBottom: hp(0.8),
   },
-  dateInputsRow: {
+  statInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: moderateScale(6),
-  },
-  dateCol: {
-    flex: 1,
-  },
-  dateColLbl: {
-    fontSize: fontScale(9.5),
-    color: '#94A3B8',
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  dateInput: {
     backgroundColor: '#FFFFFF',
     borderRadius: moderateScale(10),
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    paddingVertical: moderateScale(6),
     paddingHorizontal: moderateScale(8),
-    fontSize: fontScale(13),
-    fontWeight: '700',
-    color: '#0F172A',
-    textAlign: 'center',
+    height: moderateScale(38),
   },
-  dateSlash: {
-    fontSize: fontScale(16),
+  statNumInput: {
+    flex: 1,
+    fontSize: fontScale(15),
+    fontWeight: '800',
+    color: '#0F172A',
+    paddingVertical: 0,
+  },
+  statUnitBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(6),
+  },
+  statUnitText: {
+    fontSize: fontScale(10),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  bmiPreviewBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    paddingVertical: moderateScale(6),
+    paddingHorizontal: moderateScale(10),
+    borderRadius: moderateScale(10),
+    marginBottom: hp(1.2),
+  },
+  bmiPreviewText: {
+    fontSize: fontScale(10.5),
+    color: '#065F46',
+    fontWeight: '600',
+  },
+  goalSectionBox: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(14),
+    padding: moderateScale(11),
+    marginBottom: hp(1.6),
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  goalSectionLabel: {
+    fontSize: fontScale(9.5),
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.4,
+  },
+  goalGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: moderateScale(6),
+    justifyContent: 'space-between',
+  },
+  goalOptionCard: {
+    width: '48.5%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(11),
+    padding: moderateScale(9),
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    position: 'relative',
+  },
+  goalOptionCardActive: {
+    borderColor: '#6C5CE7',
+    backgroundColor: '#FAF5FF',
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  goalIconCircle: {
+    width: moderateScale(26),
+    height: moderateScale(26),
+    borderRadius: moderateScale(13),
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: moderateScale(4),
+  },
+  goalIconCircleActive: {
+    backgroundColor: '#EEF2FF',
+  },
+  goalOptionTitle: {
+    fontSize: fontScale(11.5),
     fontWeight: '700',
+    color: '#334155',
+  },
+  goalOptionTitleActive: {
+    color: '#6C5CE7',
+    fontWeight: '800',
+  },
+  goalOptionSub: {
+    fontSize: fontScale(9),
     color: '#94A3B8',
-    marginTop: moderateScale(14),
+    marginTop: 1,
+  },
+  goalSelectedCheck: {
+    position: 'absolute',
+    top: moderateScale(7),
+    right: moderateScale(7),
   },
   confirmExpBtn: {
     backgroundColor: '#6C5CE7',
     borderRadius: moderateScale(14),
-    paddingVertical: moderateScale(13),
+    paddingVertical: moderateScale(12),
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 3,
@@ -2299,49 +2563,107 @@ const styles = StyleSheet.create({
   },
 
   // ── Member Quick Access Grid ──
+  quickAccessHeaderBadge: {
+    backgroundColor: '#F3F2FE',
+    paddingHorizontal: moderateScale(9),
+    paddingVertical: moderateScale(3.5),
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  quickAccessHeaderBadgeText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '800',
+    color: '#6C5CE7',
+    letterSpacing: 0.3,
+  },
+  sectionSubHeading: {
+    fontSize: fontScale(11),
+    color: '#64748B',
+    marginTop: 1,
+    fontWeight: '500',
+  },
   quickAccessGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: moderateScale(10),
-    marginTop: hp(0.5),
-    marginBottom: hp(1.5),
+    rowGap: hp(1.4),
+    marginTop: hp(0.8),
+    marginBottom: hp(1.8),
   },
   quickAccessCard: {
-    width: '48%',
+    width: '48.2%',
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(18),
-    padding: moderateScale(14),
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
-    elevation: 2,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-  },
-  quickAccessIconBox: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(12),
+    borderRadius: moderateScale(20),
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(12),
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1.2,
+    borderColor: '#ECEAFD',
+    elevation: 2,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  quickAccessCardGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  quickAccessIconBox: {
+    width: moderateScale(46),
+    height: moderateScale(46),
+    borderRadius: moderateScale(15),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.2,
     marginBottom: moderateScale(10),
   },
   quickAccessIcon: {
-    width: moderateScale(20),
-    height: moderateScale(20),
+    width: moderateScale(22),
+    height: moderateScale(22),
   },
   quickAccessTitle: {
-    fontSize: fontScale(13.5),
+    fontSize: fontScale(14),
     fontWeight: '800',
     color: '#0F172A',
     marginBottom: 2,
+    letterSpacing: -0.2,
+    textAlign: 'center',
   },
   quickAccessSub: {
     fontSize: fontScale(10.5),
     fontWeight: '600',
     color: '#64748B',
+    marginBottom: moderateScale(9),
+    textAlign: 'center',
+  },
+  quickAccessTagPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(4),
+    alignSelf: 'center',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(8),
+  },
+  quickAccessTagDot: {
+    width: moderateScale(5),
+    height: moderateScale(5),
+    borderRadius: moderateScale(2.5),
+  },
+  quickAccessTagText: {
+    fontSize: fontScale(9.5),
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    textAlign: 'center',
   },
 
   // ── This Week Overview Header & Quick Summary Styles ──

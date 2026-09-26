@@ -231,10 +231,13 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
   const { currentMember, currentUser, currentGym } = useAppContext();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState<'all' | 'month' | 'week'>('all');
+  const [filter, setFilter] = useState<'all' | 'week' | 'month'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<any>(null);
+
   const [weekOverview, setWeekOverview] = useState<any>({
     daysAttended: 0,
     targetDays: 6,
@@ -254,6 +257,17 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(16)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  const memberJoinDateStr = (
+    currentMember?.joinDate ||
+    (currentMember as any)?.joinedDate ||
+    currentMember?.startDate ||
+    ((currentMember as any)?.createdAt ? String((currentMember as any).createdAt).slice(0, 10) : '') ||
+    '2026-09-25'
+  ).slice(0, 10);
+
+  const todayDateObj = new Date();
+  const todayStr = `${todayDateObj.getFullYear()}-${String(todayDateObj.getMonth() + 1).padStart(2, '0')}-${String(todayDateObj.getDate()).padStart(2, '0')}`;
 
   useEffect(() => {
     Animated.parallel([
@@ -293,11 +307,13 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
 
   const fetchAttendance = useCallback(async () => {
     try {
-      const memberId = String(currentMember?.id || currentUser?.id || currentMember?.userId || 'm1');
+      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || (currentUser as any)?._id || '');
       const memberPhone = String(currentMember?.phone || currentUser?.phone || '');
 
+      if (!memberId && !memberPhone) return;
+
       // Load instant local cached attendance if available
-      const cacheKey = `@fitcore_attendance_${memberId}_${memberPhone}`;
+      const cacheKey = `@fitcore_attendance_${memberId || memberPhone}`;
       try {
         const cached = await AsyncStorage.getItem(cacheKey);
         if (cached) {
@@ -315,60 +331,32 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
       let rawRecords = res?.data?.records || [];
       let attData = res?.data || {};
 
-      // Only if no records exist at all, load historical past days (NOT today)
-      if (!Array.isArray(rawRecords) || rawRecords.length === 0) {
-        const now = new Date();
-        // Only past days (offsets >= 1), so TODAY is never falsely populated with morning check-in
-        const fallbackPastDays = [1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 13, 14];
-        const durations = [80, 110, 75, 105, 85, 90, 120, 65, 95, 85, 100, 90];
-        
-        rawRecords = fallbackPastDays.map((offset, idx) => {
-          const d = new Date(now);
-          d.setDate(d.getDate() - offset);
-          const dateStr = d.toISOString().split('T')[0];
-          const dur = durations[idx] || 75;
-          const inHour = 6 + (idx % 2 === 0 ? 0 : 11);
-          const inTimeStr = `${inHour > 12 ? inHour - 12 : inHour}:${String(30 + (idx % 20)).padStart(2, '0')} ${inHour >= 12 ? 'PM' : 'AM'}`;
-          const outHour = inHour + Math.floor(dur / 60);
-          const outMin = (30 + (idx % 20) + (dur % 60)) % 60;
-          const outTimeStr = `${outHour > 12 ? outHour - 12 : outHour}:${String(outMin).padStart(2, '0')} ${outHour >= 12 ? 'PM' : 'AM'}`;
-
-          return {
-            id: `att_session_${idx}_${dateStr}`,
-            date: dateStr,
-            checkIn: inTimeStr,
-            checkInFormatted: inTimeStr,
-            checkOut: outTimeStr,
-            checkOutFormatted: outTimeStr,
-            durationMinutes: dur,
-            durationFormatted: `${Math.floor(dur / 60)}h ${dur % 60}m`,
-            caloriesBurned: Math.round(dur * 6.2),
-            status: 'completed',
-            sessionsCombinedCount: 1,
-            method: 'qr_code',
-          };
-        });
-      }
-
-      // Group raw records into distinct Date + Slot sessions
+      // Group raw records into distinct Date + Slot sessions directly from API
       const { groupedRecords, totalVisits, thisMonthVisits, totalHoursSpent, avgTimePerSession } = processAndGroupRecords(rawRecords);
 
       setAttendanceRecords(groupedRecords);
       if (attData?.weekOverview) {
-        setWeekOverview(attData.weekOverview);
+        const enrichedDays = (attData.weekOverview.days || []).map((d: any) => ({
+          ...d,
+          isBeforeJoined: Boolean(memberJoinDateStr && d.date && d.date < memberJoinDateStr),
+        }));
+        setWeekOverview({
+          ...attData.weekOverview,
+          days: enrichedDays,
+        });
       } else {
         setWeekOverview({
-          daysAttended: Math.min(groupedRecords.length, 5),
+          daysAttended: groupedRecords.length,
           targetDays: 6,
           days: [],
         });
       }
 
       const updatedSummary = {
-        totalVisits: totalVisits || attData?.totalVisits || groupedRecords.length,
-        thisMonthVisits: thisMonthVisits || attData?.thisMonthVisits || Math.min(groupedRecords.length, 12),
-        totalHoursSpent: totalHoursSpent || attData?.totalHoursSpent || '16.5 hrs',
-        avgTimePerSession: avgTimePerSession || attData?.avgTimePerSession || '1h 25m',
+        totalVisits: totalVisits ?? attData?.totalVisits ?? 0,
+        thisMonthVisits: thisMonthVisits ?? attData?.thisMonthVisits ?? 0,
+        totalHoursSpent: totalHoursSpent ?? attData?.totalHoursSpent ?? '0.0 hrs',
+        avgTimePerSession: avgTimePerSession ?? attData?.avgTimePerSession ?? '0m',
       };
       setSummary(updatedSummary);
       const liveCheckedIn = Boolean(attData?.todaySession?.isCheckedIn);
@@ -377,7 +365,7 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
       // Cache latest attendance
       AsyncStorage.setItem(cacheKey, JSON.stringify({
         groupedRecords,
-        weekOverview: attData?.weekOverview || { daysAttended: 5, targetDays: 6 },
+        weekOverview: attData?.weekOverview || { daysAttended: 0, targetDays: 6, days: [] },
         summary: updatedSummary,
         isCheckedIn: liveCheckedIn,
       })).catch(() => {});
@@ -396,17 +384,105 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
     setRefreshing(false);
   };
 
-  const handleFilterChange = (newFilter: 'all' | 'month' | 'week') => {
+  const handleFilterChange = (newFilter: 'all' | 'week' | 'month') => {
     setFilter(newFilter);
     setCurrentPage(1);
+    setSelectedCalendarDay(null);
   };
+
+  const handlePrevMonth = () => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    setSelectedCalendarDay(null);
+  };
+
+  const handleNextMonth = () => {
+    setCalendarMonth((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    setSelectedCalendarDay(null);
+  };
+
+  // Build Interactive Monthly Calendar Data
+  const getCalendarMonthData = () => {
+    const year = calendarMonth.getFullYear();
+    const month = calendarMonth.getMonth(); // 0 to 11
+    const monthName = calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const firstDayIndex = new Date(year, month, 1).getDay(); // 0 = Sun, 1 = Mon ...
+    const offset = firstDayIndex === 0 ? 6 : firstDayIndex - 1; // Mon = 0, Sun = 6
+
+    let presentCount = 0;
+    let absentCount = 0;
+    let totalMonthMinutes = 0;
+
+    const daysList: any[] = [];
+
+    // Pre-month empty slots
+    for (let i = 0; i < offset; i++) {
+      daysList.push({ isBlank: true, key: `blank_${i}` });
+    }
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayDate = new Date(year, month, d);
+      const isSunday = dayDate.getDay() === 0;
+      const isBeforeJoined = memberJoinDateStr ? dateStr < memberJoinDateStr : false;
+      const isToday = dateStr === todayStr;
+      const isPast = dateStr < todayStr;
+      const isFuture = dateStr > todayStr;
+
+      const matchingRecord = attendanceRecords.find((r) => r.date === dateStr);
+      const isAttended = Boolean(matchingRecord);
+      const isAbsent = !isBeforeJoined && isPast && !isAttended && !isSunday;
+
+      if (isAttended) {
+        presentCount++;
+        totalMonthMinutes += (matchingRecord.durationMinutes || 0);
+      }
+      if (isAbsent) {
+        absentCount++;
+      }
+
+      let status = 'future';
+      if (isBeforeJoined) status = 'pre_join';
+      else if (isToday) status = isAttended ? 'present_today' : 'today_pending';
+      else if (isAttended) status = 'present';
+      else if (isAbsent) status = 'absent';
+      else if (isSunday) status = 'rest';
+
+      daysList.push({
+        isBlank: false,
+        key: dateStr,
+        dayNum: d,
+        dateStr,
+        status,
+        isAttended,
+        isAbsent,
+        isSunday,
+        isBeforeJoined,
+        isToday,
+        isPast,
+        isFuture,
+        record: matchingRecord,
+      });
+    }
+
+    const monthHours = (totalMonthMinutes / 60).toFixed(1);
+
+    return {
+      monthName,
+      daysList,
+      presentCount,
+      absentCount,
+      totalMonthMinutes,
+      monthHours,
+      year,
+      month,
+    };
+  };
+
+  const calendarData = getCalendarMonthData();
 
   // Filter records based on selected tab
   const getFilteredRecords = () => {
-    const currentMonthPrefix = new Date().toISOString().slice(0, 7);
-    if (filter === 'month') {
-      return attendanceRecords.filter((r) => r.date && r.date.startsWith(currentMonthPrefix));
-    }
     if (filter === 'week') {
       const now = new Date();
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -431,8 +507,272 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
     Math.round(((weekOverview?.daysAttended || 0) / (weekOverview?.targetDays || 6)) * 100)
   );
 
+  const renderSessionCard = (rec: any, idx: number) => {
+    if (!rec) return null;
+    const isLive = rec.status === 'in_gym';
+    return (
+      <View key={rec.id || idx} style={styles.sessionCard}>
+        {/* Header Row */}
+        <View style={styles.sessionCardTopRow}>
+          <View style={styles.sessionDateGroup}>
+            <View style={styles.sessionCalendarBadge}>
+              <Image source={calendarIcon} style={styles.sessionCalendarImg} resizeMode="contain" />
+            </View>
+            <View>
+              <Text style={styles.sessionDateTitle}>
+                {rec.formattedDate || rec.date}
+              </Text>
+              <View style={styles.slotBadgeRow}>
+                <Text style={[styles.slotBadgeText, rec.slot === 'MORNING' ? styles.morningSlotText : styles.eveningSlotText]}>
+                  {rec.slot === 'MORNING' ? 'Morning Session' : 'Evening Session'}
+                </Text>
+                {rec.sessionsCombinedCount > 1 && (
+                  <Text style={styles.combinedCountText}>
+                    • {rec.sessionsCombinedCount} check-ins
+                  </Text>
+                )}
+              </View>
+            </View>
+          </View>
+
+          <View style={[styles.sessionStatusPill, isLive ? styles.sessionPillLive : styles.sessionPillDone]}>
+            <View style={[styles.sessionDot, { backgroundColor: isLive ? '#6C5CE7' : '#00C48C' }]} />
+            <Text style={[styles.sessionStatusText, isLive ? { color: '#6C5CE7' } : { color: '#00C48C' }]}>
+              {isLive ? 'IN GYM NOW' : 'COMPLETED'}
+            </Text>
+          </View>
+        </View>
+
+        {/* Metrics Row */}
+        <View style={styles.sessionMetricsStrip}>
+          <View style={styles.metricColumn}>
+            <View style={styles.metricLabelGroup}>
+              <Image source={clockIcon} style={styles.metricIconSmall} resizeMode="contain" />
+              <Text style={styles.metricLabelText}>CHECK IN</Text>
+            </View>
+            <Text style={styles.metricValueText}>
+              {rec.checkInFormatted || rec.checkIn || '--:--'}
+            </Text>
+          </View>
+
+          <View style={styles.metricDividerLine} />
+
+          <View style={styles.metricColumn}>
+            <View style={styles.metricLabelGroup}>
+              <Image source={stopwatchIcon} style={styles.metricIconSmall} resizeMode="contain" />
+              <Text style={styles.metricLabelText}>CHECK OUT</Text>
+            </View>
+            <Text style={[styles.metricValueText, isLive && { color: '#6C5CE7', fontWeight: '800' }]}>
+              {isLive ? 'Active Live' : rec.checkOutFormatted || rec.checkOut || '--:--'}
+            </Text>
+          </View>
+
+          <View style={styles.metricDividerLine} />
+
+          <View style={styles.metricColumn}>
+            <View style={styles.metricLabelGroup}>
+              <Image source={dumbbellIcon} style={styles.metricIconSmall} resizeMode="contain" />
+              <Text style={styles.metricLabelText}>DURATION</Text>
+            </View>
+            <Text style={[styles.metricValueText, { color: '#6C5CE7', fontWeight: '800' }]}>
+              {rec.durationFormatted || `${rec.durationMinutes || 0}m`}
+            </Text>
+          </View>
+
+          <View style={styles.metricDividerLine} />
+
+          <View style={styles.metricColumn}>
+            <View style={styles.metricLabelGroup}>
+              <Image source={kcalIcon} style={styles.metricIconSmall} resizeMode="contain" />
+              <Text style={styles.metricLabelText}>BURNED</Text>
+            </View>
+            <Text style={styles.metricValueText}>
+              {rec.caloriesBurned ? `${rec.caloriesBurned} kcal` : '--'}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  const renderPaginationFooter = () => {
+    const pagePercent = Math.min(100, Math.round((currentPage / totalPages) * 100));
+
+    // Calculate smart sliding window for page chips (works for 1 to 100+ pages)
+    const getVisiblePages = () => {
+      if (totalPages <= 5) {
+        return Array.from({ length: totalPages }, (_, i) => i + 1);
+      }
+      const pages: (number | string)[] = [];
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, '...', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+      }
+      return pages;
+    };
+
+    const visiblePages = getVisiblePages();
+
+    return (
+      <View style={styles.paginationStepperCard}>
+        {/* ── Main Stepper & Quick Jump Row ── */}
+        <View style={styles.stepperMainRow}>
+          {/* Quick First Page Jump Button */}
+          {totalPages > 2 && (
+            <TouchableOpacity
+              style={[styles.stepperFastJumpBtn, currentPage === 1 && styles.stepperFastJumpBtnDisabled]}
+              onPress={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.stepperFastJumpText, currentPage === 1 && styles.stepperFastJumpTextDisabled]}>
+                « First
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Previous Page Circular Button */}
+          <TouchableOpacity
+            style={[styles.stepperCircleBtn, currentPage === 1 && styles.stepperCircleBtnDisabled]}
+            onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={leftArrowIcon}
+              style={[styles.stepperArrowIcon, currentPage === 1 && styles.stepperArrowIconDisabled]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          {/* Center Page & Status Display */}
+          <View style={styles.stepperCenterInfo}>
+            <View style={styles.stepperTagRow}>
+              <View style={styles.stepperPulseDot} />
+              <Text style={styles.stepperSuperText}>PAGE {currentPage} OF {totalPages}</Text>
+            </View>
+            <Text style={styles.stepperCountText}>
+              Showing <Text style={styles.stepperCountBold}>{startIndex + 1}–{endIndex}</Text> of <Text style={styles.stepperCountBold}>{totalItems}</Text> Sessions
+            </Text>
+          </View>
+
+          {/* Next Page Circular Button */}
+          <TouchableOpacity
+            style={[
+              styles.stepperCircleBtn,
+              styles.stepperCircleBtnNext,
+              currentPage === totalPages && styles.stepperCircleBtnDisabled,
+            ]}
+            onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            activeOpacity={0.7}
+          >
+            <Image
+              source={leftArrowIcon}
+              style={[
+                styles.stepperArrowIcon,
+                styles.stepperArrowIconRotated,
+                currentPage === totalPages ? styles.stepperArrowIconDisabled : styles.stepperArrowIconNextActive,
+              ]}
+              resizeMode="contain"
+            />
+          </TouchableOpacity>
+
+          {/* Quick Last Page Jump Button */}
+          {totalPages > 2 && (
+            <TouchableOpacity
+              style={[styles.stepperFastJumpBtn, styles.stepperFastJumpBtnLast, currentPage === totalPages && styles.stepperFastJumpBtnDisabled]}
+              onPress={() => setCurrentPage(totalPages)}
+              disabled={currentPage === totalPages}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.stepperFastJumpText, styles.stepperFastJumpTextLast, currentPage === totalPages && styles.stepperFastJumpTextDisabled]}>
+                Last »
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* ── Visual Page Progress Track ── */}
+        <View style={styles.stepperProgressTrack}>
+          <View style={[styles.stepperProgressFill, { width: `${pagePercent}%` }]} />
+        </View>
+
+        {/* ── Bottom Per-Page Selector & Direct Page Number Jump Pills ── */}
+        <View style={styles.stepperBottomRow}>
+          <View style={styles.stepperPageSizeGroup}>
+            <Text style={styles.stepperPageSizeLabel}>Show:</Text>
+            {[5, 10, 20].map((size) => {
+              const isSelected = itemsPerPage === size;
+              return (
+                <TouchableOpacity
+                  key={size}
+                  style={[styles.pageSizePill, isSelected && styles.pageSizePillActive]}
+                  onPress={() => {
+                    setItemsPerPage(size);
+                    setCurrentPage(1);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.pageSizePillText, isSelected && styles.pageSizePillTextActive]}>
+                    {size}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Dynamic Smart Page Chips (1 ... 5 6 7 ... 20) */}
+          {totalPages > 1 && (
+            <View style={styles.stepperDirectJumpRow}>
+              {visiblePages.map((item, idx) => {
+                if (item === '...') {
+                  const isLeftEllipsis = idx < visiblePages.indexOf(currentPage);
+                  return (
+                    <TouchableOpacity
+                      key={`ellipsis_${idx}`}
+                      style={styles.stepperEllipsisBtn}
+                      onPress={() => {
+                        if (isLeftEllipsis) {
+                          setCurrentPage((p) => Math.max(1, p - 5));
+                        } else {
+                          setCurrentPage((p) => Math.min(totalPages, p + 5));
+                        }
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.stepperEllipsisText}>•••</Text>
+                    </TouchableOpacity>
+                  );
+                }
+
+                const pageNum = Number(item);
+                const isCurrent = pageNum === currentPage;
+                return (
+                  <TouchableOpacity
+                    key={pageNum}
+                    style={[styles.stepperJumpChip, isCurrent && styles.stepperJumpChipActive]}
+                    onPress={() => setCurrentPage(pageNum)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.stepperJumpChipText, isCurrent && styles.stepperJumpChipTextActive]}>
+                      {pageNum}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
 
       {/* ── 1. AMBIENT BACKGROUND GLOW (MATCHING DASHBOARD) ── */}
@@ -449,7 +789,7 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
           <Image source={leftArrowIcon} style={styles.backIcon} resizeMode="contain" />
         </TouchableOpacity>
 
-        <View style={styles.headerTitleContainer}>
+        <View style={styles.headerTitleContainer} pointerEvents="none">
           <Text style={styles.headerTitleText}>Attendance History</Text>
         </View>
 
@@ -478,74 +818,9 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
       >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
 
-          {/* ── 3. 4 STAT ISLANDS (CLEAN PASTEL THEME - NUMBERS ON TOP) ── */}
-          <View style={styles.statsGrid}>
-            {/* Total Visits */}
-            <View style={[styles.statCard, { borderColor: '#ECEAFD' }]}>
-              <View style={styles.statTopRow}>
-                <Text style={styles.statCardValue}>
-                  {summary.totalVisits || attendanceRecords.length || 0}{' '}
-                  <Text style={styles.statCardUnit}>Days</Text>
-                </Text>
-                <View style={[styles.statIconBadge, { backgroundColor: '#F3F2FE' }]}>
-                  <Image source={chartIcon} style={[styles.statIconImg, { tintColor: '#6C5CE7' }]} resizeMode="contain" />
-                </View>
-              </View>
-              <Text style={[styles.statCardCode, { color: '#6C5CE7' }]}>TOTAL VISITS</Text>
-              <Text style={styles.statCardSubtitle}>All-Time Lifetime</Text>
-            </View>
-
-            {/* This Month */}
-            <View style={[styles.statCard, { borderColor: '#E6FBF5' }]}>
-              <View style={styles.statTopRow}>
-                <Text style={styles.statCardValue}>
-                  {summary.thisMonthVisits || 0}{' '}
-                  <Text style={styles.statCardUnit}>Days</Text>
-                </Text>
-                <View style={[styles.statIconBadge, { backgroundColor: '#E6FBF5' }]}>
-                  <Image source={calendarIcon} style={[styles.statIconImg, { tintColor: '#00C48C' }]} resizeMode="contain" />
-                </View>
-              </View>
-              <Text style={[styles.statCardCode, { color: '#00C48C' }]}>THIS MONTH</Text>
-              <Text style={styles.statCardSubtitle}>Active Billing Cycle</Text>
-            </View>
-
-            {/* Total Time Trained */}
-            <View style={[styles.statCard, { borderColor: '#FEF3C7' }]}>
-              <View style={styles.statTopRow}>
-                <Text style={styles.statCardValue}>
-                  {summary.totalHoursSpent || '0.0 hrs'}
-                </Text>
-                <View style={[styles.statIconBadge, { backgroundColor: '#FEF3C7' }]}>
-                  <Image source={stopwatchIcon} style={[styles.statIconImg, { tintColor: '#F59E0B' }]} resizeMode="contain" />
-                </View>
-              </View>
-              <Text style={[styles.statCardCode, { color: '#F59E0B' }]}>TIME TRAINED</Text>
-              <Text style={styles.statCardSubtitle}>Total Gym Hours</Text>
-            </View>
-
-            {/* Avg Session Duration */}
-            <View style={[styles.statCard, { borderColor: '#FDF2F8' }]}>
-              <View style={styles.statTopRow}>
-                <Text style={styles.statCardValue}>
-                  {summary.avgTimePerSession || '0m'}
-                </Text>
-                <View style={[styles.statIconBadge, { backgroundColor: '#FDF2F8' }]}>
-                  <Image source={clockIcon} style={[styles.statIconImg, { tintColor: '#EC4899' }]} resizeMode="contain" />
-                </View>
-              </View>
-              <Text style={[styles.statCardCode, { color: '#EC4899' }]}>AVG SESSION</Text>
-              <Text style={styles.statCardSubtitle}>Per Check-In</Text>
-            </View>
-          </View>
-
-          {/* ── 6. FILTER SEGMENTED CONTROLS ── */}
+          {/* ── FILTER SEGMENTED CONTROLS ── */}
           <View style={styles.filterSection}>
-            <View style={styles.filterHeaderGroup}>
-              <Text style={styles.sectionHeadingText}>Session Logs & History</Text>
-              <Text style={styles.sectionSubHeadingText}>Biometric time stamps & workout duration</Text>
-            </View>
-
+       
             <View style={styles.filterTabsWrapper}>
               <TouchableOpacity
                 style={[styles.filterTab, filter === 'all' && styles.filterTabActive]}
@@ -558,16 +833,6 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.filterTab, filter === 'month' && styles.filterTabActive]}
-                onPress={() => handleFilterChange('month')}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.filterTabText, filter === 'month' && styles.filterTabTextActive]}>
-                  This Month ({summary.thisMonthVisits || 0})
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
                 style={[styles.filterTab, filter === 'week' && styles.filterTabActive]}
                 onPress={() => handleFilterChange('week')}
                 activeOpacity={0.8}
@@ -576,199 +841,437 @@ export default function AttendanceHistoryScreen({ navigation }: any) {
                   This Week ({weekOverview?.daysAttended || 0})
                 </Text>
               </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.filterTab, filter === 'month' && styles.filterTabActive]}
+                onPress={() => handleFilterChange('month')}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.filterTabText, filter === 'month' && styles.filterTabTextActive]}>
+                  Monthly Calendar
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          {/* ── 8. DETAILED SESSION TIMELINE CARDS ── */}
-          {totalItems === 0 ? (
-            <View style={styles.emptyCardBox}>
-              <View style={styles.emptyCircle}>
-                <Image source={calendarIcon} style={styles.emptyIconImg} resizeMode="contain" />
-              </View>
-              <Text style={styles.emptyTitleText}>No Attendance Sessions Found</Text>
-              <Text style={styles.emptySubText}>
-                Check in at the gym turnstile or tap Check In on the dashboard to log your sessions!
-              </Text>
-            </View>
-          ) : (
-            paginatedRecords.map((rec: any, idx: number) => {
-              const isLive = rec.status === 'in_gym';
-              return (
-                <View key={rec.id || idx} style={styles.sessionCard}>
-                  {/* Header Row */}
-                  <View style={styles.sessionCardTopRow}>
-                    <View style={styles.sessionDateGroup}>
-                      <View style={styles.sessionCalendarBadge}>
-                        <Image source={calendarIcon} style={styles.sessionCalendarImg} resizeMode="contain" />
-                      </View>
-                      <View>
-                        <Text style={styles.sessionDateTitle}>
-                          {rec.formattedDate || rec.date}
-                        </Text>
-                        <View style={styles.slotBadgeRow}>
-                          <Text style={[styles.slotBadgeText, rec.slot === 'MORNING' ? styles.morningSlotText : styles.eveningSlotText]}>
-                            {rec.slot === 'MORNING' ? 'Morning Session' : 'Evening Session'}
-                          </Text>
-                          {rec.sessionsCombinedCount > 1 && (
-                            <Text style={styles.combinedCountText}>
-                              • {rec.sessionsCombinedCount} check-ins
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                    </View>
-
-                    <View style={[styles.sessionStatusPill, isLive ? styles.sessionPillLive : styles.sessionPillDone]}>
-                      <View style={[styles.sessionDot, { backgroundColor: isLive ? '#6C5CE7' : '#00C48C' }]} />
-                      <Text style={[styles.sessionStatusText, isLive ? { color: '#6C5CE7' } : { color: '#00C48C' }]}>
-                        {isLive ? 'IN GYM NOW' : 'COMPLETED'}
-                      </Text>
+          {/* ══════════════════════════════════════════════════
+              TAB 1: ALL TIME VIEW (STAT ISLANDS + ALL LOGS)
+             ══════════════════════════════════════════════════ */}
+          {filter === 'all' && (
+            <View>
+              {/* 4 STAT ISLANDS */}
+              <View style={styles.statsGrid}>
+                {/* Total Visits */}
+                <View style={[styles.statCard, { borderColor: '#ECEAFD' }]}>
+                  <View style={styles.statTopRow}>
+                    <Text style={styles.statCardValue}>
+                      {summary.totalVisits || attendanceRecords.length || 0}{' '}
+                      <Text style={styles.statCardUnit}>Days</Text>
+                    </Text>
+                    <View style={[styles.statIconBadge, { backgroundColor: '#F3F2FE' }]}>
+                      <Image source={chartIcon} style={[styles.statIconImg, { tintColor: '#6C5CE7' }]} resizeMode="contain" />
                     </View>
                   </View>
-
-                  {/* Metrics Row */}
-                  <View style={styles.sessionMetricsStrip}>
-                    <View style={styles.metricColumn}>
-                      <View style={styles.metricLabelGroup}>
-                        <Image source={clockIcon} style={styles.metricIconSmall} resizeMode="contain" />
-                        <Text style={styles.metricLabelText}>CHECK IN</Text>
-                      </View>
-                      <Text style={styles.metricValueText}>
-                        {rec.checkInFormatted || rec.checkIn || '--:--'}
-                      </Text>
-                    </View>
-
-                    <View style={styles.metricDividerLine} />
-
-                    <View style={styles.metricColumn}>
-                      <View style={styles.metricLabelGroup}>
-                        <Image source={stopwatchIcon} style={styles.metricIconSmall} resizeMode="contain" />
-                        <Text style={styles.metricLabelText}>CHECK OUT</Text>
-                      </View>
-                      <Text style={[styles.metricValueText, isLive && { color: '#6C5CE7', fontWeight: '800' }]}>
-                        {isLive ? 'Active Live' : rec.checkOutFormatted || rec.checkOut || '--:--'}
-                      </Text>
-                    </View>
-
-                    <View style={styles.metricDividerLine} />
-
-                    <View style={styles.metricColumn}>
-                      <View style={styles.metricLabelGroup}>
-                        <Image source={dumbbellIcon} style={styles.metricIconSmall} resizeMode="contain" />
-                        <Text style={styles.metricLabelText}>DURATION</Text>
-                      </View>
-                      <Text style={[styles.metricValueText, { color: '#6C5CE7', fontWeight: '800' }]}>
-                        {rec.durationFormatted || `${rec.durationMinutes || 0}m`}
-                      </Text>
-                    </View>
-
-                    <View style={styles.metricDividerLine} />
-
-                    <View style={styles.metricColumn}>
-                      <View style={styles.metricLabelGroup}>
-                        <Image source={kcalIcon} style={styles.metricIconSmall} resizeMode="contain" />
-                        <Text style={styles.metricLabelText}>BURNED</Text>
-                      </View>
-                      <Text style={styles.metricValueText}>
-                        {rec.caloriesBurned ? `${rec.caloriesBurned} kcal` : '--'}
-                      </Text>
-                    </View>
-                  </View>
+                  <Text style={[styles.statCardCode, { color: '#6C5CE7' }]}>TOTAL VISITS</Text>
+                  <Text style={styles.statCardSubtitle}>All-Time Lifetime</Text>
                 </View>
-              );
-            })
+
+                {/* This Month */}
+                <View style={[styles.statCard, { borderColor: '#E6FBF5' }]}>
+                  <View style={styles.statTopRow}>
+                    <Text style={styles.statCardValue}>
+                      {summary.thisMonthVisits || 0}{' '}
+                      <Text style={styles.statCardUnit}>Days</Text>
+                    </Text>
+                    <View style={[styles.statIconBadge, { backgroundColor: '#E6FBF5' }]}>
+                      <Image source={calendarIcon} style={[styles.statIconImg, { tintColor: '#00C48C' }]} resizeMode="contain" />
+                    </View>
+                  </View>
+                  <Text style={[styles.statCardCode, { color: '#00C48C' }]}>THIS MONTH</Text>
+                  <Text style={styles.statCardSubtitle}>Active Billing Cycle</Text>
+                </View>
+
+                {/* Total Time Trained */}
+                <View style={[styles.statCard, { borderColor: '#FEF3C7' }]}>
+                  <View style={styles.statTopRow}>
+                    <Text style={styles.statCardValue}>
+                      {summary.totalHoursSpent || '0.0 hrs'}
+                    </Text>
+                    <View style={[styles.statIconBadge, { backgroundColor: '#FEF3C7' }]}>
+                      <Image source={stopwatchIcon} style={[styles.statIconImg, { tintColor: '#F59E0B' }]} resizeMode="contain" />
+                    </View>
+                  </View>
+                  <Text style={[styles.statCardCode, { color: '#F59E0B' }]}>TIME TRAINED</Text>
+                  <Text style={styles.statCardSubtitle}>Total Gym Hours</Text>
+                </View>
+
+                {/* Avg Session Duration */}
+                <View style={[styles.statCard, { borderColor: '#FDF2F8' }]}>
+                  <View style={styles.statTopRow}>
+                    <Text style={styles.statCardValue}>
+                      {summary.avgTimePerSession || '0m'}
+                    </Text>
+                    <View style={[styles.statIconBadge, { backgroundColor: '#FDF2F8' }]}>
+                      <Image source={clockIcon} style={[styles.statIconImg, { tintColor: '#EC4899' }]} resizeMode="contain" />
+                    </View>
+                  </View>
+                  <Text style={[styles.statCardCode, { color: '#EC4899' }]}>AVG SESSION</Text>
+                  <Text style={styles.statCardSubtitle}>Per Check-In</Text>
+                </View>
+              </View>
+
+              {/* SECTION HEADING */}
+              <View style={styles.sessionHeaderRow}>
+                <Text style={styles.sessionSectionTitle}>All Time Session History</Text>
+                <Text style={styles.sessionCountBadge}>{totalItems} Sessions</Text>
+              </View>
+
+              {/* TIMELINE LIST */}
+              {totalItems === 0 ? (
+                <View style={styles.emptyCardBox}>
+                  <View style={styles.emptyCircle}>
+                    <Image source={calendarIcon} style={styles.emptyIconImg} resizeMode="contain" />
+                  </View>
+                  <Text style={styles.emptyTitleText}>No Attendance Sessions Found</Text>
+                  <Text style={styles.emptySubText}>
+                    Check in at the gym turnstile or tap Check In on the dashboard to log your sessions!
+                  </Text>
+                </View>
+              ) : (
+                paginatedRecords.map((rec: any, idx: number) => renderSessionCard(rec, idx))
+              )}
+
+              {/* PAGINATION CONTROLLER FOOTER */}
+              {totalItems > 0 && renderPaginationFooter()}
+            </View>
           )}
 
-          {/* ── 9. BOTTOM PAGINATION CONTROLLER FOOTER (<< < 1 2 3 > >>) ── */}
-          {totalItems > 0 && (
-            <View style={styles.paginationFooterCard}>
-              {/* Pagination controls row: << < 1 2 3 4 5 > >> */}
-              <View style={styles.paginationControlsRow}>
-                {/* First Page << */}
-                <TouchableOpacity
-                  style={[styles.pageNavBtn, currentPage === 1 && styles.pageNavBtnDisabled]}
-                  onPress={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.pageNavSymbol, currentPage === 1 && styles.pageNavSymbolDisabled]}>«</Text>
-                </TouchableOpacity>
+          {/* ══════════════════════════════════════════════════
+              TAB 2: THIS WEEK VIEW (WEEK STREAK + 7-DAY STRIP)
+             ══════════════════════════════════════════════════ */}
+          {filter === 'week' && (
+            <View>
+              {/* 7-DAY WEEKLY STREAK & GOAL CARD */}
+              <View style={styles.weekStreakCard}>
+                <View style={styles.sectionHeaderRow}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(10) }}>
+                    <View style={styles.sparkleIconBox}>
+                      <Image source={thunderIcon} style={styles.sparkleIcon} resizeMode="contain" />
+                    </View>
+                    <View>
+                      <Text style={styles.cardSuperTitle}>WEEKLY TARGET</Text>
+                      <Text style={styles.cardMainTitle}>Weekly Consistency</Text>
+                    </View>
+                  </View>
+                  <View style={styles.weekPercentBadge}>
+                    <Text style={styles.weekPercentText}>{weekPercent}%</Text>
+                  </View>
+                </View>
 
-                {/* Prev Page < */}
-                <TouchableOpacity
-                  style={[styles.pageNavBtn, currentPage === 1 && styles.pageNavBtnDisabled]}
-                  onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.pageNavSymbol, currentPage === 1 && styles.pageNavSymbolDisabled]}>‹</Text>
-                </TouchableOpacity>
+                {/* 7-DAY MON TO SUN STRIP */}
+                <View style={styles.weekDaysStrip}>
+                  {weekOverview?.days?.map((d: any) => {
+                    const isDone = Boolean(d.attended || d.done);
+                    const isToday = d.isToday || d.date === todayStr;
+                    const isBeforeJoined = Boolean(memberJoinDateStr && d.date && d.date < memberJoinDateStr);
+                    const isMissed = !isBeforeJoined && d.isPast && !isDone && d.day !== 'Sun';
+                    return (
+                      <View
+                        key={d.day}
+                        style={[
+                          styles.weekDayCol,
+                          isToday && styles.weekDayColToday,
+                          isDone && styles.weekDayColCompleted,
+                          isMissed && styles.weekDayColMissed,
+                          isBeforeJoined && styles.weekDayColPreJoin,
+                        ]}
+                      >
+                        <Text style={[styles.weekDayText, isToday && styles.weekDayTextToday, isDone && styles.weekDayTextCompleted, isBeforeJoined && styles.weekDayTextPreJoin]}>
+                          {d.day}
+                        </Text>
+                        <View
+                          style={[
+                            styles.weekDayStatusCircle,
+                            isDone && styles.weekDayStatusCircleDone,
+                            isToday && !isDone && styles.weekDayStatusCircleToday,
+                            isMissed && styles.weekDayStatusCircleMissed,
+                            isBeforeJoined && styles.weekDayStatusCirclePreJoin,
+                          ]}
+                        >
+                          {isDone ? (
+                            <Text style={styles.doneCheckmark}>✓</Text>
+                          ) : isMissed ? (
+                            <Text style={styles.missedCross}>✕</Text>
+                          ) : isBeforeJoined ? (
+                            <Text style={{ fontSize: fontScale(11), color: '#94A3B8', fontWeight: '800' }}>-</Text>
+                          ) : isToday ? (
+                            <View style={[styles.statusDotPlaceholder, { backgroundColor: '#6C5CE7' }]} />
+                          ) : (
+                            <View style={styles.statusDotPlaceholder} />
+                          )}
+                        </View>
+                        <Text style={[styles.weekFocusText, isDone && styles.weekFocusTextDone, isToday && styles.weekFocusTextToday, isBeforeJoined && styles.weekFocusTextPreJoin]} numberOfLines={1}>
+                          {isDone ? `${d.durationMinutes || 0}m` : isBeforeJoined ? '-' : isToday ? 'Today' : d.day === 'Sun' ? 'Rest' : isMissed ? 'Absent' : 'Pending'}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
 
-                {/* Number Pills: 1 2 3 4 5 */}
-                <View style={styles.pagePillsRow}>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => {
-                    const isActive = pageNum === currentPage;
+                {/* PROGRESS BAR & STAT METRICS */}
+                <View style={styles.weekProgressBox}>
+                  <View style={styles.progressLabelRow}>
+                    <Text style={styles.progressLabelLeft}>
+                      Goal: <Text style={styles.progressBold}>{weekOverview?.daysAttended || 0} of {weekOverview?.targetDays || 6} Days</Text>
+                    </Text>
+                    <Text style={styles.progressLabelRight}>
+                      {weekOverview?.weeklyTimeFormatted || '0.0 hrs'} trained
+                    </Text>
+                  </View>
+                  <View style={styles.progressBarTrack}>
+                    <View style={[styles.progressBarFill, { width: `${weekPercent}%` }]} />
+                  </View>
+                </View>
+              </View>
+
+              {/* THIS WEEK SESSION TIMELINE LIST */}
+              <View style={styles.sessionHeaderRow}>
+                <Text style={styles.sessionSectionTitle}>This Week's Session Logs</Text>
+                <Text style={styles.sessionCountBadge}>{filteredRecords.length} Sessions</Text>
+              </View>
+
+              {filteredRecords.length === 0 ? (
+                <View style={styles.emptyCardBox}>
+                  <View style={styles.emptyCircle}>
+                    <Image source={calendarIcon} style={styles.emptyIconImg} resizeMode="contain" />
+                  </View>
+                  <Text style={styles.emptyTitleText}>No Sessions This Week</Text>
+                  <Text style={styles.emptySubText}>
+                    Check in today to start your weekly workout streak!
+                  </Text>
+                </View>
+              ) : (
+                filteredRecords.map((rec: any, idx: number) => renderSessionCard(rec, idx))
+              )}
+            </View>
+          )}
+
+          {/* ══════════════════════════════════════════════════
+              TAB 3: MONTHLY CALENDAR VIEW (PRESENT / ABSENT)
+             ══════════════════════════════════════════════════ */}
+          {filter === 'month' && (
+            <View>
+              {/* MONTHLY CALENDAR CARD */}
+              <View style={styles.calendarCard}>
+                {/* Month Navigation Header */}
+                <View style={styles.calendarMonthNavRow}>
+                  <TouchableOpacity
+                    style={styles.calendarMonthNavBtn}
+                    onPress={handlePrevMonth}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.calendarMonthNavText}>‹</Text>
+                  </TouchableOpacity>
+
+                  <Text style={styles.calendarMonthTitle}>{calendarData.monthName}</Text>
+
+                  <TouchableOpacity
+                    style={styles.calendarMonthNavBtn}
+                    onPress={handleNextMonth}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.calendarMonthNavText}>›</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Monthly Summary Stats Island */}
+                <View style={styles.calendarStatsPillsRow}>
+                  <View style={styles.calendarStatPill}>
+                    <View style={[styles.calendarStatDot, { backgroundColor: '#10B981' }]} />
+                    <Text style={styles.calendarStatText}>
+                      Present: <Text style={{ color: '#059669', fontWeight: '900' }}>{calendarData.presentCount} Days</Text>
+                    </Text>
+                  </View>
+
+                  <View style={styles.calendarStatPill}>
+                    <View style={[styles.calendarStatDot, { backgroundColor: '#EF4444' }]} />
+                    <Text style={styles.calendarStatText}>
+                      Absent: <Text style={{ color: '#DC2626', fontWeight: '900' }}>{calendarData.absentCount} Days</Text>
+                    </Text>
+                  </View>
+
+                  <View style={styles.calendarStatPill}>
+                    <View style={[styles.calendarStatDot, { backgroundColor: '#6C5CE7' }]} />
+                    <Text style={styles.calendarStatText}>
+                      Time: <Text style={{ color: '#6C5CE7', fontWeight: '900' }}>{calendarData.monthHours} hrs</Text>
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Weekdays Row: Mon Tue Wed Thu Fri Sat Sun */}
+                <View style={styles.calendarWeekDaysHeader}>
+                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                    <View key={day} style={styles.calendarWeekDayColHeader}>
+                      <Text style={[styles.calendarWeekDayHeaderText, day === 'Sun' && { color: '#0284C7' }]}>
+                        {day}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Calendar Days Matrix */}
+                <View style={styles.calendarDaysGrid}>
+                  {calendarData.daysList.map((dayItem: any) => {
+                    if (dayItem.isBlank) {
+                      return <View key={dayItem.key} style={styles.calendarDayCell} />;
+                    }
+
+                    const isSelected = selectedCalendarDay?.dateStr === dayItem.dateStr;
+                    const status = dayItem.status;
+
                     return (
                       <TouchableOpacity
-                        key={pageNum}
-                        style={[styles.pageNumberPill, isActive && styles.pageNumberPillActive]}
-                        onPress={() => setCurrentPage(pageNum)}
-                        activeOpacity={0.8}
+                        key={dayItem.key}
+                        style={styles.calendarDayCell}
+                        onPress={() => setSelectedCalendarDay(dayItem)}
+                        activeOpacity={0.7}
                       >
-                        <Text style={[styles.pageNumberText, isActive && styles.pageNumberTextActive]}>
-                          {pageNum}
-                        </Text>
+                        <View
+                          style={[
+                            styles.calendarDayPill,
+                            status === 'present' && styles.calendarDayPillPresent,
+                            status === 'present_today' && styles.calendarDayPillPresent,
+                            status === 'absent' && styles.calendarDayPillAbsent,
+                            status === 'rest' && styles.calendarDayPillRest,
+                            status === 'today_pending' && styles.calendarDayPillToday,
+                            status === 'pre_join' && styles.calendarDayPillPreJoin,
+                            isSelected && styles.calendarDayPillSelected,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.calendarDayNum,
+                              (status === 'present' || status === 'present_today') && styles.calendarDayNumPresent,
+                              status === 'absent' && styles.calendarDayNumAbsent,
+                              status === 'rest' && styles.calendarDayNumRest,
+                              status === 'today_pending' && styles.calendarDayNumToday,
+                              status === 'pre_join' && styles.calendarDayNumPreJoin,
+                            ]}
+                          >
+                            {dayItem.dayNum}
+                          </Text>
+
+                          {/* Micro Status Marker */}
+                          {(status === 'present' || status === 'present_today') && (
+                            <View style={[styles.calendarStatusMicroDot, { backgroundColor: '#10B981' }]} />
+                          )}
+                          {status === 'absent' && (
+                            <View style={[styles.calendarStatusMicroDot, { backgroundColor: '#EF4444' }]} />
+                          )}
+                          {status === 'today_pending' && (
+                            <View style={[styles.calendarStatusMicroDot, { backgroundColor: '#6C5CE7' }]} />
+                          )}
+                        </View>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
 
-                {/* Next Page > */}
-                <TouchableOpacity
-                  style={[styles.pageNavBtn, currentPage === totalPages && styles.pageNavBtnDisabled]}
-                  onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.pageNavSymbol, currentPage === totalPages && styles.pageNavSymbolDisabled]}>›</Text>
-                </TouchableOpacity>
-
-                {/* Last Page >> */}
-                <TouchableOpacity
-                  style={[styles.pageNavBtn, currentPage === totalPages && styles.pageNavBtnDisabled]}
-                  onPress={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.pageNavSymbol, currentPage === totalPages && styles.pageNavSymbolDisabled]}>»</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Bottom Info & Per-Page Row */}
-              <View style={styles.paginationBottomInfoRow}>
-                <Text style={styles.paginationInfoText}>
-                  Showing <Text style={styles.paginationBold}>{startIndex + 1} - {endIndex}</Text> of <Text style={styles.paginationBold}>{totalItems}</Text> logs
-                </Text>
-
-                <View style={styles.perPagePickerRow}>
-                  <Text style={styles.perPageLabel}>Per page:</Text>
-                  {[5, 10, 20].map((size) => (
-                    <TouchableOpacity
-                      key={size}
-                      style={[styles.perPageChip, itemsPerPage === size && styles.perPageChipActive]}
-                      onPress={() => {
-                        setItemsPerPage(size);
-                        setCurrentPage(1);
-                      }}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={[styles.perPageChipText, itemsPerPage === size && styles.perPageChipTextActive]}>
-                        {size}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                {/* Calendar Legend */}
+                <View style={styles.calendarLegendRow}>
+                  <View style={styles.calendarLegendItem}>
+                    <View style={[styles.calendarLegendDot, { backgroundColor: '#10B981' }]} />
+                    <Text style={styles.calendarLegendText}>Present</Text>
+                  </View>
+                  <View style={styles.calendarLegendItem}>
+                    <View style={[styles.calendarLegendDot, { backgroundColor: '#EF4444' }]} />
+                    <Text style={styles.calendarLegendText}>Absent</Text>
+                  </View>
+                  <View style={styles.calendarLegendItem}>
+                    <View style={[styles.calendarLegendDot, { backgroundColor: '#6C5CE7' }]} />
+                    <Text style={styles.calendarLegendText}>Today</Text>
+                  </View>
+                  <View style={styles.calendarLegendItem}>
+                    <View style={[styles.calendarLegendDot, { backgroundColor: '#0284C7' }]} />
+                    <Text style={styles.calendarLegendText}>Sunday Rest</Text>
+                  </View>
+                  <View style={styles.calendarLegendItem}>
+                    <View style={[styles.calendarLegendDot, { backgroundColor: '#CBD5E1' }]} />
+                    <Text style={styles.calendarLegendText}>Not Joined</Text>
+                  </View>
                 </View>
               </View>
+
+              {/* INTERACTIVE SELECTED DAY CARD */}
+              {selectedCalendarDay && (
+                <View style={{ marginBottom: hp(2) }}>
+                  <View style={styles.sessionHeaderRow}>
+                    <Text style={styles.sessionSectionTitle}>Selected Date: {selectedCalendarDay.dateStr}</Text>
+                  </View>
+
+                  {selectedCalendarDay.isAttended ? (
+                    renderSessionCard(selectedCalendarDay.record, 0)
+                  ) : (
+                    <View style={styles.emptyCardBox}>
+                      <View
+                        style={[
+                          styles.emptyCircle,
+                          selectedCalendarDay.status === 'absent'
+                            ? { backgroundColor: '#FEE2E2' }
+                            : selectedCalendarDay.status === 'rest'
+                            ? { backgroundColor: '#E0F2FE' }
+                            : selectedCalendarDay.status === 'pre_join'
+                            ? { backgroundColor: '#F1F5F9' }
+                            : { backgroundColor: '#F3F2FE' },
+                        ]}
+                      >
+                        <Image
+                          source={
+                            selectedCalendarDay.status === 'absent'
+                              ? clockIcon
+                              : selectedCalendarDay.status === 'rest'
+                              ? activeIcon
+                              : selectedCalendarDay.status === 'pre_join'
+                              ? calendarIcon
+                              : dumbbellIcon
+                          }
+                          style={[
+                            styles.emptyIconImg,
+                            selectedCalendarDay.status === 'absent'
+                              ? { tintColor: '#EF4444' }
+                              : selectedCalendarDay.status === 'rest'
+                              ? { tintColor: '#0284C7' }
+                              : selectedCalendarDay.status === 'pre_join'
+                              ? { tintColor: '#94A3B8' }
+                              : { tintColor: '#6C5CE7' },
+                          ]}
+                          resizeMode="contain"
+                        />
+                      </View>
+                      <Text style={styles.emptyTitleText}>
+                        {selectedCalendarDay.status === 'absent'
+                          ? 'Absent (No Check-In)'
+                          : selectedCalendarDay.status === 'rest'
+                          ? 'Sunday Rest & Recovery Day'
+                          : selectedCalendarDay.status === 'pre_join'
+                          ? `Pre-Membership Period`
+                          : selectedCalendarDay.isToday
+                          ? 'Today (Pending Check-In)'
+                          : 'Upcoming Gym Day'}
+                      </Text>
+                      <Text style={styles.emptySubText}>
+                        {selectedCalendarDay.status === 'absent'
+                          ? 'You were absent on this day. Consistency is the key to progress!'
+                          : selectedCalendarDay.status === 'rest'
+                          ? 'Sundays are designated for muscle recovery and relaxation.'
+                          : selectedCalendarDay.status === 'pre_join'
+                          ? `You officially joined on ${memberJoinDateStr}. Records before this date are not counted.`
+                          : 'Log in at the turnstile or tap Check In to register your session!'}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              )}
             </View>
           )}
 
@@ -807,12 +1310,14 @@ const styles = StyleSheet.create({
 
   // ── Light Top Navigation ──
   topNav: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(4.5),
     paddingTop: hp(1),
     paddingBottom: hp(1.2),
+    minHeight: hp(6),
   },
   backButton: {
     width: moderateScale(40),
@@ -828,6 +1333,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 6,
     elevation: 2,
+    zIndex: 2,
   },
   backIcon: {
     width: moderateScale(16),
@@ -835,14 +1341,21 @@ const styles = StyleSheet.create({
     tintColor: '#6C5CE7',
   },
   headerTitleContainer: {
-    flex: 1,
-    marginHorizontal: wp(3),
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   headerTitleText: {
-    fontSize: fontScale(17.5),
-    fontWeight: '800',
+    fontSize: fontScale(17),
+    fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
   headerSubText: {
     fontSize: fontScale(11.5),
@@ -859,6 +1372,7 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(20),
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
+    zIndex: 2,
   },
   statusBadgeIn: {
     borderColor: '#A7F3D0',
@@ -1064,12 +1578,12 @@ const styles = StyleSheet.create({
   weekDayCol: {
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: moderateScale(12),
-    paddingVertical: hp(0.9),
-    paddingHorizontal: wp(1.8),
+    borderRadius: moderateScale(10),
+    paddingVertical: hp(0.8),
+    paddingHorizontal: wp(0.8),
     borderWidth: 1,
     borderColor: '#ECEAFD',
-    minWidth: wp(11.2),
+    width: '13.2%',
   },
   weekDayColToday: {
     backgroundColor: '#F3F2FE',
@@ -1083,6 +1597,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
   },
+  weekDayColPreJoin: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    opacity: 0.65,
+  },
   weekDayText: {
     fontSize: fontScale(10.5),
     fontWeight: '700',
@@ -1094,6 +1613,9 @@ const styles = StyleSheet.create({
   },
   weekDayTextCompleted: {
     color: '#00C48C',
+  },
+  weekDayTextPreJoin: {
+    color: '#94A3B8',
   },
   weekDayStatusCircle: {
     width: moderateScale(22),
@@ -1117,6 +1639,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#EF4444',
   },
+  weekDayStatusCirclePreJoin: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
   doneCheckmark: {
     color: '#FFFFFF',
     fontSize: fontScale(12),
@@ -1134,7 +1661,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#94A3B8',
   },
   weekFocusText: {
-    fontSize: fontScale(9),
+    fontSize: fontScale(8.5),
     fontWeight: '600',
     color: '#64748B',
   },
@@ -1145,6 +1672,10 @@ const styles = StyleSheet.create({
   weekFocusTextToday: {
     color: '#6C5CE7',
     fontWeight: '700',
+  },
+  weekFocusTextPreJoin: {
+    color: '#94A3B8',
+    fontWeight: '500',
   },
   weekProgressBox: {
     marginTop: hp(0.4),
@@ -1184,11 +1715,12 @@ const styles = StyleSheet.create({
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: wp(2.5),
+    justifyContent: 'space-between',
+    rowGap: hp(1.4),
     marginBottom: hp(2.2),
   },
   statCard: {
-    width: (SCREEN_WIDTH - wp(9) - wp(2.5)) / 2,
+    width: '48.5%',
     backgroundColor: '#FFFFFF',
     borderRadius: moderateScale(18),
     padding: moderateScale(14),
@@ -1453,132 +1985,437 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F2FE',
   },
 
-  // ── 9. Pagination Footer Card ──
-  paginationFooterCard: {
+  // ── 9. Minimalist Circular Stepper Pagination ──
+  paginationStepperCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(18),
-    paddingHorizontal: wp(4),
-    paddingVertical: hp(1.4),
+    borderRadius: moderateScale(20),
+    paddingHorizontal: wp(4.5),
+    paddingVertical: hp(1.8),
     marginTop: hp(1),
-    marginBottom: hp(2),
+    marginBottom: hp(2.5),
     borderWidth: 1,
     borderColor: '#ECEAFD',
     shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  paginationControlsRow: {
+  stepperMainRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: moderateScale(6),
-    marginBottom: hp(1.2),
+    justifyContent: 'space-between',
+    marginBottom: hp(1.4),
   },
-  pageNavBtn: {
+  stepperCircleBtn: {
+    width: moderateScale(42),
+    height: moderateScale(42),
+    borderRadius: moderateScale(21),
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#ECEAFD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  stepperCircleBtnNext: {
+    backgroundColor: '#6C5CE7',
+    borderColor: '#6C5CE7',
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  stepperCircleBtnDisabled: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#F1F5F9',
+    shadowOpacity: 0,
+    elevation: 0,
+    opacity: 0.45,
+  },
+  stepperArrowIcon: {
+    width: moderateScale(15),
+    height: moderateScale(15),
+    tintColor: '#6C5CE7',
+  },
+  stepperArrowIconRotated: {
+    transform: [{ rotate: '180deg' }],
+  },
+  stepperArrowIconNextActive: {
+    tintColor: '#FFFFFF',
+  },
+  stepperArrowIconDisabled: {
+    tintColor: '#94A3B8',
+  },
+  stepperCenterInfo: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    paddingHorizontal: moderateScale(8),
+  },
+  stepperTagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(6),
+    marginBottom: 3,
+  },
+  stepperPulseDot: {
+    width: moderateScale(6.5),
+    height: moderateScale(6.5),
+    borderRadius: moderateScale(3.5),
+    backgroundColor: '#6C5CE7',
+  },
+  stepperSuperText: {
+    fontSize: fontScale(12),
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: 0.5,
+  },
+  stepperCountText: {
+    fontSize: fontScale(10.5),
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  stepperCountBold: {
+    color: '#1E293B',
+    fontWeight: '800',
+  },
+  stepperProgressTrack: {
+    height: moderateScale(5),
+    backgroundColor: '#F1F5F9',
+    borderRadius: moderateScale(3),
+    overflow: 'hidden',
+    marginBottom: hp(1.4),
+  },
+  stepperProgressFill: {
+    height: '100%',
+    backgroundColor: '#6C5CE7',
+    borderRadius: moderateScale(3),
+  },
+  stepperBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: hp(1),
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+    flexWrap: 'wrap',
+    gap: moderateScale(6),
+  },
+  stepperPageSizeGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(5),
+  },
+  stepperPageSizeLabel: {
+    fontSize: fontScale(10.5),
+    fontWeight: '600',
+    color: '#64748B',
+    marginRight: 2,
+  },
+  pageSizePill: {
+    paddingHorizontal: moderateScale(9),
+    paddingVertical: moderateScale(3.5),
+    borderRadius: moderateScale(8),
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  pageSizePillActive: {
+    backgroundColor: '#F3F2FE',
+    borderColor: '#C4B5FD',
+  },
+  pageSizePillText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  pageSizePillTextActive: {
+    color: '#6C5CE7',
+    fontWeight: '900',
+  },
+  stepperDirectJumpRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(4),
+  },
+  stepperFastJumpBtn: {
+    paddingHorizontal: moderateScale(9),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(10),
+    backgroundColor: '#F3F2FE',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperFastJumpBtnLast: {
+    backgroundColor: '#F3F2FE',
+  },
+  stepperFastJumpBtnDisabled: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#F1F5F9',
+    opacity: 0.45,
+  },
+  stepperFastJumpText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  stepperFastJumpTextLast: {
+    color: '#6C5CE7',
+  },
+  stepperFastJumpTextDisabled: {
+    color: '#94A3B8',
+  },
+  stepperEllipsisBtn: {
+    paddingHorizontal: moderateScale(4),
+    paddingVertical: moderateScale(2),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperEllipsisText: {
+    fontSize: fontScale(11),
+    fontWeight: '900',
+    color: '#94A3B8',
+    letterSpacing: 1,
+  },
+  stepperJumpChip: {
+    width: moderateScale(26),
+    height: moderateScale(26),
+    borderRadius: moderateScale(13),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+  },
+  stepperJumpChipActive: {
+    backgroundColor: '#6C5CE7',
+    borderColor: '#6C5CE7',
+  },
+  stepperJumpChipText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  stepperJumpChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+  },
+
+  // ── Session Section Headers ──
+  sessionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp(1.2),
+    marginTop: hp(0.5),
+  },
+  sessionSectionTitle: {
+    fontSize: fontScale(14.5),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  sessionCountBadge: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+    color: '#6C5CE7',
+    backgroundColor: '#F3F2FE',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(8),
+  },
+
+  // ── Monthly Calendar View Styles ──
+  calendarCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(16),
+    marginBottom: hp(2),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+  },
+  calendarMonthNavRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp(1.5),
+  },
+  calendarMonthNavBtn: {
     width: moderateScale(34),
     height: moderateScale(34),
     borderRadius: moderateScale(10),
     backgroundColor: '#F3F2FE',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
   },
-  pageNavBtnDisabled: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#F1F5F9',
-    opacity: 0.4,
-  },
-  pageNavSymbol: {
+  calendarMonthNavText: {
     fontSize: fontScale(16),
-    fontWeight: '800',
+    fontWeight: '900',
     color: '#6C5CE7',
-    lineHeight: fontScale(18),
   },
-  pageNavSymbolDisabled: {
-    color: '#94A3B8',
+  calendarMonthTitle: {
+    fontSize: fontScale(15.5),
+    fontWeight: '900',
+    color: '#0F172A',
   },
-  pagePillsRow: {
+  calendarStatsPillsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FAFAFD',
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(8),
+    marginBottom: hp(1.5),
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  calendarStatPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: moderateScale(5),
   },
-  pageNumberPill: {
-    width: moderateScale(34),
-    height: moderateScale(34),
-    borderRadius: moderateScale(10),
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
+  calendarStatDot: {
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
   },
-  pageNumberPillActive: {
-    backgroundColor: '#6C5CE7',
-    borderColor: '#6C5CE7',
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+  calendarStatText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '700',
+    color: '#334155',
   },
-  pageNumberText: {
-    fontSize: fontScale(12.5),
-    fontWeight: '800',
-    color: '#64748B',
-  },
-  pageNumberTextActive: {
-    color: '#FFFFFF',
-  },
-  paginationBottomInfoRow: {
+  calendarWeekDaysHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: hp(1),
-    borderTopWidth: 1,
-    borderTopColor: '#F3F2FE',
+    paddingBottom: hp(1),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: hp(0.8),
   },
-  paginationInfoText: {
+  calendarWeekDayColHeader: {
+    width: `${100 / 7}%`,
+    alignItems: 'center',
+  },
+  calendarWeekDayHeaderText: {
     fontSize: fontScale(11),
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  paginationBold: {
-    color: '#0F172A',
     fontWeight: '800',
+    color: '#94A3B8',
   },
-  perPagePickerRow: {
+  calendarDaysGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  calendarDayCell: {
+    width: `${100 / 7}%`,
+    height: moderateScale(44),
     alignItems: 'center',
-    gap: moderateScale(4),
+    justifyContent: 'center',
+    paddingVertical: 2,
   },
-  perPageLabel: {
-    fontSize: fontScale(10.5),
-    color: '#64748B',
-    marginRight: 2,
-    fontWeight: '500',
-  },
-  perPageChip: {
-    paddingHorizontal: moderateScale(8),
-    paddingVertical: moderateScale(3),
-    borderRadius: moderateScale(6),
-    backgroundColor: '#F8FAFC',
+  calendarDayPill: {
+    width: moderateScale(34),
+    height: moderateScale(34),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+    backgroundColor: '#FAFAFD',
     borderWidth: 1,
-    borderColor: '#ECEAFD',
+    borderColor: '#F1F5F9',
   },
-  perPageChipActive: {
-    backgroundColor: '#6C5CE7',
+  calendarDayPillSelected: {
+    borderWidth: 2,
     borderColor: '#6C5CE7',
   },
-  perPageChipText: {
-    fontSize: fontScale(10.5),
-    fontWeight: '600',
-    color: '#64748B',
+  calendarDayPillPresent: {
+    backgroundColor: '#E6FBF5',
+    borderColor: '#A7F3D0',
   },
-  perPageChipTextActive: {
-    color: '#FFFFFF',
+  calendarDayPillAbsent: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  calendarDayPillRest: {
+    backgroundColor: '#F0F9FF',
+    borderColor: '#BAE6FD',
+  },
+  calendarDayPillToday: {
+    backgroundColor: '#F3F2FE',
+    borderColor: '#6C5CE7',
+    borderWidth: 1.5,
+  },
+  calendarDayPillPreJoin: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#F1F5F9',
+    opacity: 0.45,
+  },
+  calendarDayNum: {
+    fontSize: fontScale(12),
     fontWeight: '800',
+    color: '#334155',
+  },
+  calendarDayNumPresent: {
+    color: '#059669',
+    fontWeight: '900',
+  },
+  calendarDayNumAbsent: {
+    color: '#EF4444',
+    fontWeight: '900',
+  },
+  calendarDayNumRest: {
+    color: '#0284C7',
+    fontWeight: '800',
+  },
+  calendarDayNumToday: {
+    color: '#6C5CE7',
+    fontWeight: '900',
+  },
+  calendarDayNumPreJoin: {
+    color: '#94A3B8',
+  },
+  calendarStatusMicroDot: {
+    position: 'absolute',
+    bottom: 3,
+    width: moderateScale(4),
+    height: moderateScale(4),
+    borderRadius: moderateScale(2),
+  },
+  calendarLegendRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: moderateScale(10),
+    paddingTop: hp(1.2),
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    marginTop: hp(0.5),
+  },
+  calendarLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  calendarLegendDot: {
+    width: moderateScale(7),
+    height: moderateScale(7),
+    borderRadius: moderateScale(3.5),
+  },
+  calendarLegendText: {
+    fontSize: fontScale(10),
+    fontWeight: '700',
+    color: '#64748B',
   },
 });

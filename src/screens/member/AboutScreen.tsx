@@ -54,42 +54,38 @@ export default function AboutScreen({ navigation }: any) {
             <Text style={styles.brandTagline}>Smarter Gym Management & Member Fitness Platform</Text>
 
             <View style={styles.versionBadge}>
-              <Text style={styles.versionBadgeText}>VERSION 2.4.0 • PRODUCTION BUILD 2026</Text>
+              <Text style={styles.versionBadgeText}>VERSION 0.0.1 • PRODUCTION BUILD</Text>
             </View>
           </View>
 
           {/* ── DETAILS CARD ── */}
           <View style={styles.infoCard}>
-            <Text style={styles.cardHeader}>DEVELOPER & ORGANIZATION</Text>
+            <Text style={styles.cardHeader}>APP SPECIFICATIONS</Text>
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Developer / Entity</Text>
-              <Text style={styles.infoVal}>FitCore Technologies India</Text>
+              <Text style={styles.infoLabel}>Application</Text>
+              <Text style={styles.infoVal}>FitCore Gym Management</Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Official Website</Text>
-              <TouchableOpacity onPress={() => handleOpenLink('https://fitcore.app')}>
-                <Text style={styles.infoLink}>https://fitcore.app</Text>
-              </TouchableOpacity>
+              <Text style={styles.infoLabel}>Architecture</Text>
+              <Text style={styles.infoVal}>Offline-First Cloud Sync</Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Contact Email</Text>
-              <TouchableOpacity onPress={() => handleOpenLink('mailto:support@fitcore.app')}>
-                <Text style={styles.infoLink}>support@fitcore.app</Text>
-              </TouchableOpacity>
+              <Text style={styles.infoLabel}>Security</Text>
+              <Text style={styles.infoVal}>End-to-End JWT Auth</Text>
             </View>
 
             <View style={styles.divider} />
 
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Target Platform</Text>
-              <Text style={styles.infoVal}>Android 16 (API Level 36)</Text>
+              <Text style={styles.infoVal}>Android (SDK 36)</Text>
             </View>
           </View>
 

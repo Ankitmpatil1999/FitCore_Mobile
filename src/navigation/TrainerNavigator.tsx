@@ -16,6 +16,7 @@ import TrainerProfileScreen from '../screens/trainer/TrainerProfileScreen';
 import TrainerAttendanceScreen from '../screens/trainer/TrainerAttendanceScreen';
 import TrainerReviewsScreen from '../screens/trainer/TrainerReviewsScreen';
 import TrainerLeaveRequestScreen from '../screens/trainer/TrainerLeaveRequestScreen';
+import NotificationsScreen from '../screens/member/NotificationsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -28,6 +29,7 @@ const profileIcon = require('../assets/Bottom bar/gym.png');
 function TrainerTabNavigator() {
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
+  const tabBarHeight = 58 + bottomInset;
 
   return (
     <Tab.Navigator
@@ -37,7 +39,7 @@ function TrainerTabNavigator() {
         tabBarStyle: [
           styles.tabBar,
           {
-            height: 60 + bottomInset,
+            height: tabBarHeight,
             paddingBottom: bottomInset,
           },
         ],
@@ -139,6 +141,7 @@ export default function TrainerNavigator() {
       <Stack.Screen name="TrainerAttendance" component={TrainerAttendanceScreen} />
       <Stack.Screen name="TrainerReviews" component={TrainerReviewsScreen} />
       <Stack.Screen name="TrainerLeaveRequest" component={TrainerLeaveRequestScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }

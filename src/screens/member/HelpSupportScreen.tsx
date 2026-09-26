@@ -73,16 +73,32 @@ export default function HelpSupportScreen({ navigation }: any) {
   const [submittingIssue, setSubmittingIssue] = useState(false);
   const [ticketSubmitted, setTicketSubmitted] = useState(false);
 
+  const gymPhone = currentGym?.phone || '';
+  const gymEmail = currentGym?.email || '';
+
   const handleOpenEmail = () => {
-    Linking.openURL('mailto:support@fitcore.app?subject=FitCore%20Member%20Support%20Request');
+    if (gymEmail) {
+      Linking.openURL(`mailto:${gymEmail}?subject=Gym%20Member%20Support%20Request`);
+    } else {
+      setActiveTab('report');
+    }
   };
 
   const handleOpenWhatsApp = () => {
-    Linking.openURL('https://wa.me/919326093115?text=Hi%20FitCore%20Support%2C%20I%20need%20assistance%20with%20my%20member%20account.');
+    if (gymPhone) {
+      const cleanPhone = gymPhone.replace(/[^0-9]/g, '');
+      Linking.openURL(`https://wa.me/${cleanPhone.length === 10 ? '91' + cleanPhone : cleanPhone}?text=Hi%2C%20I%20need%20assistance%20with%20my%20gym%20membership.`);
+    } else {
+      setActiveTab('report');
+    }
   };
 
   const handleCallSupport = () => {
-    Linking.openURL('tel:+919326093115');
+    if (gymPhone) {
+      Linking.openURL(`tel:${gymPhone}`);
+    } else {
+      setActiveTab('report');
+    }
   };
 
   const handleSubmitTicket = () => {
@@ -237,8 +253,8 @@ export default function HelpSupportScreen({ navigation }: any) {
                 </View>
                 <View style={{ flex: 1, marginLeft: moderateScale(12) }}>
                   <Text style={styles.channelTitle}>WhatsApp Support</Text>
-                  <Text style={styles.channelSub}>Instant chat assistance with support agent</Text>
-                  <Text style={styles.channelHighlight}>+91 93260 93115</Text>
+                  <Text style={styles.channelSub}>Instant chat assistance with front desk</Text>
+                  <Text style={styles.channelHighlight}>{gymPhone || 'In-App Support Desk'}</Text>
                 </View>
                 <Icon name="chevron-forward" size={moderateScale(18)} color="#CBD5E1" />
               </TouchableOpacity>
@@ -253,9 +269,9 @@ export default function HelpSupportScreen({ navigation }: any) {
                   <Icon name="mail" size={moderateScale(22)} color="#6C5CE7" />
                 </View>
                 <View style={{ flex: 1, marginLeft: moderateScale(12) }}>
-                  <Text style={styles.channelTitle}>Official Email</Text>
+                  <Text style={styles.channelTitle}>Gym Helpdesk</Text>
                   <Text style={styles.channelSub}>Billing, gym inquiries & technical feedback</Text>
-                  <Text style={styles.channelHighlight}>support@fitcore.app</Text>
+                  <Text style={styles.channelHighlight}>{gymEmail || 'Submit Grievance in App'}</Text>
                 </View>
                 <Icon name="chevron-forward" size={moderateScale(18)} color="#CBD5E1" />
               </TouchableOpacity>
@@ -272,7 +288,7 @@ export default function HelpSupportScreen({ navigation }: any) {
                 <View style={{ flex: 1, marginLeft: moderateScale(12) }}>
                   <Text style={styles.channelTitle}>Phone Helpline</Text>
                   <Text style={styles.channelSub}>Direct helpline for urgent gym access issues</Text>
-                  <Text style={styles.channelHighlight}>Mon – Sat, 7 AM – 9 PM</Text>
+                  <Text style={styles.channelHighlight}>{gymPhone || 'Mon – Sat, 7 AM – 9 PM'}</Text>
                 </View>
                 <Icon name="chevron-forward" size={moderateScale(18)} color="#CBD5E1" />
               </TouchableOpacity>

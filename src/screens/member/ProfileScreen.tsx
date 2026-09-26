@@ -226,13 +226,12 @@ export default function ProfileScreen({ navigation }: any) {
         } else if (res?.data?.member?.sessionsDone) {
           setLiveSessionsDone(res.data.member.sessionsDone);
         } else {
-          // Dynamic calculation: Calculate lifetime sessions from member's join date (approx 12 sessions)
-          setLiveSessionsDone(12);
+          setLiveSessionsDone(0);
         }
       } catch (e) {}
     } catch (err) {
       console.log('Using cached profile', err);
-      setLiveSessionsDone(12);
+      setLiveSessionsDone(0);
     }
   };
 
@@ -402,14 +401,6 @@ export default function ProfileScreen({ navigation }: any) {
     } catch (err: any) {
       console.log('Camera capture error', err);
     }
-  };
-
-  const handleOpenWhatsApp = () => {
-    Linking.openURL('https://wa.me/919326093115?text=Hi%20FitCore%20Gym%20Support%2C%20I%20need%20assistance');
-  };
-
-  const handleOpenEmail = () => {
-    Linking.openURL('mailto:support@fitcore.app?subject=Member%20Query%20-%20Arjun%20Patil');
   };
 
   return (
@@ -734,7 +725,7 @@ export default function ProfileScreen({ navigation }: any) {
                 </View>
                 <View style={{ flex: 1, paddingHorizontal: 12 }}>
                   <Text style={styles.menuTitle}>About FitCore</Text>
-                  <Text style={styles.menuSub}>App v2.4.0 • FitCore Technologies India</Text>
+                  <Text style={styles.menuSub}>App v0.0.1 • FitCore Gym</Text>
                 </View>
                 <Icon name="chevron-forward" size={moderateScale(16)} color="#CBD5E1" />
               </TouchableOpacity>
@@ -754,7 +745,7 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={styles.logoutBtnText}>LOGOUT FROM FITCORE</Text>
             </TouchableOpacity>
 
-            <Text style={styles.appVersionText}>FitCore Member App • Version 2.4.0 (Build 2026)</Text>
+            <Text style={styles.appVersionText}>FitCore Member App • Version 0.0.1 (Build 1)</Text>
 
             <View style={{ height: hp(12) }} />
           </Animated.View>

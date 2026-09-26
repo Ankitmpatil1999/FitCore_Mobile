@@ -265,7 +265,7 @@ export const USERS: User[] = [
   {
     id: 'owner_fns',
     name: 'Rahul Barapatre',
-    phone: '9326093115',
+    phone: '9876543210',
     email: 'rahul@fnsfitness.com',
     password: 'Hello@123',
     role: 'owner',

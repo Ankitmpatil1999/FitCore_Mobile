@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   StatusBar, Image,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
@@ -59,28 +60,73 @@ const MOCK_NOTIFICATIONS = [
 
 export default function NotificationsScreen({ navigation }: any) {
   const { role, currentUser, currentMember, currentGym } = useAppContext();
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<any[]>([]);
+
+  const userId = (currentMember as any)?.id || (currentMember as any)?._id || (currentMember as any)?.userId || currentUser?.id || 'default_user';
+  const gymId = currentGym?.id || (currentMember as any)?.gymId || currentUser?.gymId;
+
+  const getAllStorageKeys = () => {
+    const ids = [
+      (currentMember as any)?.id,
+      (currentMember as any)?._id,
+      (currentMember as any)?.userId,
+      currentUser?.id,
+      currentUser?.phone,
+      (currentMember as any)?.phone,
+      'default_user',
+    ].filter(Boolean).map(String);
+    const uniqueIds = Array.from(new Set(ids));
+    return [
+      'fitcore_read_notifs_all',
+      ...uniqueIds.map(id => `fitcore_read_notifs_${id}`),
+    ];
+  };
 
   useEffect(() => {
     async function loadNotifications() {
       try {
-        const gymId = currentGym?.id || (currentMember as any)?.gymId || currentUser?.gymId;
-        const userId = (currentMember as any)?.id || (currentMember as any)?._id || currentUser?.id;
+        const keys = getAllStorageKeys();
+        const storedResults = await Promise.all(keys.map(k => AsyncStorage.getItem(k).catch(() => null)));
+        const allReadTimeStr = await AsyncStorage.getItem('fitcore_all_notifs_read_timestamp').catch(() => null);
+        const allReadTime = allReadTimeStr ? Number(allReadTimeStr) : 0;
+
+        const locallyReadIds = new Set<string>();
+        storedResults.forEach(res => {
+          if (res) {
+            try {
+              const arr = JSON.parse(res);
+              if (Array.isArray(arr)) arr.forEach(i => locallyReadIds.add(String(i)));
+            } catch (e) {}
+          }
+        });
+
         const res: any = await apiService.getNotifications(role || 'member', gymId, userId);
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          const mapped = res.data.map((n: any, idx: number) => ({
-            id: n.id || n._id || String(idx),
-            title: n.title,
-            body: n.message || n.body,
-            time: n.time || n.date || 'Recently',
-            read: n.isRead || false,
-            icon: n.icon || (n.type === 'checkin' ? 'checkmark-circle' : n.type === 'checkout' ? 'flame' : n.type === 'renewal' || n.type === 'admission' ? 'document' : 'megaphone'),
-            color: n.color || (n.type === 'checkin' ? Colors.success : n.type === 'checkout' ? '#FF5C5C' : Colors.primaryGreen),
-          }));
+        if (res.success && Array.isArray(res.data)) {
+          const mapped = res.data.map((n: any, idx: number) => {
+            const notifId = String(n.id || n._id || idx);
+            const createdAtTime = n.createdAt ? new Date(n.createdAt).getTime() : 0;
+            const isRead = Boolean(
+              n.isRead ||
+              n.read ||
+              locallyReadIds.has(notifId) ||
+              (allReadTime > 0 && createdAtTime > 0 && createdAtTime <= allReadTime)
+            );
+            return {
+              id: notifId,
+              title: n.title,
+              body: n.message || n.body,
+              time: n.time || n.date || 'Recently',
+              read: isRead,
+              icon: n.icon || (n.type === 'checkin' ? 'checkmark-circle' : n.type === 'checkout' ? 'flame' : n.type === 'renewal' || n.type === 'admission' ? 'document' : 'megaphone'),
+              color: n.color || (n.type === 'checkin' ? Colors.success : n.type === 'checkout' ? '#FF5C5C' : Colors.primaryGreen),
+            };
+          });
           setNotifications(mapped);
+        } else {
+          setNotifications([]);
         }
       } catch (e) {
-        console.log('Using default notifications list');
+        setNotifications([]);
       }
     }
     loadNotifications();
@@ -88,8 +134,57 @@ export default function NotificationsScreen({ navigation }: any) {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
+    // 1. Instantly update UI state
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+
+    // 2. Cache all IDs and timestamp to AsyncStorage so dashboard sees 0 unread immediately
+    try {
+      const allIds = notifications.map(n => String(n.id));
+      const keys = getAllStorageKeys();
+      await Promise.all([
+        ...keys.map(k => AsyncStorage.setItem(k, JSON.stringify(allIds))),
+        AsyncStorage.setItem('fitcore_all_notifs_read_timestamp', String(Date.now())),
+      ]);
+    } catch (e) {}
+
+    // 3. Update backend in background
+    try {
+      await apiService.markAllNotificationsRead(userId, gymId);
+    } catch (e) {
+      console.log('Error marking all read:', e);
+    }
+  };
+
+  const handleNotificationPress = async (notifId: string) => {
+    const idStr = String(notifId);
+    // 1. Instantly update UI state
+    setNotifications(prev => prev.map(n => String(n.id) === idStr ? { ...n, read: true } : n));
+
+    // 2. Cache this ID across all user storage keys
+    try {
+      const keys = getAllStorageKeys();
+      const storedResults = await Promise.all(keys.map(k => AsyncStorage.getItem(k).catch(() => null)));
+      const existingIds = new Set<string>();
+      storedResults.forEach(res => {
+        if (res) {
+          try {
+            const arr = JSON.parse(res);
+            if (Array.isArray(arr)) arr.forEach(i => existingIds.add(String(i)));
+          } catch (e) {}
+        }
+      });
+      existingIds.add(idStr);
+      const updatedList = Array.from(existingIds);
+      await Promise.all(keys.map(k => AsyncStorage.setItem(k, JSON.stringify(updatedList))));
+    } catch (e) {}
+
+    // 3. Update backend in background
+    try {
+      await apiService.markNotificationRead(idStr, userId);
+    } catch (e) {
+      console.log('Error marking notification read:', e);
+    }
   };
 
   return (
@@ -137,9 +232,7 @@ export default function NotificationsScreen({ navigation }: any) {
                 key={notif.id}
                 style={[styles.notifCard, !notif.read && styles.notifCardUnread]}
                 activeOpacity={0.8}
-                onPress={() => {
-                  setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
-                }}
+                onPress={() => handleNotificationPress(notif.id)}
               >
                 <View style={[styles.notifIcon, { backgroundColor: notif.color + '15' }]}>
                   <Icon name={notif.icon} size={20} color={notif.color} />

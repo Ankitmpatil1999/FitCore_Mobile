@@ -197,34 +197,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       console.log('⚠️ [BACKEND LOGIN ERROR]:', backendErr);
     }
 
-    // 2. Fallback to local mock data (Trainers, Users, Members)
-    const mockTrainer = getTrainerByPhone(phone) || TRAINERS.find(t => t.phone === phone);
-    if (mockTrainer && (password === 'Hello@123' || password === '123456')) {
-      const gym = getGymById(mockTrainer.gymId) ?? GYMS[0];
-      const trainerUser: User = {
-        id: mockTrainer.id,
-        name: mockTrainer.name,
-        phone: mockTrainer.phone,
-        email: `${mockTrainer.name.toLowerCase().replace(/\s+/g, '')}@fitcore.in`,
-        password: 'Hello@123',
-        role: 'trainer',
-        gymId: gym.id,
-        avatar: mockTrainer.avatar || 'KP',
-      };
-      setCurrentUser(trainerUser);
-      setCurrentGym(gym as any);
-      setRole('trainer');
-      setCurrentTrainer(mockTrainer);
-      setCurrentMember(null);
-      setCurrentVendor(null);
-
-      AsyncStorage.setItem('user_phone', phone);
-      AsyncStorage.setItem('user_password', password);
-      return { success: true };
-    }
+    // 2. Local mock fallback is DISABLED — all logins must go through backend
+    // (Mock data is for reference only, not authentication)
 
     const user = USERS.find(u => u.phone === phone);
-    if (user && (user.password === password || password === 'Hello@123' || password === '123456')) {
+    if (user && user.password === password) {
       const effectiveRole = normalizeRole(user.role);
       const gym = user.gymId ? (getGymById(user.gymId) ?? GYMS[0]) : null;
       setCurrentUser({ ...user, role: effectiveRole });

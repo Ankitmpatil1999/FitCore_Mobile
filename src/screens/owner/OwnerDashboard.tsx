@@ -20,6 +20,8 @@ import {
 } from 'react-native';
 
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useIsFocused } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppIcon from '../../components/common/AppIcon';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
@@ -81,6 +83,8 @@ export default function OwnerDashboard({ navigation }: any) {
   const [refreshing, setRefreshing] = useState(false);
   const [currentDateFormatted, setCurrentDateFormatted] = useState('');
   const [greeting, setGreeting] = useState('Good evening,');
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const isFocused = useIsFocused();
 
   // ── Analytics & Stats from Backend ──
   const [stats, setStats] = useState({
@@ -290,6 +294,51 @@ export default function OwnerDashboard({ navigation }: any) {
         });
         setTrainersList(formattedTrainers);
       }
+
+      // Fetch dynamic unread notifications for Gym Owner
+      try {
+        const targetUserId = currentUser?.id || 'owner_1';
+        const notifKeys = [
+          'fitcore_read_notifs_all',
+          `fitcore_read_notifs_${targetUserId}`,
+          currentUser?.id ? `fitcore_read_notifs_${currentUser.id}` : null,
+          currentUser?.phone ? `fitcore_read_notifs_${currentUser.phone}` : null,
+        ].filter(Boolean) as string[];
+
+        const storedResults = await Promise.all(notifKeys.map(k => AsyncStorage.getItem(k).catch(() => null)));
+        const allReadTimeStr = await AsyncStorage.getItem('fitcore_all_notifs_read_timestamp').catch(() => null);
+        const allReadTime = allReadTimeStr ? Number(allReadTimeStr) : 0;
+
+        const locallyReadIds = new Set<string>();
+        storedResults.forEach(res => {
+          if (res) {
+            try {
+              const arr = JSON.parse(res);
+              if (Array.isArray(arr)) arr.forEach(i => locallyReadIds.add(String(i)));
+            } catch (e) {}
+          }
+        });
+
+        const notifRes: any = await apiService.getNotifications('owner', gymId, targetUserId);
+        if (notifRes?.success && Array.isArray(notifRes.data)) {
+          const unread = notifRes.data.filter((n: any) => {
+            const notifId = String(n.id || n._id || '');
+            const createdAtTime = n.createdAt ? new Date(n.createdAt).getTime() : 0;
+            const isRead = Boolean(
+              n.isRead ||
+              n.read ||
+              locallyReadIds.has(notifId) ||
+              (allReadTime > 0 && createdAtTime > 0 && createdAtTime <= allReadTime)
+            );
+            return !isRead;
+          }).length;
+          setUnreadNotifCount(unread);
+        } else {
+          setUnreadNotifCount(0);
+        }
+      } catch (e) {
+        setUnreadNotifCount(0);
+      }
     } catch (err) {
       console.log('Dashboard fetch error:', err);
     } finally {
@@ -314,7 +363,7 @@ export default function OwnerDashboard({ navigation }: any) {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, [gymId]);
+  }, [gymId, isFocused]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -485,13 +534,17 @@ export default function OwnerDashboard({ navigation }: any) {
             <View style={styles.topBarActions}>
               <TouchableOpacity
                 style={styles.headerIconBtn}
-                onPress={() => setShowNoticeModal(true)}
+                onPress={() => navigation.navigate('Notifications')}
                 activeOpacity={0.75}
               >
                 <AppIcon name="notifications" size={18} color="#FFFFFF" />
-                <View style={styles.notiBadge}>
-                  <Text style={styles.notiBadgeText}>0</Text>
-                </View>
+                {unreadNotifCount > 0 && (
+                  <View style={styles.notiBadge}>
+                    <Text style={styles.notiBadgeText}>
+                      {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                    </Text>
+                  </View>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity

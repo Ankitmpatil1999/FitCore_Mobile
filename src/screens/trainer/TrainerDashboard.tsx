@@ -22,12 +22,14 @@ import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
 import { getMembersByTrainer } from '../../data/mockData';
 import apiService from '../../services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CheckInOutModal } from '../../components/common/CheckInOutModal';
 
 // ── Asset Icons ──
 const barbellIconImg = require('../../assets/Icons2/barbell.png');
 const calendarIconImg = require('../../assets/Icons2/calendar.png');
 const healthyIconImg = require('../../assets/Icons2/healthy.png');
+const bellNotifImg = require('../../assets/Icons2/bell_clean.png');
 
 export default function TrainerDashboard({ navigation }: any) {
   const { currentTrainer, currentGym, currentUser } = useAppContext();
@@ -57,6 +59,7 @@ export default function TrainerDashboard({ navigation }: any) {
   const [totalShiftsCount, setTotalShiftsCount] = useState(0);
   const [coachRating, setCoachRating] = useState('5.0');
   const [todayPTSessions, setTodayPTSessions] = useState<any[]>([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   // ── Leave Request State ──
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
@@ -116,6 +119,52 @@ export default function TrainerDashboard({ navigation }: any) {
       });
       if (ptRes?.success && Array.isArray(ptRes.data)) {
         setTodayPTSessions(ptRes.data);
+      }
+
+      // Fetch dynamic unread notifications for trainer
+      try {
+        const targetGymId = currentGym?.id || (currentUser as any)?.gymId;
+        const targetUserId = trainerId || currentUser?.id || 't1';
+        const notifKeys = [
+          'fitcore_read_notifs_all',
+          `fitcore_read_notifs_${targetUserId}`,
+          currentUser?.id ? `fitcore_read_notifs_${currentUser.id}` : null,
+          currentUser?.phone ? `fitcore_read_notifs_${currentUser.phone}` : null,
+        ].filter(Boolean) as string[];
+
+        const storedResults = await Promise.all(notifKeys.map(k => AsyncStorage.getItem(k).catch(() => null)));
+        const allReadTimeStr = await AsyncStorage.getItem('fitcore_all_notifs_read_timestamp').catch(() => null);
+        const allReadTime = allReadTimeStr ? Number(allReadTimeStr) : 0;
+
+        const locallyReadIds = new Set<string>();
+        storedResults.forEach(res => {
+          if (res) {
+            try {
+              const arr = JSON.parse(res);
+              if (Array.isArray(arr)) arr.forEach(i => locallyReadIds.add(String(i)));
+            } catch (e) {}
+          }
+        });
+
+        const notifRes: any = await apiService.getNotifications('trainer', targetGymId, targetUserId);
+        if (notifRes?.success && Array.isArray(notifRes.data)) {
+          const unread = notifRes.data.filter((n: any) => {
+            const notifId = String(n.id || n._id || '');
+            const createdAtTime = n.createdAt ? new Date(n.createdAt).getTime() : 0;
+            const isRead = Boolean(
+              n.isRead ||
+              n.read ||
+              locallyReadIds.has(notifId) ||
+              (allReadTime > 0 && createdAtTime > 0 && createdAtTime <= allReadTime)
+            );
+            return !isRead;
+          }).length;
+          setUnreadNotifCount(unread);
+        } else {
+          setUnreadNotifCount(0);
+        }
+      } catch (e) {
+        setUnreadNotifCount(0);
       }
     } catch (e) {
       console.log('Using local trainer attendance fallback');
@@ -291,13 +340,34 @@ export default function TrainerDashboard({ navigation }: any) {
             </View>
           </View>
 
-          <TouchableOpacity
-            style={styles.avatarBtn}
-            onPress={() => navigation.navigate('Profile')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.avatarText}>{currentTrainer?.avatar || currentUser?.avatar || 'KP'}</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <TouchableOpacity
+              style={styles.headerIconBtn}
+              onPress={() => navigation.navigate('Notifications')}
+              activeOpacity={0.7}
+            >
+              <Image
+                source={bellNotifImg}
+                style={{ width: moderateScale(22), height: moderateScale(22) }}
+                resizeMode="contain"
+              />
+              {unreadNotifCount > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeText}>
+                    {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.avatarBtn}
+              onPress={() => navigation.navigate('Profile')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.avatarText}>{currentTrainer?.avatar || currentUser?.avatar || 'KP'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -592,6 +662,37 @@ const styles = StyleSheet.create({
     fontSize: fontScale(11),
     color: '#64748B',
     fontWeight: '600',
+  },
+  headerIconBtn: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(19),
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: moderateScale(4),
+    right: moderateScale(4),
+    width: moderateScale(15),
+    height: moderateScale(15),
+    borderRadius: moderateScale(7.5),
+    backgroundColor: '#FF3B30',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifBadgeText: {
+    fontSize: fontScale(8.5),
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   avatarBtn: {
     width: moderateScale(38),

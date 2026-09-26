@@ -87,37 +87,7 @@ export default function LegalWebviewScreen({ route, navigation }: LegalDocProps)
           contentContainerStyle={[styles.contentScroll, { paddingBottom: insets.bottom + hp(6) }]}
           showsVerticalScrollIndicator={false}
         >
-          {/* ── PUBLIC URL BANNER ── */}
-          <View style={styles.publicUrlCard}>
-            <View style={styles.publicUrlIconBox}>
-              <Icon name="globe-outline" size={moderateScale(18)} color="#6C5CE7" />
-            </View>
-            <View style={{ flex: 1, marginLeft: moderateScale(10) }}>
-              <Text style={styles.publicUrlTitle}>Official Public Web URL</Text>
-              <Text style={styles.publicUrlText}>
-                {activeDoc === 'privacy'
-                  ? 'https://fitcore.app/privacy-policy'
-                  : activeDoc === 'terms'
-                  ? 'https://fitcore.app/terms-and-conditions'
-                  : 'https://fitcore.app/delete-account'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.openExternalBtn}
-              onPress={() =>
-                handleOpenExternal(
-                  activeDoc === 'privacy'
-                    ? 'https://fitcore.app/privacy-policy'
-                    : activeDoc === 'terms'
-                    ? 'https://fitcore.app/terms-and-conditions'
-                    : 'https://fitcore.app/delete-account'
-                )
-              }
-              activeOpacity={0.7}
-            >
-              <Icon name="open-outline" size={moderateScale(16)} color="#6C5CE7" />
-            </TouchableOpacity>
-          </View>
+
 
           {/* ── DOCUMENT BODY ── */}
           {activeDoc === 'privacy' && (
@@ -183,14 +153,12 @@ export default function LegalWebviewScreen({ route, navigation }: LegalDocProps)
 
               <Text style={styles.sectionTitle}>5. Account & Data Deletion Rights</Text>
               <Text style={styles.paragraph}>
-                You retain complete control over your data. You may delete your account and associated profile records directly within the app (Profile → Delete Account) or via our public deletion webpage (https://fitcore.app/delete-account).
+                You retain complete control over your data. You may delete your account and associated profile records directly within the app (Profile → Delete Account).
               </Text>
 
               <Text style={styles.sectionTitle}>6. Grievance & Privacy Contact</Text>
               <Text style={styles.paragraph}>
-                For questions regarding this policy or data processing, contact our Grievance Officer:{"\n"}
-                Email: privacy@fitcore.app | support@fitcore.app{"\n"}
-                Helpline: +91 93260 93115
+                For questions regarding this policy or data processing, please submit a query via the in-app Help & Support desk (Profile → Help & Support → Report Issue) or contact your gym administration.
               </Text>
             </View>
           )}

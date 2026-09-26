@@ -41,6 +41,7 @@ const meIcon = require('../assets/Icons2/user.png');
 function MemberTabNavigator() {
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
+  const tabBarHeight = 58 + bottomInset;
 
   return (
     <Tab.Navigator
@@ -51,7 +52,7 @@ function MemberTabNavigator() {
         tabBarStyle: [
           styles.tabBar,
           {
-            height: 60 + bottomInset,
+            height: tabBarHeight,
             paddingBottom: bottomInset,
           },
         ],
@@ -196,14 +197,14 @@ export default function MemberNavigator() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#ECEAFD',
-    paddingTop: 8,
-    elevation: 10,
+    borderTopWidth: 0,
+    borderTopColor: 'transparent',
+    paddingTop: 6,
+    elevation: 8,
     shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
   },
   tabBarItem: {
     justifyContent: 'center',

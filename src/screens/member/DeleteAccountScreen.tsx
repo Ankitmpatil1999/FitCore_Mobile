@@ -155,19 +155,7 @@ export default function DeleteAccountScreen({ navigation }: any) {
                 ))}
               </View>
 
-              {/* Public Web URL Resource Note */}
-              <View style={styles.webNoticeCard}>
-                <Icon name="information-circle" size={moderateScale(18)} color="#64748B" />
-                <Text style={styles.webNoticeText}>
-                  Need to request deletion without installing the app? Visit our public web resource at{' '}
-                  <Text
-                    style={{ color: '#6C5CE7', fontWeight: '800' }}
-                    onPress={() => Linking.openURL('https://fitcore.app/delete-account')}
-                  >
-                    https://fitcore.app/delete-account
-                  </Text>
-                </Text>
-              </View>
+
 
               {/* Continue Button */}
               <TouchableOpacity

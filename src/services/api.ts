@@ -4,6 +4,7 @@
  */
 import { Platform, NativeModules } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL as ENV_API_URL } from '@env';
 
 // Automatically extract the host IP from the React Native Metro bundler URL if running on physical device/emulator
 const getDynamicHost = (): string | null => {
@@ -21,15 +22,21 @@ const getDynamicHost = (): string | null => {
 
 const dynamicHost = getDynamicHost();
 
-// Candidate URLs for Android physical device (ADB reverse / Wi-Fi IP) & Android Studio Emulator
+// Loaded securely from .env (hidden from source code repo)
+export const PRODUCTION_API_URL = ENV_API_URL || 'http://localhost:7000/api';
+
+// Candidate URLs: Prioritizes Environment URL, with local development fallbacks
 const CANDIDATE_URLS = [
+  PRODUCTION_API_URL,
+  ...(dynamicHost ? [`http://${dynamicHost}:7000/api`] : []),
+  'http://192.168.0.106:7000/api',
+  'http://192.168.0.109:7000/api',
   'http://localhost:7000/api',
   'http://127.0.0.1:7000/api',
-  ...(dynamicHost ? [`http://${dynamicHost}:7000/api`] : []),
   'http://10.0.2.2:7000/api',
 ];
 
-export let API_BASE_URL = dynamicHost ? `http://${dynamicHost}:7000/api` : CANDIDATE_URLS[0];
+export let API_BASE_URL = PRODUCTION_API_URL;
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -96,7 +103,8 @@ class ApiService {
       try {
         const url = `${baseUrl}${endpoint}`;
         const controller = new AbortController();
-        const timeoutMs = this.activeBaseUrl === baseUrl ? 3000 : 1200;
+        // Allow adequate time (10s) for SMS gateway calls and DB operations
+        const timeoutMs = this.activeBaseUrl === baseUrl ? 10000 : 3500;
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const response = await fetch(url, {
@@ -110,14 +118,24 @@ class ApiService {
         clearTimeout(timeoutId);
 
         let json: any = {};
+        let isJson = false;
         try {
           const text = await response.text();
-          json = text ? JSON.parse(text) : {};
+          if (text) {
+            json = JSON.parse(text);
+            isJson = true;
+          }
         } catch {
           json = { message: response.statusText };
         }
 
-        if (this.activeBaseUrl !== baseUrl) {
+        // If response failed (e.g. 404 DEPLOYMENT_NOT_FOUND, 502, 503) and we have other URLs to try, continue
+        if (!response.ok && (!isJson || response.status === 404 || response.status >= 500) && urlsToTry.indexOf(baseUrl) < urlsToTry.length - 1) {
+          lastError = new Error(`Status ${response.status} from ${baseUrl}`);
+          continue;
+        }
+
+        if (response.ok && this.activeBaseUrl !== baseUrl) {
           this.activeBaseUrl = baseUrl;
           API_BASE_URL = baseUrl;
           AsyncStorage.setItem('@fitcore_active_base_url', baseUrl).catch(() => {});
@@ -130,22 +148,36 @@ class ApiService {
           error: !response.ok ? (json.error || json.message || `Request failed with status ${response.status}`) : undefined,
         };
       } catch (err: any) {
-        lastError = err;
+        if (err.name === 'AbortError' || err.message === 'Aborted') {
+          lastError = new Error('Request timed out. Please check your backend connection.');
+        } else {
+          lastError = err;
+        }
       }
     }
 
+    const errorMessage = lastError?.name === 'AbortError' || lastError?.message === 'Aborted'
+      ? 'Connection timed out. Please ensure the backend server is running.'
+      : (lastError?.message || 'Network error or backend unreachable');
+
     return {
       success: false,
-      error: lastError?.message || 'Network error or backend unreachable',
+      error: errorMessage,
     };
   }
 
-
   // ── Auth Endpoints ──
-  async login(phone: string, password?: string) {
+  async checkPhone(phone: string) {
+    return this.request<any>('/auth/check-phone', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+  }
+
+  async login(phone: string, password: string) {
     const res = await this.request<any>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ phone, password: password || 'Hello@123' }),
+      body: JSON.stringify({ phone, password }),
     });
     if (res.success && res.data?.token) {
       this.setToken(res.data.token);
@@ -153,12 +185,45 @@ class ApiService {
     return res;
   }
 
+  async sendFirstTimeOtp(phone: string) {
+    return this.request<any>('/auth/send-first-time-otp', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+  }
+
   async verifyOtp(phone: string, otp: string) {
-    return this.request('/auth/verify-otp', {
+    return this.request<any>('/auth/verify-otp', {
       method: 'POST',
       body: JSON.stringify({ phone, otp }),
     });
   }
+
+  async setupFirstTimePassword(phone: string, otp: string, password: string) {
+    const res = await this.request<any>('/auth/setup-first-time-password', {
+      method: 'POST',
+      body: JSON.stringify({ phone, otp, password }),
+    });
+    if (res.success && res.data?.token) {
+      this.setToken(res.data.token);
+    }
+    return res;
+  }
+
+  async forgotPassword(phone: string) {
+    return this.request<any>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ phone }),
+    });
+  }
+
+  async resetPassword(phone: string, otp: string, password: string) {
+    return this.request<any>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ phone, otp, password }),
+    });
+  }
+
 
   // ── Member Endpoints ──
   async getMemberProfile(userId?: string) {
@@ -422,6 +487,20 @@ class ApiService {
     if (userId) params.append('userId', userId);
     const query = params.toString() ? `?${params.toString()}` : '';
     return this.request(`/notifications${query}`);
+  }
+
+  async markNotificationRead(id: string, userId?: string) {
+    return this.request('/notifications/read', {
+      method: 'POST',
+      body: JSON.stringify({ id, userId }),
+    });
+  }
+
+  async markAllNotificationsRead(userId?: string, gymId?: string) {
+    return this.request('/notifications/mark-all-read', {
+      method: 'POST',
+      body: JSON.stringify({ userId, gymId }),
+    });
   }
 
   async clearNotifications(gymId?: string) {

@@ -13,8 +13,6 @@ import {
   Modal,
   Alert,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppContext } from '../../context/AppContext';
@@ -27,20 +25,18 @@ const dumbbellIcon = require('../../assets/Icons/dumbbell.png');
 const barbellIcon = require('../../assets/Icons2/barbell.png');
 const kettlebellIcon = require('../../assets/Icons2/kettlebell.png');
 const clockImg = require('../../assets/Icons2/clock.png');
-const calendarIcon = require('../../assets/Icons2/calendar.png');
 const chartIcon = require('../../assets/Icons2/chart.png');
 const healthyIcon = require('../../assets/Icons2/healthy.png');
 const editIcon = require('../../assets/Icons/edit.png');
 
-// ── Exact Muscle Anatomy Icons (Extracted directly from Reference) ──
+// ── Exact Muscle Anatomy Icons ──
 const chestIcon = require('../../assets/muscle_icons/chest.png');
 const backIcon = require('../../assets/muscle_icons/back.png');
 const legsIcon = require('../../assets/muscle_icons/legs.png');
 const shouldersIcon = require('../../assets/muscle_icons/shoulders.png');
-const chestBackIcon = require('../../assets/muscle_icons/chest_back.png');
 const bicepsIcon = require('../../assets/muscle_icons/biceps.png');
 
-// ── Default Weekly Schedule (Standard Clean Single Muscle Split) ──
+// ── Default Weekly Schedule ──
 const INITIAL_WORKOUT_SCHEDULE = [
   {
     day: 'Monday',
@@ -79,7 +75,7 @@ const INITIAL_WORKOUT_SCHEDULE = [
     title: 'Triceps',
     iconBg: '#F3E8FF',
     iconTint: '#9333EA',
-    iconType: 'muscle_chest_back',
+    iconType: 'muscle_triceps',
     customIcon: dumbbellIcon,
   },
   {
@@ -101,15 +97,16 @@ const INITIAL_WORKOUT_SCHEDULE = [
 ];
 
 const PRESET_ROUTINE_OPTIONS = [
-  { title: 'Chest', icon: chestIcon, bg: '#FEE2E2', tint: '#EF4444', type: 'muscle_chest' },
-  { title: 'Back', icon: backIcon, bg: '#DBEAFE', tint: '#3B82F6', type: 'muscle_back' },
-  { title: 'Biceps', icon: bicepsIcon, bg: '#FFEDD5', tint: '#EA580C', type: 'muscle_biceps' },
-  { title: 'Shoulder', icon: shouldersIcon, bg: '#FEF3C7', tint: '#F59E0B', type: 'muscle_shoulders' },
-  { title: 'Triceps', icon: dumbbellIcon, bg: '#F3E8FF', tint: '#9333EA', type: 'dumbbell' },
-  { title: 'Legs', icon: legsIcon, bg: '#DCFCE7', tint: '#10B981', type: 'muscle_legs' },
-  { title: 'Cardio & Abs', icon: healthyIcon, bg: '#E0F2FE', tint: '#0284C7', type: 'clock' },
-  { title: 'Rest & Recovery', icon: clockImg, bg: '#E0F2FE', tint: '#0284C7', type: 'clock' },
-  { title: 'Other', icon: editIcon, bg: '#F3F4F6', tint: '#6B7280', type: 'custom' },
+  { id: 'chest', title: 'Chest', icon: chestIcon, bg: '#FEE2E2', tint: '#EF4444', type: 'muscle_chest' },
+  { id: 'back', title: 'Back', icon: backIcon, bg: '#DBEAFE', tint: '#3B82F6', type: 'muscle_back' },
+  { id: 'biceps', title: 'Biceps', icon: bicepsIcon, bg: '#FFEDD5', tint: '#EA580C', type: 'muscle_biceps' },
+  { id: 'triceps', title: 'Triceps', icon: dumbbellIcon, bg: '#F3E8FF', tint: '#9333EA', type: 'dumbbell' },
+  { id: 'shoulders', title: 'Shoulders', icon: shouldersIcon, bg: '#FEF3C7', tint: '#F59E0B', type: 'muscle_shoulders' },
+  { id: 'legs', title: 'Legs', icon: legsIcon, bg: '#DCFCE7', tint: '#10B981', type: 'muscle_legs' },
+  { id: 'abs', title: 'Abs & Core', icon: healthyIcon, bg: '#EDE9FE', tint: '#7C3AED', type: 'clock' },
+  { id: 'cardio', title: 'Cardio', icon: healthyIcon, bg: '#E0F2FE', tint: '#0284C7', type: 'clock' },
+  { id: 'rest', title: 'Rest & Recovery', icon: clockImg, bg: '#F1F5F9', tint: '#64748B', type: 'clock' },
+  { id: 'other', title: 'Other (Custom)', icon: editIcon, bg: '#F8FAFC', tint: '#6B7280', type: 'custom' },
 ];
 
 export default function WorkoutScreen({ navigation }: any) {
@@ -146,33 +143,20 @@ export default function WorkoutScreen({ navigation }: any) {
     ]).start();
   }, []);
 
-  // ── Helper to strip any emoji, &, +, and secondary muscles to ensure pure single muscle format ──
   const cleanWorkoutTitle = (rawText: string) => {
     if (!rawText) return 'Rest & Recovery';
-    // 1. Remove all unicode emojis and extra symbols
-    let cleaned = rawText
+    const cleaned = rawText
       .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}]/gu, '')
       .replace(/^[\s\-•–—]+/, '')
       .trim();
 
-    // 2. If title contains '&' or '+', isolate the primary single muscle part unless it's Rest & Recovery
     if (cleaned.toLowerCase().includes('rest') || cleaned.toLowerCase().includes('recovery')) {
       return 'Rest & Recovery';
-    }
-
-    // Split by '&' or '+' or '/' and pick the main muscle
-    if (cleaned.includes('&')) {
-      cleaned = cleaned.split('&')[0].trim();
-    } else if (cleaned.includes('+')) {
-      cleaned = cleaned.split('+')[0].trim();
-    } else if (cleaned.includes('/')) {
-      cleaned = cleaned.split('/')[0].trim();
     }
 
     return cleaned || rawText;
   };
 
-  // ── Fetch Live Plan ──
   useEffect(() => {
     const fetchPlan = async () => {
       try {
@@ -186,8 +170,9 @@ export default function WorkoutScreen({ navigation }: any) {
             );
             if (match?.focus) {
               const cleanedTitle = cleanWorkoutTitle(match.focus);
+              const firstPart = cleanedTitle.split(/[+&,/]/)[0].trim().toLowerCase();
               const preset = PRESET_ROUTINE_OPTIONS.find(
-                (p) => p.title.toLowerCase() === cleanedTitle.toLowerCase()
+                (p) => p.title.toLowerCase() === firstPart || p.id === firstPart
               );
               return {
                 ...item,
@@ -210,44 +195,131 @@ export default function WorkoutScreen({ navigation }: any) {
   }, [memberId]);
 
   const handleToggleEdit = () => {
-    if (isEditing) {
-      // If currently editing and user taps Done/Cancel without saving
-      setIsEditing(false);
-      setOpenDropdownDay(null);
-    } else {
-      setIsEditing(true);
-      setOpenDropdownDay(null);
-    }
+    setIsEditing(!isEditing);
+    setOpenDropdownDay(null);
   };
 
   const handleToggleDayDropdown = (idx: number) => {
-    if (!isEditing) return; // STRICT RULE: Cards cannot be modified or expanded unless Edit Plan is clicked
+    if (!isEditing) return;
     setOpenDropdownDay((prev) => (prev === idx ? null : idx));
   };
 
-  const handleSelectDayPreset = (dayIdx: number, presetObj: any) => {
-    if (presetObj.type === 'custom') {
-      setShowOtherInput((prev) => ({ ...prev, [dayIdx]: true }));
+  const isOptionSelected = (itemTitle: string, opt: any, isOtherOpen: boolean) => {
+    if (opt.type === 'custom') return !!isOtherOpen;
+    if (!itemTitle) return false;
+    const lowerTitle = itemTitle.toLowerCase();
+    const optTitleLower = opt.title.toLowerCase();
+
+    if (opt.id === 'rest' || optTitleLower.includes('rest')) {
+      return lowerTitle.includes('rest') || lowerTitle.includes('recovery');
+    }
+
+    if (lowerTitle.includes('rest') || lowerTitle.includes('recovery')) {
+      return false;
+    }
+
+    const parts = lowerTitle.split(/[+&,/]/).map((p) => p.trim());
+    return (
+      parts.includes(optTitleLower) ||
+      parts.some((p) => p === optTitleLower || p.startsWith(optTitleLower) || optTitleLower.startsWith(p))
+    );
+  };
+
+  const handleToggleDayPreset = (dayIdx: number, opt: any) => {
+    if (opt.type === 'custom') {
+      setShowOtherInput((prev) => ({ ...prev, [dayIdx]: !prev[dayIdx] }));
       return;
     }
+
+    const currentItem = schedule[dayIdx];
+    const currentTitle = currentItem?.title || '';
+
+    // If Rest & Recovery is clicked
+    if (opt.title.toLowerCase().includes('rest') || opt.id === 'rest') {
+      setShowOtherInput((prev) => ({ ...prev, [dayIdx]: false }));
+      const updated = [...schedule];
+      updated[dayIdx] = {
+        ...updated[dayIdx],
+        title: 'Rest & Recovery',
+        iconBg: opt.bg,
+        iconTint: opt.tint,
+        iconType: opt.type,
+        customIcon: opt.icon,
+      };
+      setSchedule(updated);
+      return;
+    }
+
+    // If current was Rest & Recovery or empty, switch directly to this option
+    if (currentTitle.toLowerCase().includes('rest') || currentTitle.toLowerCase().includes('recovery') || !currentTitle) {
+      setShowOtherInput((prev) => ({ ...prev, [dayIdx]: false }));
+      const updated = [...schedule];
+      updated[dayIdx] = {
+        ...updated[dayIdx],
+        title: opt.title,
+        iconBg: opt.bg,
+        iconTint: opt.tint,
+        iconType: opt.type,
+        customIcon: opt.icon,
+      };
+      setSchedule(updated);
+      return;
+    }
+
+    // Current has muscle group(s) -> toggle selection
+    let parts = currentTitle
+      .split(/[+&,/]/)
+      .map((p: string) => p.trim())
+      .filter(Boolean);
+
+    const existsIndex = parts.findIndex((p: string) => p.toLowerCase() === opt.title.toLowerCase());
+
+    if (existsIndex >= 0) {
+      parts.splice(existsIndex, 1);
+    } else {
+      parts.push(opt.title);
+    }
+
+    let newTitle = parts.join(' + ');
+    let newIcon = opt.icon;
+    let newBg = opt.bg;
+    let newTint = opt.tint;
+    let newType = opt.type;
+
+    if (!newTitle) {
+      newTitle = 'Rest & Recovery';
+      newIcon = clockImg;
+      newBg = '#F1F5F9';
+      newTint = '#64748B';
+      newType = 'clock';
+    } else {
+      const firstPreset = PRESET_ROUTINE_OPTIONS.find(
+        (p) => p.title.toLowerCase() === parts[0].toLowerCase()
+      );
+      if (firstPreset) {
+        newIcon = firstPreset.icon;
+        newBg = firstPreset.bg;
+        newTint = firstPreset.tint;
+        newType = firstPreset.type;
+      }
+    }
+
     setShowOtherInput((prev) => ({ ...prev, [dayIdx]: false }));
     const updated = [...schedule];
     updated[dayIdx] = {
       ...updated[dayIdx],
-      title: presetObj.title,
-      iconBg: presetObj.bg,
-      iconTint: presetObj.tint,
-      iconType: presetObj.type,
-      customIcon: presetObj.icon,
+      title: newTitle,
+      iconBg: newBg,
+      iconTint: newTint,
+      iconType: newType,
+      customIcon: newIcon,
     };
     setSchedule(updated);
-    setOpenDropdownDay(null); // Close dropdown after selection
   };
 
   const handleCustomTextChange = (dayIdx: number, text: string) => {
     setCustomTextInputs((prev) => ({ ...prev, [dayIdx]: text }));
     const updated = [...schedule];
-    // Find if text matches any preset
     const match = PRESET_ROUTINE_OPTIONS.find((p) => p.title.toLowerCase() === text.trim().toLowerCase());
     updated[dayIdx] = {
       ...updated[dayIdx],
@@ -295,7 +367,10 @@ export default function WorkoutScreen({ navigation }: any) {
       return (
         <Image
           source={item.customIcon}
-          style={[styles.dayIconImg, isMuscle ? { width: moderateScale(28), height: moderateScale(28) } : { tintColor: item.iconTint }]}
+          style={[
+            styles.dayIconImg,
+            isMuscle ? { width: moderateScale(24), height: moderateScale(24) } : { tintColor: item.iconTint },
+          ]}
           resizeMode="contain"
         />
       );
@@ -312,7 +387,7 @@ export default function WorkoutScreen({ navigation }: any) {
   const activeDaysCount = schedule.filter((s) => !s.title.toLowerCase().includes('rest')).length;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
       <View style={styles.root}>
         {/* ── AMBIENT BACKGROUND GLOWS ── */}
@@ -333,9 +408,8 @@ export default function WorkoutScreen({ navigation }: any) {
             />
           </TouchableOpacity>
 
-          <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle} numberOfLines={1}>Weekly Workout Plan</Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>Stay Consistent, Stay Fit</Text>
+          <View style={styles.headerTitleWrap} pointerEvents="none">
+            <Text style={styles.headerTitle} numberOfLines={1}>Workouts</Text>
           </View>
 
           {/* Edit Plan / Done Toggle Button */}
@@ -356,7 +430,7 @@ export default function WorkoutScreen({ navigation }: any) {
         </View>
 
         <ScrollView
-          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + hp(4) }]}
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + hp(3) }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -384,23 +458,31 @@ export default function WorkoutScreen({ navigation }: any) {
               </View>
             </View>
 
-            {/* ── EDIT MODE BANNER (Shown only when Edit Plan is clicked) ── */}
+            {/* ── EDIT MODE BANNER ── */}
             {isEditing && (
               <View style={styles.editingInstructionBanner}>
                 <View style={styles.editingDot} />
                 <Text style={styles.editingInstructionText}>
-                  Editing Mode: Tap any day's dropdown to choose workout or type custom routine.
+                  Editing Mode: Tap any day's card to select routine or type custom focus.
                 </Text>
               </View>
             )}
 
-            {/* ── SCHOOL TIMETABLE WEEKLY WORKOUT SCHEDULE (MONDAY TO SUNDAY) ── */}
+            {/* ── WEEKLY WORKOUT TIMETABLE ── */}
             <View style={styles.timetableContainer}>
               <View style={styles.timetableHeaderRow}>
-                <Text style={styles.timetableColDay}>DAY</Text>
+                <View style={styles.timetableColDayWrap}>
+                  <Text style={styles.timetableColDay}>DAY</Text>
+                </View>
                 <Text style={styles.timetableColSeparator}>-</Text>
-                <Text style={styles.timetableColRoutine}>WORKOUT ROUTINE</Text>
-                {isEditing && <Text style={styles.timetableColAction}>EDIT</Text>}
+                <View style={styles.timetableColRoutineWrap}>
+                  <Text style={styles.timetableColRoutine}>WORKOUT ROUTINE</Text>
+                </View>
+                {isEditing && (
+                  <View style={styles.timetableColActionWrap}>
+                    <Text style={styles.timetableColAction}>EDIT</Text>
+                  </View>
+                )}
               </View>
 
               {schedule.map((item, idx) => {
@@ -420,20 +502,25 @@ export default function WorkoutScreen({ navigation }: any) {
                         <View style={[styles.timetableIconBadge, { backgroundColor: item.iconBg }]}>
                           {renderIcon(item)}
                         </View>
-                        <Text style={styles.timetableDayName}>{item.day}</Text>
+                        <Text style={styles.timetableDayName} numberOfLines={1}>
+                          {item.day}
+                        </Text>
                       </View>
 
                       {/* Middle Separator: Dash */}
                       <Text style={styles.timetableDash}>-</Text>
 
-                      {/* Right Clean Workout Routine (No extra icons) */}
+                      {/* Right Workout Routine */}
                       <View style={styles.timetableRoutineGroup}>
-                        <Text style={[styles.timetableRoutineName, isOpen && styles.timetableRoutineNameActive]} numberOfLines={1}>
+                        <Text
+                          style={[styles.timetableRoutineName, isOpen && styles.timetableRoutineNameActive]}
+                          numberOfLines={1}
+                        >
                           {item.title}
                         </Text>
                       </View>
 
-                      {/* Dropdown Chevron (Visible only when in Edit Mode) */}
+                      {/* Dropdown Chevron (Visible only in Edit Mode) */}
                       {isEditing && (
                         <View style={[styles.timetableDropdownBtn, isOpen && styles.timetableDropdownBtnOpen]}>
                           <Text style={[styles.timetableDropdownChevron, isOpen && { color: '#FFFFFF' }]}>
@@ -443,22 +530,32 @@ export default function WorkoutScreen({ navigation }: any) {
                       )}
                     </TouchableOpacity>
 
-                    {/* ── DROPDOWN LIST CONTAINER (MATCHING REFERENCE DESIGN) ── */}
+                    {/* ── DROPDOWN LIST CONTAINER ── */}
                     {isOpen && (
                       <View style={styles.dropdownListWrapper}>
                         <View style={styles.dropdownHeaderSub}>
-                          <Text style={styles.dropdownSelectLabel}>Select Routine for {item.day}</Text>
+                          <View style={styles.dropdownHeaderLeft}>
+                            <Text style={styles.dropdownSelectLabel}>Select Routine for {item.day}</Text>
+                            <Text style={styles.dropdownMultiHint}>Tap multiple to combine (e.g. Chest + Triceps)</Text>
+                          </View>
+                          <TouchableOpacity
+                            style={styles.dropdownDoneBtn}
+                            onPress={() => setOpenDropdownDay(null)}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.dropdownDoneBtnText}>Done</Text>
+                          </TouchableOpacity>
                         </View>
 
                         {/* List Options */}
                         <View style={styles.dropdownOptionsContainer}>
                           {PRESET_ROUTINE_OPTIONS.map((opt) => {
-                            const isSelected = item.title.toLowerCase() === opt.title.toLowerCase() || (opt.title === 'Other' && isOtherOpen);
+                            const isSelected = isOptionSelected(item.title, opt, isOtherOpen);
                             return (
                               <TouchableOpacity
-                                key={opt.title}
+                                key={opt.id || opt.title}
                                 style={[styles.dropdownItemRow, isSelected && styles.dropdownItemRowSelected]}
-                                onPress={() => handleSelectDayPreset(idx, opt)}
+                                onPress={() => handleToggleDayPreset(idx, opt)}
                                 activeOpacity={0.7}
                               >
                                 <View style={styles.dropdownItemLeft}>
@@ -467,32 +564,38 @@ export default function WorkoutScreen({ navigation }: any) {
                                       source={opt.icon}
                                       style={[
                                         styles.dropdownItemIconImg,
-                                        opt.type?.startsWith('muscle_') ? { width: moderateScale(20), height: moderateScale(20) } : { tintColor: opt.tint }
+                                        opt.type?.startsWith('muscle_')
+                                          ? { width: moderateScale(18), height: moderateScale(18) }
+                                          : { tintColor: opt.tint },
                                       ]}
                                       resizeMode="contain"
                                     />
                                   </View>
-                                  <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>
+                                  <Text
+                                    style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}
+                                    numberOfLines={1}
+                                  >
                                     {opt.title}
                                   </Text>
                                 </View>
 
-                                {isSelected && (
-                                  <Text style={styles.dropdownCheckmark}>✓</Text>
-                                )}
+                                {/* Luxury Checkbox */}
+                                <View style={[styles.dropdownCheckbox, isSelected && styles.dropdownCheckboxActive]}>
+                                  {isSelected && <Text style={styles.dropdownCheckmarkText}>✓</Text>}
+                                </View>
                               </TouchableOpacity>
                             );
                           })}
                         </View>
 
-                        {/* Custom Input Box if user clicked "Other" or wants to type custom */}
+                        {/* Custom Input Box if user clicked "Other" */}
                         {isOtherOpen && (
                           <View style={styles.customTypeContainer}>
                             <Text style={styles.customTypeLabel}>Type your custom workout:</Text>
                             <View style={styles.customInputRow}>
                               <TextInput
                                 style={styles.customTextInput}
-                                placeholder="e.g. Legs + Shoulders, Yoga, Swimming..."
+                                placeholder="e.g. Legs + Shoulders, Yoga, Cardio..."
                                 placeholderTextColor="#94A3B8"
                                 value={customTextInputs[idx] !== undefined ? customTextInputs[idx] : item.title}
                                 onChangeText={(text) => handleCustomTextChange(idx, text)}
@@ -515,7 +618,7 @@ export default function WorkoutScreen({ navigation }: any) {
               })}
             </View>
 
-            {/* ── SAVE BUTTON (Visible when in Edit Mode) ── */}
+            {/* ── SAVE BUTTON (Visible in Edit Mode) ── */}
             {isEditing && (
               <TouchableOpacity
                 style={styles.savePlanBtn}
@@ -535,7 +638,7 @@ export default function WorkoutScreen({ navigation }: any) {
           </Animated.View>
         </ScrollView>
 
-        {/* ── LUXURY CUSTOM SUCCESS POPUP MODAL ── */}
+        {/* ── SUCCESS MODAL ── */}
         <Modal
           visible={showSuccessModal}
           transparent
@@ -576,7 +679,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F7FD',
   },
 
-  // ── Ambient Glows ──
+  // Ambient Glows
   ambientGlowTop: {
     position: 'absolute',
     top: -wp(20),
@@ -596,42 +699,48 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 196, 140, 0.04)',
   },
 
-  // ── Header ──
+  // Header
   header: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: wp(4.5),
-    paddingTop: hp(1),
+    paddingTop: hp(0.8),
     paddingBottom: hp(1.2),
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ECEAFD',
+    minHeight: hp(6),
   },
   backBtn: {
     width: moderateScale(38),
     height: moderateScale(38),
     borderRadius: moderateScale(12),
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F3F2FE',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    zIndex: 2,
   },
   headerTitleWrap: {
-    flex: 1,
-    marginLeft: wp(3),
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   headerTitle: {
-    fontSize: fontScale(17.5),
+    fontSize: fontScale(17),
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: fontScale(11.5),
+    fontSize: fontScale(11),
     color: '#64748B',
     fontWeight: '500',
     marginTop: 1,
@@ -647,10 +756,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ECEAFD',
     shadowColor: '#6C5CE7',
+    zIndex: 2,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
+  },
+  editPlanTopBtnActive: {
+    backgroundColor: '#6C5CE7',
+    borderColor: '#6C5CE7',
   },
   editIconTop: {
     width: moderateScale(12),
@@ -662,14 +776,17 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#6C5CE7',
   },
-
-  // ── Scroll Content ──
-  scroll: {
-    paddingHorizontal: wp(4.5),
-    paddingTop: hp(1),
+  editPlanTopTextActive: {
+    color: '#FFFFFF',
   },
 
-  // ── 6 Days Workout Plan Hero Banner ──
+  // Scroll Content
+  scroll: {
+    paddingHorizontal: wp(4.5),
+    paddingTop: hp(1.4),
+  },
+
+  // Hero Banner
   heroBannerCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -691,22 +808,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: moderateScale(12),
     flex: 1,
+    paddingRight: moderateScale(6),
   },
   heroIconCircle: {
-    width: moderateScale(46),
-    height: moderateScale(46),
-    borderRadius: moderateScale(15),
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: moderateScale(14),
     backgroundColor: '#F3F2FE',
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroDumbbellImg: {
-    width: moderateScale(24),
-    height: moderateScale(24),
+    width: moderateScale(22),
+    height: moderateScale(22),
     tintColor: '#6C5CE7',
   },
   heroPlanTitle: {
-    fontSize: fontScale(14.5),
+    fontSize: fontScale(14),
     fontWeight: '900',
     color: '#0F172A',
     marginBottom: 2,
@@ -719,11 +837,11 @@ const styles = StyleSheet.create({
   heroRightStatus: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingLeft: moderateScale(8),
+    paddingLeft: moderateScale(6),
   },
   chartMiniIcon: {
-    width: moderateScale(18),
-    height: moderateScale(18),
+    width: moderateScale(17),
+    height: moderateScale(17),
     tintColor: '#6C5CE7',
     marginBottom: 2,
   },
@@ -733,111 +851,7 @@ const styles = StyleSheet.create({
     color: '#6C5CE7',
   },
 
-  // ── Day Cards List ──
-  dayCardsList: {
-    gap: hp(1.2),
-    marginBottom: hp(1.8),
-  },
-  dayCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(18),
-    paddingHorizontal: moderateScale(14),
-    paddingVertical: moderateScale(12),
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  dayIconBox: {
-    width: moderateScale(48),
-    height: moderateScale(48),
-    borderRadius: moderateScale(14),
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: moderateScale(14),
-  },
-  dayIconImg: {
-    width: moderateScale(24),
-    height: moderateScale(24),
-  },
-  dayInfoWrap: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  dayLabelText: {
-    fontSize: fontScale(11.5),
-    color: '#64748B',
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  workoutTitleText: {
-    fontSize: fontScale(15),
-    fontWeight: '900',
-    color: '#0F172A',
-    letterSpacing: -0.2,
-  },
-
-  // ── Bottom Motivation Banner ──
-  motivationBannerCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(18),
-    padding: moderateScale(14),
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  motivationLeftGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: moderateScale(12),
-    flex: 1,
-  },
-  trophyIconCircle: {
-    width: moderateScale(42),
-    height: moderateScale(42),
-    borderRadius: moderateScale(14),
-    backgroundColor: '#F3F2FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trophyIconImg: {
-    width: moderateScale(22),
-    height: moderateScale(22),
-    tintColor: '#6C5CE7',
-  },
-  motivationTitle: {
-    fontSize: fontScale(13.5),
-    fontWeight: '900',
-    color: '#0F172A',
-    marginBottom: 2,
-  },
-  motivationSubtitle: {
-    fontSize: fontScale(10.5),
-    color: '#64748B',
-    fontWeight: '500',
-  },
-
-  editPlanTopBtnActive: {
-    backgroundColor: '#6C5CE7',
-    borderColor: '#6C5CE7',
-  },
-  editPlanTopTextActive: {
-    color: '#FFFFFF',
-  },
-
-  // ── Editing Mode Instructions Banner ──
+  // Editing Instruction Banner
   editingInstructionBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -863,12 +877,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // ── School Timetable Container ──
+  // Timetable Container
   timetableContainer: {
     backgroundColor: '#FFFFFF',
     borderRadius: moderateScale(22),
-    paddingHorizontal: moderateScale(14),
-    paddingVertical: moderateScale(16),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(14),
     marginBottom: hp(2),
     borderWidth: 1,
     borderColor: '#ECEAFD',
@@ -877,109 +891,124 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 12,
     elevation: 3,
-    gap: moderateScale(10),
+    gap: moderateScale(8),
   },
   timetableHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: moderateScale(8),
-    paddingBottom: moderateScale(10),
+    paddingHorizontal: moderateScale(6),
+    paddingBottom: moderateScale(8),
     borderBottomWidth: 1.5,
     borderBottomColor: '#F1F5F9',
-    marginBottom: moderateScale(4),
+    marginBottom: moderateScale(2),
+  },
+  timetableColDayWrap: {
+    width: moderateScale(108),
   },
   timetableColDay: {
-    width: wp(30),
-    fontSize: fontScale(11),
+    fontSize: fontScale(10.5),
     fontWeight: '900',
     color: '#6C5CE7',
     letterSpacing: 0.8,
   },
   timetableColSeparator: {
-    width: wp(6),
+    width: moderateScale(16),
     fontSize: fontScale(12),
     fontWeight: '900',
     color: '#94A3B8',
     textAlign: 'center',
   },
-  timetableColRoutine: {
+  timetableColRoutineWrap: {
     flex: 1,
-    fontSize: fontScale(11),
+    paddingLeft: moderateScale(6),
+  },
+  timetableColRoutine: {
+    fontSize: fontScale(10.5),
     fontWeight: '900',
     color: '#64748B',
     letterSpacing: 0.8,
   },
+  timetableColActionWrap: {
+    width: moderateScale(36),
+    alignItems: 'center',
+  },
   timetableColAction: {
-    fontSize: fontScale(10.5),
+    fontSize: fontScale(10),
     fontWeight: '800',
     color: '#6C5CE7',
-    paddingRight: moderateScale(4),
     letterSpacing: 0.6,
   },
 
-  // ── Timetable Row Card ──
+  // Timetable Row Card
   timetableRowCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(16),
+    borderRadius: moderateScale(14),
     borderWidth: 1.2,
     borderColor: '#F1F5F9',
     overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
   },
   timetableRowCardOpen: {
-    backgroundColor: '#FFFFFF',
     borderColor: '#6C5CE7',
+    backgroundColor: '#FAFAFD',
+    elevation: 2,
     shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
   },
   timetableRowMain: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(11),
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(9),
+  },
+  timetableRowMainOpen: {
+    backgroundColor: '#F8F7FF',
   },
   timetableDayGroup: {
-    width: wp(30),
+    width: moderateScale(108),
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(10),
+    gap: moderateScale(8),
   },
   timetableIconBadge: {
-    width: moderateScale(38),
-    height: moderateScale(38),
-    borderRadius: moderateScale(12),
+    width: moderateScale(34),
+    height: moderateScale(34),
+    borderRadius: moderateScale(10),
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dayIconImg: {
+    width: moderateScale(18),
+    height: moderateScale(18),
+  },
   timetableDayName: {
-    fontSize: fontScale(13),
+    fontSize: fontScale(12),
     fontWeight: '800',
     color: '#0F172A',
-    letterSpacing: -0.2,
+    flex: 1,
   },
   timetableDash: {
-    width: wp(6),
-    fontSize: fontScale(14),
+    width: moderateScale(16),
+    fontSize: fontScale(13),
     fontWeight: '900',
     color: '#CBD5E1',
     textAlign: 'center',
   },
   timetableRoutineGroup: {
     flex: 1,
-    paddingRight: moderateScale(6),
+    paddingLeft: moderateScale(6),
+    paddingRight: moderateScale(4),
   },
   timetableRoutineName: {
-    fontSize: fontScale(13.5),
+    fontSize: fontScale(12.5),
     fontWeight: '800',
     color: '#1E293B',
     letterSpacing: -0.2,
+  },
+  timetableRoutineNameActive: {
+    color: '#6C5CE7',
+    fontWeight: '900',
   },
   timetableDropdownBtn: {
     width: moderateScale(26),
@@ -996,12 +1025,12 @@ const styles = StyleSheet.create({
     borderColor: '#6C5CE7',
   },
   timetableDropdownChevron: {
-    fontSize: fontScale(9),
+    fontSize: fontScale(8.5),
     fontWeight: '900',
     color: '#64748B',
   },
 
-  // ── Dropdown List Container (Matching Reference Image) ──
+  // Dropdown List
   dropdownListWrapper: {
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
@@ -1011,16 +1040,41 @@ const styles = StyleSheet.create({
     paddingBottom: moderateScale(10),
   },
   dropdownHeaderSub: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingVertical: moderateScale(4),
-    paddingHorizontal: moderateScale(4),
-    marginBottom: moderateScale(4),
+    marginBottom: moderateScale(6),
+  },
+  dropdownHeaderLeft: {
+    flex: 1,
+    paddingRight: moderateScale(8),
   },
   dropdownSelectLabel: {
-    fontSize: fontScale(10),
-    fontWeight: '800',
+    fontSize: fontScale(10.5),
+    fontWeight: '900',
     color: '#6C5CE7',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  dropdownMultiHint: {
+    fontSize: fontScale(9.5),
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  dropdownDoneBtn: {
+    backgroundColor: '#F3F2FE',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  dropdownDoneBtnText: {
+    fontSize: fontScale(11),
+    fontWeight: '800',
+    color: '#6C5CE7',
   },
   dropdownOptionsContainer: {
     gap: moderateScale(4),
@@ -1030,14 +1084,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(8),
+    paddingVertical: moderateScale(7),
     borderRadius: moderateScale(10),
     backgroundColor: '#FAFAFD',
     borderWidth: 1,
     borderColor: '#F1F5F9',
   },
   dropdownItemRowSelected: {
-    backgroundColor: '#F3F2FE',
+    backgroundColor: '#F5F3FF',
     borderColor: '#C4B5FD',
   },
   dropdownItemLeft: {
@@ -1047,33 +1101,48 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dropdownItemIconCircle: {
-    width: moderateScale(28),
-    height: moderateScale(28),
+    width: moderateScale(26),
+    height: moderateScale(26),
     borderRadius: moderateScale(8),
     alignItems: 'center',
     justifyContent: 'center',
   },
   dropdownItemIconImg: {
-    width: moderateScale(16),
-    height: moderateScale(16),
+    width: moderateScale(15),
+    height: moderateScale(15),
   },
   dropdownItemText: {
-    fontSize: fontScale(12.5),
+    fontSize: fontScale(12),
     fontWeight: '700',
     color: '#334155',
+    flex: 1,
   },
   dropdownItemTextSelected: {
     color: '#6C5CE7',
     fontWeight: '900',
   },
-  dropdownCheckmark: {
-    fontSize: fontScale(13),
+  dropdownCheckbox: {
+    width: moderateScale(20),
+    height: moderateScale(20),
+    borderRadius: moderateScale(6),
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  dropdownCheckboxActive: {
+    backgroundColor: '#6C5CE7',
+    borderColor: '#6C5CE7',
+  },
+  dropdownCheckmarkText: {
+    fontSize: fontScale(11),
     fontWeight: '900',
-    color: '#6C5CE7',
-    marginRight: moderateScale(4),
+    color: '#FFFFFF',
+    lineHeight: fontScale(13),
   },
 
-  // ── Custom Type Option ──
+  // Custom Input
   customTypeContainer: {
     marginTop: moderateScale(8),
     padding: moderateScale(8),
@@ -1103,50 +1172,41 @@ const styles = StyleSheet.create({
     paddingVertical: moderateScale(6),
     fontSize: fontScale(12),
     color: '#0F172A',
-    fontWeight: '600',
   },
   applyCustomBtn: {
     backgroundColor: '#6C5CE7',
     paddingHorizontal: moderateScale(14),
     paddingVertical: moderateScale(8),
     borderRadius: moderateScale(8),
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   applyCustomBtnText: {
-    color: '#FFFFFF',
     fontSize: fontScale(11.5),
     fontWeight: '800',
+    color: '#FFFFFF',
   },
 
-  timetableRowMainOpen: {
-    backgroundColor: '#F8FAFC',
-  },
-  timetableRoutineNameActive: {
-    color: '#6C5CE7',
-  },
-
-  // ── Save Plan CTA Button ──
+  // Save Routine Button
   savePlanBtn: {
     backgroundColor: '#6C5CE7',
-    borderRadius: moderateScale(14),
+    borderRadius: moderateScale(16),
     paddingVertical: moderateScale(13),
     alignItems: 'center',
-    marginBottom: hp(1.8),
+    justifyContent: 'center',
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
     elevation: 4,
+    marginBottom: hp(2),
   },
   savePlanBtnText: {
-    fontSize: fontScale(14),
+    fontSize: fontScale(13.5),
     fontWeight: '900',
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
 
-  // ── Luxury Success Popup Modal ──
+  // Success Modal
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
@@ -1156,70 +1216,56 @@ const styles = StyleSheet.create({
   },
   successModalCard: {
     width: '100%',
-    maxWidth: moderateScale(340),
+    maxWidth: 340,
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(24),
-    paddingHorizontal: moderateScale(22),
-    paddingTop: moderateScale(24),
-    paddingBottom: moderateScale(20),
+    borderRadius: moderateScale(22),
+    padding: moderateScale(22),
     alignItems: 'center',
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
   },
   successIconCircle: {
-    width: moderateScale(60),
-    height: moderateScale(60),
-    borderRadius: moderateScale(30),
+    width: moderateScale(56),
+    height: moderateScale(56),
+    borderRadius: moderateScale(28),
     backgroundColor: '#DCFCE7',
-    borderWidth: 2,
-    borderColor: '#86EFAC',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: moderateScale(14),
+    marginBottom: hp(1.5),
   },
   successCheckmark: {
-    fontSize: fontScale(26),
+    fontSize: fontScale(24),
     fontWeight: '900',
-    color: '#16A34A',
+    color: '#10B981',
   },
   successModalTitle: {
     fontSize: fontScale(17),
     fontWeight: '900',
     color: '#0F172A',
     textAlign: 'center',
-    marginBottom: moderateScale(8),
-    letterSpacing: -0.3,
+    marginBottom: hp(0.8),
   },
   successModalMessage: {
     fontSize: fontScale(12.5),
     color: '#64748B',
     textAlign: 'center',
     lineHeight: fontScale(18),
-    marginBottom: moderateScale(20),
-    paddingHorizontal: moderateScale(6),
+    marginBottom: hp(2.5),
   },
   successModalBtn: {
     width: '100%',
     backgroundColor: '#6C5CE7',
-    borderRadius: moderateScale(14),
-    paddingVertical: moderateScale(13),
+    paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(12),
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
   },
   successModalBtnText: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
     color: '#FFFFFF',
-    fontSize: fontScale(13.5),
-    fontWeight: '900',
-    letterSpacing: 0.3,
   },
 });

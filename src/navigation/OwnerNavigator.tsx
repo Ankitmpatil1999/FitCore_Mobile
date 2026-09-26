@@ -14,6 +14,7 @@ import OwnerAnalytics from '../screens/owner/OwnerAnalytics';
 import MembershipPlansScreen from '../screens/owner/MembershipPlansScreen';
 import GymProfileScreen from '../screens/owner/GymProfileScreen';
 import OwnerWorkoutPlansScreen from '../screens/owner/OwnerWorkoutPlansScreen';
+import NotificationsScreen from '../screens/member/NotificationsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -21,6 +22,7 @@ const Stack = createStackNavigator();
 function OwnerTabNavigator() {
   const insets = useSafeAreaInsets();
   const bottomInset = insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 10 : 8);
+  const tabBarHeight = 58 + bottomInset;
 
   return (
     <Tab.Navigator
@@ -31,7 +33,7 @@ function OwnerTabNavigator() {
         tabBarStyle: [
           styles.tabBar,
           {
-            height: 60 + bottomInset,
+            height: tabBarHeight,
             paddingBottom: bottomInset,
           },
         ],
@@ -137,6 +139,7 @@ export default function OwnerNavigator() {
       <Stack.Screen name="Analytics" component={OwnerAnalytics} />
       <Stack.Screen name="GymProfile" component={GymProfileScreen} />
       <Stack.Screen name="WorkoutPlans" component={OwnerWorkoutPlansScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );
 }
