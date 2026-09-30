@@ -29,6 +29,7 @@ export const PRODUCTION_API_URL = ENV_API_URL || 'http://localhost:7000/api';
 const CANDIDATE_URLS = [
   PRODUCTION_API_URL,
   ...(dynamicHost ? [`http://${dynamicHost}:7000/api`] : []),
+  'http://192.168.88.28:7000/api',
   'http://192.168.0.106:7000/api',
   'http://192.168.0.109:7000/api',
   'http://localhost:7000/api',
@@ -60,6 +61,12 @@ class ApiService {
         API_BASE_URL = cached;
       }
     }).catch(() => {});
+  }
+
+  private onAccountDeletedCallback: ((message?: string) => void) | null = null;
+
+  setOnAccountDeleted(cb: ((message?: string) => void) | null) {
+    this.onAccountDeletedCallback = cb;
   }
 
   setToken(token: string | null) {
@@ -139,6 +146,12 @@ class ApiService {
           this.activeBaseUrl = baseUrl;
           API_BASE_URL = baseUrl;
           AsyncStorage.setItem('@fitcore_active_base_url', baseUrl).catch(() => {});
+        }
+
+        if (json?.isDeleted || json?.accountDeleted) {
+          if (this.onAccountDeletedCallback) {
+            this.onAccountDeletedCallback(json.message || 'Your member account has been removed by the gym administration.');
+          }
         }
 
         return {
@@ -271,6 +284,21 @@ class ApiService {
     return this.savePersonalDetails(data);
   }
 
+  async reportIssue(data: {
+    memberId?: string;
+    memberName?: string;
+    memberPhone?: string;
+    gymId?: string;
+    gymName?: string;
+    category: string;
+    description: string;
+  }) {
+    return this.request<any>('/members/report-issue', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async getMemberQRPass(userId?: string) {
     const query = userId ? `?userId=${userId}` : '';
     return this.request(`/members/qr-pass${query}`);
@@ -396,7 +424,7 @@ class ApiService {
   }
 
   async logWeightCheckpoint(data: {
-    memberId: string;
+    memberId?: string;
     weight: number;
     date?: string;
     note?: string;
@@ -408,7 +436,7 @@ class ApiService {
   }
 
   async updateBodyMeasurements(data: {
-    memberId: string;
+    memberId?: string;
     measurements?: any[];
     waist?: number;
     chest?: number;
@@ -416,6 +444,17 @@ class ApiService {
     shoulders?: number;
     thighs?: number;
     calves?: number;
+    unit?: string;
+  }) {
+    return this.request('/members/body-analytics/measurements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async saveBodyMeasurements(data: {
+    memberId?: string;
+    measurements: any[];
     unit?: string;
   }) {
     return this.request('/members/body-analytics/measurements', {
@@ -914,8 +953,87 @@ class ApiService {
       body: JSON.stringify({ phone: phoneOrMemberId, memberId: phoneOrMemberId, reason: reason || 'User in-app deletion' }),
     });
   }
-}
 
+  // ── Vendor & Marketplace Store APIs ──
+  async getVendorStore(userId: string) {
+    return this.request(`/vendors/${userId}`);
+  }
+
+  async getVendorProfile(vendorId: string) {
+    return this.getVendorStore(vendorId);
+  }
+
+  async updateVendorStore(id: string, data: any) {
+    return this.request(`/vendors/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateVendorProfile(vendorId: string, data: any) {
+    return this.updateVendorStore(vendorId, data);
+  }
+
+  async getVendorProducts(vendorId: string) {
+    return this.request(`/products/vendor/${vendorId}`);
+  }
+
+  async createProduct(data: any) {
+    return this.request('/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async createVendorProduct(data: any) {
+    return this.createProduct(data);
+  }
+
+  async updateProduct(id: string, data: any) {
+    return this.request(`/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteProduct(id: string) {
+    return this.request(`/products/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ── Orders & E-Commerce APIs ──
+  async getVendorOrders(vendorId: string) {
+    return this.request(`/orders/vendor/${vendorId}`);
+  }
+
+  async getOrderById(id: string) {
+    return this.request(`/orders/${id}`);
+  }
+
+  async updateOrderStatus(id: string, status: string, notes?: string) {
+    return this.request(`/orders/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, notes }),
+    });
+  }
+
+  async updateVendorOrderStatus(id: string, status: string, notes?: string) {
+    return this.updateOrderStatus(id, status, notes);
+  }
+
+  async cancelOrder(id: string, reason?: string) {
+    return this.request(`/orders/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+  }
+
+  // ── Vendor Analytics API ──
+  async getVendorAnalytics(vendorId: string) {
+    return this.request(`/analytics/vendor/${vendorId}`);
+  }
+}
 
 export const apiService = new ApiService();
 export default apiService;

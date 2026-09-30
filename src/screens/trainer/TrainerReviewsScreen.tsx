@@ -199,7 +199,7 @@ export default function TrainerReviewsScreen({ navigation }: any) {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
       <Animated.View style={[styles.root, { opacity: fadeAnim, transform: [{ translateY: slideAnim }] }]}>
-        
+
         {/* ── Ambient Background Glows ── */}
         <View style={styles.ambientGlowTop} />
         <View style={styles.ambientGlowRight} />
@@ -283,9 +283,7 @@ export default function TrainerReviewsScreen({ navigation }: any) {
             </View>
           </View>
 
-          {/* ════════════════════════════════════════════════════════════════
-              2. KEY STRENGTH HIGHLIGHTS (CLEAN SVG VECTOR PILLS)
-          ════════════════════════════════════════════════════════════════ */}
+          {/* 2. KEY STRENGTH HIGHLIGHTS (CLEAN SVG VECTOR PILLS)*/}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>What Members Love</Text>
           </View>
@@ -309,9 +307,7 @@ export default function TrainerReviewsScreen({ navigation }: any) {
             </View>
           </ScrollView>
 
-          {/* ════════════════════════════════════════════════════════════════
-              3. REVIEWS LIST WITH FILTER TABS
-          ════════════════════════════════════════════════════════════════ */}
+          {/*  3. REVIEWS LIST WITH FILTER TABS  */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Member Reviews & Feedback</Text>
             <Text style={styles.reviewCountSub}>({filteredReviews.length})</Text>

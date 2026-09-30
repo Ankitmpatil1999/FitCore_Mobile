@@ -229,6 +229,8 @@ export interface Member {
   dietGoal?: string;
   attendanceCount?: number;
   qrCode?: string;
+  address?: string;
+  daysRemaining?: number;
 }
 
 export const USERS: User[] = [

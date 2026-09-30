@@ -9,6 +9,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { apiService } from '../../services/api';
 import { useAppContext } from '../../context/AppContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 
 const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
@@ -60,6 +61,7 @@ const MOCK_NOTIFICATIONS = [
 
 export default function NotificationsScreen({ navigation }: any) {
   const { role, currentUser, currentMember, currentGym } = useAppContext();
+  const { refreshNotifications: refreshGlobalNotifs, markAsRead: markGlobalRead, markAllAsRead: markAllGlobalRead } = useNotifications();
   const [notifications, setNotifications] = useState<any[]>([]);
 
   const userId = (currentMember as any)?.id || (currentMember as any)?._id || (currentMember as any)?.userId || currentUser?.id || 'default_user';
@@ -137,6 +139,7 @@ export default function NotificationsScreen({ navigation }: any) {
   const markAllRead = async () => {
     // 1. Instantly update UI state
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    markAllGlobalRead();
 
     // 2. Cache all IDs and timestamp to AsyncStorage so dashboard sees 0 unread immediately
     try {
@@ -160,6 +163,7 @@ export default function NotificationsScreen({ navigation }: any) {
     const idStr = String(notifId);
     // 1. Instantly update UI state
     setNotifications(prev => prev.map(n => String(n.id) === idStr ? { ...n, read: true } : n));
+    markGlobalRead(idStr);
 
     // 2. Cache this ID across all user storage keys
     try {

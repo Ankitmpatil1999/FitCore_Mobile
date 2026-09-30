@@ -35,10 +35,11 @@ export default function AboutScreen({ navigation }: any) {
           >
             <Icon name="arrow-back" size={moderateScale(20)} color="#0F172A" />
           </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: moderateScale(12) }}>
+          <View style={styles.headerCenter}>
             <Text style={styles.headerTitle}>About FitCore</Text>
             <Text style={styles.headerSub}>Platform & Developer Information</Text>
           </View>
+          <View style={styles.backBtnPlaceholder} />
         </View>
 
         <ScrollView
@@ -174,17 +175,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 4,
   },
+  backBtnPlaceholder: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: moderateScale(8),
+  },
   headerTitle: {
     fontSize: fontScale(18),
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
   headerSub: {
     fontSize: fontScale(10.5),
     color: '#64748B',
     fontWeight: '600',
     marginTop: 1,
+    textAlign: 'center',
   },
   scrollContent: {
     paddingHorizontal: wp(5),

@@ -25,7 +25,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppIcon from '../../components/common/AppIcon';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
+import { useNotifications } from '../../context/NotificationContext';
 import apiService from '../../services/api';
+
+// ── Asset Icons ──
+const bellNotifImg = require('../../assets/Icons2/bell_clean.png');
+const userProfileImg = require('../../assets/Icons2/user.png');
 
 // ── Interactive Spring Scale Pressable ──
 function AnimatedPressable({
@@ -79,6 +84,7 @@ export default function OwnerDashboard({ navigation }: any) {
   const ownerName = currentUser?.name || gymName + ' Owner';
 
   // ── State Management ──
+  const { unreadCount: globalUnreadCount } = useNotifications();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [currentDateFormatted, setCurrentDateFormatted] = useState('');
@@ -198,7 +204,7 @@ export default function OwnerDashboard({ navigation }: any) {
       if (membersRes.success && Array.isArray(membersRes.data)) {
         allM = membersRes.data;
         totalM = allM.length;
-        activeM = allM.filter((m: any) => m.status === 'active' || !m.status).length;
+        activeM = allM.filter((m: any) => String(m.status || '').toLowerCase() === 'active').length;
         setAllMembersList(allM);
 
         allM.forEach((m: any) => {
@@ -217,14 +223,16 @@ export default function OwnerDashboard({ navigation }: any) {
         inGymNow = attendanceRes.data.filter((rec: any) => !rec.checkOutTime).length;
       }
 
-      let monthlyRev = 21898;
+      let monthlyRev = 0;
       if (overviewRes.success && overviewRes.data) {
         const d: any = overviewRes.data;
         const st = d.stats || {};
-        totalM = totalM || st.totalMembers || 3;
-        activeM = activeM || st.activeMembers || totalM;
-        todayCount = todayCount || st.todayCheckIns || 1;
-        monthlyRev = st.monthlyRevenue || 21898;
+        if (!membersRes.success || !Array.isArray(membersRes.data)) {
+          totalM = Number(st.totalMembers || 0);
+          activeM = Number(st.activeMembers || totalM);
+        }
+        todayCount = todayCount || Number(st.todayCheckIns || 0);
+        monthlyRev = Number(st.monthlyRevenue || 0);
       }
 
       // Calculate Today's Expenses
@@ -237,7 +245,20 @@ export default function OwnerDashboard({ navigation }: any) {
           }
         });
       }
-      const todayInc = Math.max(todayCount * 500, 3500); // Today's collections & admissions
+      // Calculate Today's Real Collections
+      let todayInc = 0;
+      if (membersRes.success && Array.isArray(membersRes.data)) {
+        membersRes.data.forEach((m: any) => {
+          const joinDate = m.joinedDate || m.startDate || m.createdAt;
+          if (joinDate && String(joinDate).startsWith(todayDateStr)) {
+            todayInc += Number(m.amountPaid || m.planPrice || 0);
+          }
+        });
+      }
+      if (todayInc === 0 && monthlyRev > 0) {
+        todayInc = Math.round(monthlyRev / 30);
+      }
+
       setDailyPL({
         income: todayInc,
         expense: todayExpTotal,
@@ -245,11 +266,11 @@ export default function OwnerDashboard({ navigation }: any) {
       });
 
       setStats({
-        totalMembers: totalM || 3,
-        activeMembers: activeM || totalM || 3,
+        totalMembers: totalM,
+        activeMembers: activeM,
         todayCheckIns: todayCount,
         currentlyInGym: inGymNow,
-        remainingMembers: Math.max(0, (totalM || 3) - todayCount),
+        remainingMembers: Math.max(0, totalM - todayCount),
         collectionsThisMonth: monthlyRev,
         pendingDues: pendingTotal,
         pendingCount: pendingMCount,
@@ -315,7 +336,7 @@ export default function OwnerDashboard({ navigation }: any) {
             try {
               const arr = JSON.parse(res);
               if (Array.isArray(arr)) arr.forEach(i => locallyReadIds.add(String(i)));
-            } catch (e) {}
+            } catch (e) { }
           }
         });
 
@@ -514,22 +535,19 @@ export default function OwnerDashboard({ navigation }: any) {
 
       {/* ── 1. CINEMATIC GRADIENT HERO HEADER WITH GYM ATHLETE BACKGROUND ── */}
       <View style={styles.heroHeaderContainer}>
-        {/* Background Image of Muscular Athlete with Neon Lighting */}
+        {/* High-End Luxury Gym Atmosphere Background with Neon Lighting */}
         <Image
-          source={require('../../assets/header_athlete_bg.png')}
+          source={require('../../assets/owner_header_bg.png')}
           style={styles.heroBackgroundImage}
           resizeMode="cover"
         />
-        {/* Gradient Overlay to ensure high text contrast */}
+        {/* Subtle Dark Luxury Overlay to ensure crystal-clear text readability */}
         <View style={styles.heroGradientOverlay} />
 
         {/* Top App Bar */}
         <SafeAreaView edges={['top']} style={styles.topSafeArea}>
           <View style={styles.topBarRow}>
-            <View>
-              <Text style={styles.appBrandTitle}>FitCore</Text>
-              <Text style={styles.appBrandSub}>Gym Operating System</Text>
-            </View>
+            <View style={{ flex: 1 }} />
 
             <View style={styles.topBarActions}>
               <TouchableOpacity
@@ -537,11 +555,17 @@ export default function OwnerDashboard({ navigation }: any) {
                 onPress={() => navigation.navigate('Notifications')}
                 activeOpacity={0.75}
               >
-                <AppIcon name="notifications" size={18} color="#FFFFFF" />
-                {unreadNotifCount > 0 && (
+                <Image
+                  source={bellNotifImg}
+                  style={styles.headerActionIcon}
+                  resizeMode="contain"
+                />
+                {(globalUnreadCount > 0 || unreadNotifCount > 0) && (
                   <View style={styles.notiBadge}>
                     <Text style={styles.notiBadgeText}>
-                      {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                      {(globalUnreadCount > 0 ? globalUnreadCount : unreadNotifCount) > 9
+                        ? '9+'
+                        : (globalUnreadCount > 0 ? globalUnreadCount : unreadNotifCount)}
                     </Text>
                   </View>
                 )}
@@ -552,9 +576,11 @@ export default function OwnerDashboard({ navigation }: any) {
                 onPress={() => navigation.navigate('GymProfile')}
                 activeOpacity={0.8}
               >
-                <Text style={styles.headerAvatarText}>
-                  {ownerName.charAt(0).toUpperCase()}
-                </Text>
+                <Image
+                  source={userProfileImg}
+                  style={styles.headerProfileIcon}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -564,7 +590,7 @@ export default function OwnerDashboard({ navigation }: any) {
             <View style={styles.greetingTextCol}>
               <Text style={styles.greetingLight}>{greeting}</Text>
               <Text style={styles.greetingBold}>
-                {gymName} Owner 👋
+                {gymName} Owner 
               </Text>
 
               {/* Live Floor Status & Date Row */}
@@ -612,46 +638,23 @@ export default function OwnerDashboard({ navigation }: any) {
               style={styles.metricCard}
               onPress={() => navigation.navigate('Members')}
             >
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardTitle}>Total Members</Text>
-                <View style={[styles.cardIconBox, { backgroundColor: '#EEF2FF' }]}>
-                  <AppIcon name="members" size={16} color="#6366F1" />
-                </View>
+              <View style={[styles.cardIconBox, { backgroundColor: '#EEF2FF', marginBottom: 8 }]}>
+                <AppIcon name="members" size={16} color="#6366F1" />
               </View>
               <Text style={styles.cardMainNum}>{stats.totalMembers}</Text>
-              <View style={styles.cardFooterRow}>
-                <Text style={styles.cardSubtitleLight}>Active Roster</Text>
-                <View style={styles.trendRow}>
-                  <Text style={styles.trendUpArrow}>↑</Text>
-                  <Text style={styles.trendGreenPct}>0%</Text>
-                </View>
-              </View>
+              <Text style={styles.cardTitle}>Total Members</Text>
             </AnimatedPressable>
 
-            {/* Card 2: Checked-In */}
+            {/* Card 2: Today Check-Ins */}
             <AnimatedPressable
               style={styles.metricCard}
               onPress={() => navigation.navigate('Reports')}
             >
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardTitle}>Checked-In</Text>
-                <View style={[styles.cardIconBox, { backgroundColor: '#ECFDF5' }]}>
-                  <AppIcon name="flash" size={16} color="#10B981" />
-                </View>
+              <View style={[styles.cardIconBox, { backgroundColor: '#ECFDF5', marginBottom: 8 }]}>
+                <AppIcon name="flash" size={16} color="#10B981" />
               </View>
-              <View style={styles.checkedInNumRow}>
-                <Text style={styles.cardMainNum}>{stats.todayCheckIns}</Text>
-                <Text style={styles.cardSlashTotal}>/ {stats.totalMembers}</Text>
-              </View>
-              <View style={styles.cardFooterRow}>
-                <View style={styles.remainingPill}>
-                  <Text style={styles.remainingPillText}>{stats.remainingMembers} Remaining</Text>
-                </View>
-                <View style={styles.trendRow}>
-                  <Text style={styles.trendUpArrow}>↑</Text>
-                  <Text style={styles.trendGreenPct}>0%</Text>
-                </View>
-              </View>
+              <Text style={styles.cardMainNum}>{stats.todayCheckIns}</Text>
+              <Text style={styles.cardTitle}>Today Check-Ins</Text>
             </AnimatedPressable>
 
             {/* Card 3: Collections */}
@@ -659,22 +662,13 @@ export default function OwnerDashboard({ navigation }: any) {
               style={styles.metricCard}
               onPress={() => navigation.navigate('Finance')}
             >
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardTitle}>Collections</Text>
-                <View style={[styles.cardIconBox, { backgroundColor: '#FDF2F8' }]}>
-                  <AppIcon name="wallet" size={16} color="#EC4899" />
-                </View>
+              <View style={[styles.cardIconBox, { backgroundColor: '#FDF2F8', marginBottom: 8 }]}>
+                <AppIcon name="wallet" size={16} color="#EC4899" />
               </View>
               <Text style={styles.cardMainNum}>
                 ₹{stats.collectionsThisMonth.toLocaleString('en-IN')}
               </Text>
-              <View style={styles.cardFooterRow}>
-                <Text style={styles.cardSubtitleLight}>This Month</Text>
-                <View style={styles.trendRow}>
-                  <Text style={styles.trendUpArrow}>↑</Text>
-                  <Text style={styles.trendGreenPct}>12%</Text>
-                </View>
-              </View>
+              <Text style={styles.cardTitle}>Total Collections</Text>
             </AnimatedPressable>
 
             {/* Card 4: Pending Dues */}
@@ -682,128 +676,14 @@ export default function OwnerDashboard({ navigation }: any) {
               style={styles.metricCard}
               onPress={() => navigation.navigate('Finance')}
             >
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardTitle}>Pending Dues</Text>
-                <View style={[styles.cardIconBox, { backgroundColor: '#FFF7ED' }]}>
-                  <AppIcon name="receipt" size={16} color="#F97316" />
-                </View>
+              <View style={[styles.cardIconBox, { backgroundColor: '#FFF7ED', marginBottom: 8 }]}>
+                <AppIcon name="receipt" size={16} color="#F97316" />
               </View>
               <Text style={styles.cardMainNum}>
                 ₹{stats.pendingDues.toLocaleString('en-IN')}
               </Text>
-              <View style={styles.cardFooterRow}>
-                <Text style={styles.cardSubtitleLight}>{stats.pendingCount} Members</Text>
-                <View style={styles.trendRow}>
-                  <Text style={styles.trendDownArrow}>↓</Text>
-                  <Text style={styles.trendGreenPct}>100%</Text>
-                </View>
-              </View>
+              <Text style={styles.cardTitle}>Pending Dues</Text>
             </AnimatedPressable>
-          </View>
-
-          {/* ── TODAY'S DAILY P&L CASHFLOW SNAPSHOT ── */}
-          <View style={styles.dailyPLCard}>
-            <View style={styles.plHeaderRow}>
-              <View style={styles.plTitleCol}>
-                <Text style={styles.plHeading}>Today's Cashflow (P&L)</Text>
-                <Text style={styles.plSubHeading}>Real-time daily balance sheet</Text>
-              </View>
-              <View style={[styles.plStatusBadge, { backgroundColor: dailyPL.net >= 0 ? '#ECFDF5' : '#FEF2F2' }]}>
-                <Text style={[styles.plStatusText, { color: dailyPL.net >= 0 ? '#059669' : '#DC2626' }]}>
-                  {dailyPL.net >= 0 ? '● Profitable' : '● Deficit'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.plMetricsRow}>
-              {/* Income */}
-              <View style={styles.plMetricBox}>
-                <Text style={styles.plMetricLabel}>Today Inflow</Text>
-                <Text style={[styles.plMetricValue, { color: '#059669' }]}>
-                  +₹{dailyPL.income.toLocaleString('en-IN')}
-                </Text>
-              </View>
-
-              <View style={styles.plDivider} />
-
-              {/* Expense */}
-              <View style={styles.plMetricBox}>
-                <Text style={styles.plMetricLabel}>Today Expense</Text>
-                <Text style={[styles.plMetricValue, { color: '#DC2626' }]}>
-                  -₹{dailyPL.expense.toLocaleString('en-IN')}
-                </Text>
-              </View>
-
-              <View style={styles.plDivider} />
-
-              {/* Net */}
-              <View style={styles.plMetricBox}>
-                <Text style={styles.plMetricLabel}>Net Today</Text>
-                <Text style={[styles.plMetricValue, { color: '#4F46E5', fontWeight: '900' }]}>
-                  ₹{dailyPL.net.toLocaleString('en-IN')}
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          {/* ── URGENT ACTION CENTER: 1-CLICK IN-APP FEE REMINDERS ── */}
-          <View style={styles.urgentActionCard}>
-            <View style={styles.urgentHeaderRow}>
-              <View>
-                <Text style={styles.urgentTitle}>Fee Collection & In-App Alerts</Text>
-                <Text style={styles.urgentSub}>1-Tap instant reminder notification to member app</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Finance')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.viewAllText}>View All ›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {pendingMembersList.length === 0 ? (
-              <View style={styles.zeroPendingBox}>
-                <Text style={styles.zeroPendingEmoji}>✨</Text>
-                <Text style={styles.zeroPendingText}>All fees are cleared! Zero pending dues right now.</Text>
-              </View>
-            ) : (
-              pendingMembersList.slice(0, 3).map((m: any) => {
-                const memberId = m.id || m._id || m.memberId;
-                const isSending = sendingReminderId === memberId;
-                const dueAmt = m.pendingDues || m.dueAmount || 2000;
-
-                return (
-                  <View key={memberId} style={styles.pendingMemberRow}>
-                    <View style={styles.memberAvatar}>
-                      <Text style={styles.memberAvatarText}>
-                        {(m.name || 'M').substring(0, 2).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.memberInfoCol}>
-                      <Text style={styles.pendingMemberName}>{m.name || 'Gym Member'}</Text>
-                      <Text style={styles.pendingMemberDue}>
-                        Due: <Text style={{ color: '#DC2626', fontWeight: '800' }}>₹{dueAmt}</Text> • {m.planName || 'Monthly Pass'}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.sendReminderBtn}
-                      onPress={() => handleSendInAppReminder(m)}
-                      disabled={isSending}
-                      activeOpacity={0.8}
-                    >
-                      {isSending ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <>
-                          <AppIcon name="notifications" size={13} color="#FFFFFF" />
-                          <Text style={styles.sendReminderBtnText}>Alert App</Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                );
-              })
-            )}
           </View>
 
           {/* ── 3. CHECK-IN OVERVIEW & BAR CHART (EXACT MATCH) ── */}
@@ -848,7 +728,7 @@ export default function OwnerDashboard({ navigation }: any) {
             </View>
           </View>
 
-          {/* ── 4. QUICK ACTIONS TOOLBAR (SINGLE SCREEN 5-TILES GRID) ── */}
+          {/* ── 4. QUICK ACTIONS TOOLBAR (2 PER ROW GRID) ── */}
           <View style={styles.quickActionsSection}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionHeading}>Quick Actions</Text>
@@ -857,112 +737,76 @@ export default function OwnerDashboard({ navigation }: any) {
             <View style={styles.quickActionsGridContainer}>
               {/* Tile 1: Add Member (Purple) */}
               <AnimatedPressable
-                style={styles.actionTileBtn}
+                style={styles.actionCard2Col}
                 onPress={() => setShowAddMemberModal(true)}
               >
-                <View style={[styles.actionTileIconBox, { backgroundColor: '#E0E7FF' }]}>
-                  <AppIcon name="person-add" size={19} color="#7C3AED" />
+                <View style={[styles.actionIconBox2Col, { backgroundColor: '#EEF2FF' }]}>
+                  <AppIcon name="person-add" size={20} color="#6366F1" />
                 </View>
-                <Text style={styles.actionTileLabel} numberOfLines={2}>
-                  Add Member
-                </Text>
+                <Text style={styles.actionTitle2Col}>Add Member</Text>
+                <Text style={styles.actionSub2Col}>Register new client</Text>
               </AnimatedPressable>
 
               {/* Tile 2: Packages (Orange) */}
               <AnimatedPressable
-                style={styles.actionTileBtn}
+                style={styles.actionCard2Col}
                 onPress={() => navigation.navigate('Packages')}
               >
-                <View style={[styles.actionTileIconBox, { backgroundColor: '#FFEDD5' }]}>
-                  <AppIcon name="plan" size={19} color="#EA580C" />
+                <View style={[styles.actionIconBox2Col, { backgroundColor: '#FFEDD5' }]}>
+                  <AppIcon name="plan" size={20} color="#EA580C" />
                 </View>
-                <Text style={styles.actionTileLabel} numberOfLines={2}>
-                  Packages
-                </Text>
+                <Text style={styles.actionTitle2Col}>Packages</Text>
+                <Text style={styles.actionSub2Col}>Manage gym plans</Text>
               </AnimatedPressable>
 
               {/* Tile 3: Add Expense (Pink) */}
               <AnimatedPressable
-                style={styles.actionTileBtn}
+                style={styles.actionCard2Col}
                 onPress={() => setShowAddExpenseModal(true)}
               >
-                <View style={[styles.actionTileIconBox, { backgroundColor: '#FCE7F3' }]}>
-                  <AppIcon name="pay" size={19} color="#DB2777" />
+                <View style={[styles.actionIconBox2Col, { backgroundColor: '#FCE7F3' }]}>
+                  <AppIcon name="pay" size={20} color="#DB2777" />
                 </View>
-                <Text style={styles.actionTileLabel} numberOfLines={2}>
-                  Add Expense
-                </Text>
+                <Text style={styles.actionTitle2Col}>Add Expense</Text>
+                <Text style={styles.actionSub2Col}>Log daily spend</Text>
               </AnimatedPressable>
 
               {/* Tile 4: Create Broadcast (Blue) */}
               <AnimatedPressable
-                style={styles.actionTileBtn}
+                style={styles.actionCard2Col}
                 onPress={() => setShowNoticeModal(true)}
               >
-                <View style={[styles.actionTileIconBox, { backgroundColor: '#DBEAFE' }]}>
-                  <AppIcon name="notifications" size={19} color="#2563EB" />
+                <View style={[styles.actionIconBox2Col, { backgroundColor: '#DBEAFE' }]}>
+                  <AppIcon name="notifications" size={20} color="#2563EB" />
                 </View>
-                <Text style={styles.actionTileLabel} numberOfLines={2}>
-                  Create Broadcast
-                </Text>
+                <Text style={styles.actionTitle2Col}>Create Broadcast</Text>
+                <Text style={styles.actionSub2Col}>Send app notice</Text>
               </AnimatedPressable>
 
               {/* Tile 5: Master Workout Split (Indigo) */}
               <AnimatedPressable
-                style={styles.actionTileBtn}
+                style={styles.actionCard2Col}
                 onPress={() => navigation.navigate('WorkoutPlans')}
               >
-                <View style={[styles.actionTileIconBox, { backgroundColor: '#EEF2FF' }]}>
-                  <AppIcon name="gym" size={19} color="#4F46E5" />
+                <View style={[styles.actionIconBox2Col, { backgroundColor: '#EEF2FF' }]}>
+                  <AppIcon name="gym" size={20} color="#4F46E5" />
                 </View>
-                <Text style={styles.actionTileLabel} numberOfLines={2}>
-                  Master Workout
-                </Text>
+                <Text style={styles.actionTitle2Col}>Master Workout</Text>
+                <Text style={styles.actionSub2Col}>Workout splits</Text>
               </AnimatedPressable>
 
               {/* Tile 6: View Reports (Violet) */}
               <AnimatedPressable
-                style={styles.actionTileBtn}
+                style={styles.actionCard2Col}
                 onPress={() => navigation.navigate('Reports')}
               >
-                <View style={[styles.actionTileIconBox, { backgroundColor: '#F3E8FF' }]}>
-                  <AppIcon name="chart" size={19} color="#8B5CF6" />
+                <View style={[styles.actionIconBox2Col, { backgroundColor: '#F3E8FF' }]}>
+                  <AppIcon name="chart" size={20} color="#8B5CF6" />
                 </View>
-                <Text style={styles.actionTileLabel} numberOfLines={2}>
-                  View Reports
-                </Text>
+                <Text style={styles.actionTitle2Col}>View Reports</Text>
+                <Text style={styles.actionSub2Col}>Analytics & trends</Text>
               </AnimatedPressable>
             </View>
-          </View>
-
-          {/* ── 5. TOP PERFORMING TRAINERS ── */}
-          <View style={styles.trainersSection}>
-            <View style={styles.trainersHeaderRow}>
-              <Text style={styles.trainersTitle}>Top Performing Trainers</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('Trainers')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.viewAllText}>View All ›</Text>
-              </TouchableOpacity>
-            </View>
-
-            {trainersList.map((trainer) => (
-              <View key={trainer.id} style={styles.trainerRowCard}>
-                <View style={styles.trainerAvatarCircle}>
-                  <Text style={styles.trainerAvatarText}>{trainer.initials}</Text>
-                </View>
-                <View style={styles.trainerInfoCol}>
-                  <Text style={styles.trainerNameText}>{trainer.name}</Text>
-                  <Text style={styles.trainerMembersText}>
-                    {trainer.assignedMembersCount} Members • {trainer.specialty}
-                  </Text>
-                </View>
-                <Text style={styles.trainerRevenueText}>
-                  ₹{trainer.revenue.toLocaleString('en-IN')}
-                </Text>
-              </View>
-            ))}
           </View>
 
           <View style={{ height: hp(4) }} />
@@ -1212,7 +1056,7 @@ const styles = StyleSheet.create({
 
   // ── 1. Hero Header & Top Bar ──
   heroHeaderContainer: {
-    backgroundColor: '#6366F1',
+    backgroundColor: '#0F172A',
     paddingBottom: hp(2.5),
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
@@ -1235,7 +1079,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(79, 70, 229, 0.15)',
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
   },
   topSafeArea: {
     paddingHorizontal: wp(5),
@@ -1247,16 +1091,14 @@ const styles = StyleSheet.create({
     paddingTop: hp(0.5),
     paddingBottom: hp(1.5),
   },
-  appBrandTitle: {
-    fontSize: fontScale(22),
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
+  headerActionIcon: {
+    width: moderateScale(22),
+    height: moderateScale(22),
   },
-  appBrandSub: {
-    fontSize: fontScale(11),
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontWeight: '500',
+  headerProfileIcon: {
+    width: moderateScale(19),
+    height: moderateScale(19),
+    tintColor: '#FFFFFF',
   },
   topBarActions: {
     flexDirection: 'row',
@@ -1268,6 +1110,8 @@ const styles = StyleSheet.create({
     height: moderateScale(38),
     borderRadius: moderateScale(19),
     backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1291,15 +1135,11 @@ const styles = StyleSheet.create({
     width: moderateScale(38),
     height: moderateScale(38),
     borderRadius: moderateScale(19),
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
-  },
-  headerAvatarText: {
-    fontSize: fontScale(15),
-    fontWeight: '900',
-    color: '#4F46E5',
   },
 
   // Greeting Section
@@ -1410,6 +1250,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: moderateScale(14),
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#EEF2F6',
     elevation: 2,
@@ -1592,9 +1434,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   cardTitle: {
-    fontSize: fontScale(11.5),
-    fontWeight: '600',
+    fontSize: fontScale(12),
+    fontWeight: '700',
     color: '#64748B',
+    marginTop: 2,
+    textAlign: 'center',
   },
   cardIconBox: {
     width: moderateScale(28),
@@ -1608,6 +1452,7 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.5,
+    textAlign: 'center',
   },
   checkedInNumRow: {
     flexDirection: 'row',
@@ -1749,12 +1594,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  // ── 4. Quick Actions Section (Exact Web Parity - Single Screen 5-Cols) ──
+  // ── 4. Quick Actions Section (2-Columns Luxury Cards Grid) ──
   quickActionsSection: {
     marginBottom: hp(2.5),
   },
   sectionHeaderRow: {
-    marginBottom: hp(1.2),
+    marginBottom: hp(1.4),
   },
   sectionHeading: {
     fontSize: fontScale(15),
@@ -1763,40 +1608,41 @@ const styles = StyleSheet.create({
   },
   quickActionsGridContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: moderateScale(6),
+    gap: wp(3),
   },
-  actionTileBtn: {
-    flex: 1,
+  actionCard2Col: {
+    width: (wp(90) - wp(3)) / 2,
     backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: moderateScale(14),
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingVertical: moderateScale(11),
-    paddingHorizontal: moderateScale(3),
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: '#EEF2F6',
     elevation: 2,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
-    shadowRadius: 5,
+    shadowRadius: 6,
   },
-  actionTileIconBox: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(11),
+  actionIconBox2Col: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(12),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginBottom: moderateScale(10),
   },
-  actionTileLabel: {
-    fontSize: fontScale(10),
-    fontWeight: '700',
-    color: '#1E293B',
-    textAlign: 'center',
-    lineHeight: fontScale(13),
-    minHeight: fontScale(26),
+  actionTitle2Col: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  actionSub2Col: {
+    fontSize: fontScale(10.5),
+    fontWeight: '600',
+    color: '#64748B',
   },
 
   // ── 5. Trainers Section ──

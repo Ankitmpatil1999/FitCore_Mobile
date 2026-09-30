@@ -1,9 +1,8 @@
-import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  USERS, MEMBERS, GYMS, TRAINERS,
-  getMemberByPhone, getGymById,
-  getVendorStoreByUserId, getTrainerByUserId, getTrainerByPhone,
+  getGymById,
   type User, type Member, type Gym, type Role, type VendorStore, type Trainer,
 } from '../data/mockData';
 import apiService from '../services/api';
@@ -47,6 +46,49 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const [isAppReady, setIsAppReady] = useState(false);
   const [hasSeenOnboarding, setHasSeenOnboarding] = useState(false);
+  const isLoggingOutRef = useRef(false);
+
+  // Auto Logout Handler when Gym Admin deletes or deactivates member account
+  const handleAccountDeleted = (message?: string) => {
+    if (isLoggingOutRef.current) return;
+    isLoggingOutRef.current = true;
+    
+    logout();
+    Alert.alert(
+      'Account Removed',
+      message || 'Your member account has been removed by the gym administration. You have been logged out.',
+      [{ text: 'OK', onPress: () => { isLoggingOutRef.current = false; } }]
+    );
+  };
+
+  useEffect(() => {
+    apiService.setOnAccountDeleted(handleAccountDeleted);
+    return () => {
+      apiService.setOnAccountDeleted(null);
+    };
+  }, []);
+
+  // Periodic Account Validity Check (Every 25s when user is logged in as Member)
+  useEffect(() => {
+    if (!currentUser || role !== 'member') return;
+
+    const checkMemberStillActive = async () => {
+      try {
+        const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone;
+        if (!memberId) return;
+
+        const res: any = await apiService.getMemberProfile(memberId);
+        if (res?.isDeleted || res?.accountDeleted || (!res?.success && (res?.error?.includes('deleted') || res?.message?.includes('deleted')))) {
+          handleAccountDeleted(res?.message);
+        }
+      } catch (err) {
+        // Silently skip if network momentarily drops
+      }
+    };
+
+    const interval = setInterval(checkMemberStillActive, 25000);
+    return () => clearInterval(interval);
+  }, [currentUser?.id, currentUser?.phone, role, currentMember?.id]);
 
   // Load saved session + onboarding state on app startup
   useEffect(() => {
@@ -131,11 +173,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
               name: m.name || u.name,
               phone: m.phone || u.phone,
               email: m.email || u.email,
-              avatar: u.avatar || (m.name ? m.name.slice(0, 2).toUpperCase() : 'FC'),
-              age: m.age || 24,
-              height: m.height || 175,
-              weight: m.weight || 70,
-              bmi: m.bmi || 22.8,
+              age: m.age || undefined,
+              height: m.height || undefined,
+              weight: m.weight || undefined,
+              bmi: m.bmi || undefined,
               goal: (m.goal || 'general_fitness') as any,
               medicalIssues: m.medicalIssues || 'None',
               emergencyContact: m.emergencyContact || '',
@@ -154,7 +195,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
             };
             setCurrentMember(liveMember);
           } else {
-            setCurrentMember(getMemberByPhone(phone) ?? null);
+            const dynamicMember: Member = {
+              id: u.id || u._id?.toString() || `m_${phone}`,
+              userId: u.id || u._id?.toString() || `u_${phone}`,
+              gymId: matchedGym.id,
+              gymName: matchedGym.name,
+              name: u.name || 'Athlete',
+              phone: u.phone || phone,
+              email: u.email || '',
+              goal: 'general_fitness',
+              medicalIssues: 'None',
+              emergencyContact: '',
+              emergencyPhone: '',
+              planId: 'p1',
+              planName: 'Standard Membership',
+              status: 'active',
+              joinDate: new Date().toISOString().split('T')[0],
+              startDate: new Date().toISOString().split('T')[0],
+              expiryDate: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
+              trainerId: '',
+              photo: '',
+              dietGoal: '',
+              attendanceCount: 0,
+              qrCode: `QR-${u.phone || phone}`,
+            };
+            setCurrentMember(dynamicMember);
           }
           setCurrentTrainer(null);
           setCurrentVendor(null);
@@ -179,8 +244,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setCurrentMember(null);
           setCurrentVendor(null);
         } else if (effectiveRole === 'vendor') {
-          const vendorStore = getVendorStoreByUserId(u.id);
-          setCurrentVendor(vendorStore ?? null);
+          let vendorStore: any = null;
+          try {
+            const storeRes: any = await apiService.getVendorStore(u.id || u._id);
+            if (storeRes?.success && storeRes.store) {
+              vendorStore = storeRes.store;
+            }
+          } catch (e) {
+            console.log('Vendor store fetch error:', e);
+          }
+          if (!vendorStore) {
+            vendorStore = {
+              id: u.id || u._id || 'vs1',
+              userId: u.id || u._id,
+              storeName: u.name || 'FitCore Nutrition & Supplements',
+              tagline: 'Authentic Supplements & Gear',
+              description: 'Official verified fitness supplements and sports gear vendor.',
+              address: u.address || 'Civil Lines, Nagpur',
+              city: u.city || 'Nagpur',
+              state: u.state || 'Maharashtra',
+              pincode: u.pincode || '440001',
+              phone: u.phone || phone,
+              email: u.email || '',
+              rating: 4.8,
+              totalOrders: 0,
+              totalRevenue: 0,
+              isApproved: true,
+              isOpen: true,
+            };
+          }
+          setCurrentVendor(vendorStore);
           setCurrentMember(null);
           setCurrentTrainer(null);
         } else {
@@ -193,48 +286,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
         AsyncStorage.setItem('user_password', password);
         return { success: true };
       }
-    } catch (backendErr) {
+      return {
+        success: false,
+        error: backendAuth?.error || 'Invalid mobile number or password.',
+      };
+    } catch (backendErr: any) {
       console.log('⚠️ [BACKEND LOGIN ERROR]:', backendErr);
+      return {
+        success: false,
+        error: backendErr?.message || 'Cannot connect to backend server. Please verify your connection.',
+      };
     }
-
-    // 2. Local mock fallback is DISABLED — all logins must go through backend
-    // (Mock data is for reference only, not authentication)
-
-    const user = USERS.find(u => u.phone === phone);
-    if (user && user.password === password) {
-      const effectiveRole = normalizeRole(user.role);
-      const gym = user.gymId ? (getGymById(user.gymId) ?? GYMS[0]) : null;
-      setCurrentUser({ ...user, role: effectiveRole });
-      setCurrentGym(gym);
-      setRole(effectiveRole);
-
-      if (effectiveRole === 'member') {
-        const member = getMemberByPhone(phone);
-        setCurrentMember(member ?? null);
-        setCurrentVendor(null);
-        setCurrentTrainer(null);
-      } else if (effectiveRole === 'vendor') {
-        const vendorStore = getVendorStoreByUserId(user.id);
-        setCurrentVendor(vendorStore ?? null);
-        setCurrentMember(null);
-        setCurrentTrainer(null);
-      } else if (effectiveRole === 'trainer') {
-        const trainerObj = getTrainerByPhone(phone) || getTrainerByUserId(user.id);
-        setCurrentTrainer(trainerObj ?? null);
-        setCurrentMember(null);
-        setCurrentVendor(null);
-      } else {
-        setCurrentMember(null);
-        setCurrentVendor(null);
-        setCurrentTrainer(null);
-      }
-
-      AsyncStorage.setItem('user_phone', phone);
-      AsyncStorage.setItem('user_password', password);
-      return { success: true };
-    }
-
-    return { success: false, error: 'Invalid mobile number or password.' };
   };
 
   const logout = () => {

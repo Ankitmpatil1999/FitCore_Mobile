@@ -19,9 +19,8 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
+import { apiService } from '../../services/api';
 import {
-  getVendorOrdersByStore,
-  VENDOR_ORDERS,
   VendorOrder,
   OrderStatus,
   DeliveryMethod,
@@ -72,9 +71,10 @@ function AnimatedPressable({
 
 export default function VendorOrdersScreen() {
   const { currentVendor } = useAppContext();
-  const vendorId = currentVendor?.id ?? 'vs1';
+  const vendorId = currentVendor?.id ?? '';
 
-  const [orders, setOrders] = useState<VendorOrder[]>(getVendorOrdersByStore(vendorId));
+  const [orders, setOrders] = useState<VendorOrder[]>([]);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'pending' | 'completed' | 'cancelled'>('pending');
   const [selectedOrder, setSelectedOrder] = useState<VendorOrder | null>(null);
 
@@ -82,7 +82,25 @@ export default function VendorOrdersScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  const loadOrders = async () => {
+    if (!vendorId) return;
+    setLoading(true);
+    try {
+      const res = await apiService.getVendorOrders(vendorId);
+      if (res && res.success && Array.isArray(res.data)) {
+        setOrders(res.data);
+      } else if (Array.isArray(res)) {
+        setOrders(res);
+      }
+    } catch (e) {
+      console.log('Error fetching vendor orders:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
+    loadOrders();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -97,7 +115,7 @@ export default function VendorOrdersScreen() {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [vendorId]);
 
   const filteredOrders = orders.filter((order) => {
     if (activeTab === 'pending') {
@@ -112,14 +130,19 @@ export default function VendorOrdersScreen() {
     return true;
   });
 
-  const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
-    );
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      await apiService.updateVendorOrderStatus(orderId, newStatus);
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+      );
+      if (selectedOrder && selectedOrder.id === orderId) {
+        setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
+      }
+      Alert.alert('Status Updated', `Order ${orderId} marked as ${newStatus.toUpperCase()}.`);
+    } catch (err: any) {
+      Alert.alert('Update Failed', err?.message || 'Could not update order status.');
     }
-    Alert.alert('Status Updated', `Order ${orderId} marked as ${newStatus.toUpperCase()}.`);
   };
 
   return (

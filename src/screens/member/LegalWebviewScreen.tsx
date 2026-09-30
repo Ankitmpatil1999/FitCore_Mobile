@@ -31,6 +31,20 @@ export default function LegalWebviewScreen({ route, navigation }: LegalDocProps)
     Linking.openURL(url);
   };
 
+  const docTitle =
+    activeDoc === 'terms'
+      ? 'Terms & Conditions'
+      : activeDoc === 'data'
+      ? 'Data & Privacy'
+      : 'Privacy Policy';
+
+  const docSub =
+    activeDoc === 'terms'
+      ? 'Gym Membership & Service Terms'
+      : activeDoc === 'data'
+      ? 'Google Play Data Safety Disclosures'
+      : 'Data Protection & Privacy Policy';
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
@@ -44,43 +58,11 @@ export default function LegalWebviewScreen({ route, navigation }: LegalDocProps)
           >
             <Icon name="arrow-back" size={moderateScale(20)} color="#0F172A" />
           </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: moderateScale(12) }}>
-            <Text style={styles.headerTitle}>Legal & Privacy</Text>
-            <Text style={styles.headerSub}>FitCore Compliance & Policies</Text>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>{docTitle}</Text>
+            <Text style={styles.headerSub}>{docSub}</Text>
           </View>
-        </View>
-
-        {/* ── SEGMENT SWITCHER ── */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tabBtn, activeDoc === 'privacy' && styles.tabBtnActive]}
-            onPress={() => setActiveDoc('privacy')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabBtnText, activeDoc === 'privacy' && styles.tabBtnTextActive]}>
-              Privacy Policy
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeDoc === 'terms' && styles.tabBtnActive]}
-            onPress={() => setActiveDoc('terms')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabBtnText, activeDoc === 'terms' && styles.tabBtnTextActive]}>
-              Terms of Service
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeDoc === 'data' && styles.tabBtnActive]}
-            onPress={() => setActiveDoc('data')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabBtnText, activeDoc === 'data' && styles.tabBtnTextActive]}>
-              Data & Privacy
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.backBtnPlaceholder} />
         </View>
 
         <ScrollView
@@ -317,17 +299,29 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 4,
   },
+  backBtnPlaceholder: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: moderateScale(8),
+  },
   headerTitle: {
     fontSize: fontScale(18),
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
   headerSub: {
     fontSize: fontScale(10.5),
     color: '#64748B',
     fontWeight: '600',
     marginTop: 1,
+    textAlign: 'center',
   },
   tabContainer: {
     flexDirection: 'row',

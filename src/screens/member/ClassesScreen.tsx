@@ -230,12 +230,12 @@ export default function ClassesScreen({ navigation }: any) {
   };
 
   const categories = [
-    { id: 'all', label: '⚡ All Classes' },
-    { id: 'yoga', label: '🧘 Yoga & Core' },
-    { id: 'hiit', label: '🔥 CrossFit / HIIT' },
-    { id: 'spin', label: '🚴 Spin Cycle' },
-    { id: 'zumba', label: '💃 Zumba' },
-    { id: 'strength', label: '💪 Strength' },
+    { id: 'all', label: 'All Classes' },
+    { id: 'yoga', label: 'Yoga & Core' },
+    { id: 'hiit', label: 'CrossFit / HIIT' },
+    { id: 'spin', label: 'Spin Cycle' },
+    { id: 'zumba', label: 'Zumba' },
+    { id: 'strength', label: 'Strength' },
   ];
 
   const filteredClasses = selectedCategory === 'all'

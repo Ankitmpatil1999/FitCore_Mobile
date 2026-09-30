@@ -1,33 +1,53 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  StatusBar,
+  StatusBar, ActivityIndicator, Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { useAppContext } from '../../context/AppContext';
-import { TRAINERS, FACILITIES } from '../../data/mockData';
+import { FACILITIES } from '../../data/mockData';
 import { apiService } from '../../services/api';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 
 export default function MyGymScreen() {
   const { currentGym, currentMember, currentUser } = useAppContext();
   const [liveGym, setLiveGym] = useState<any>(currentGym);
+  const [trainers, setTrainers] = useState<any[]>([]);
+  const [loadingTrainers, setLoadingTrainers] = useState(false);
+
+  const gymId = currentGym?.id || liveGym?.id;
 
   useEffect(() => {
-    async function loadGym() {
+    async function loadGymAndTrainers() {
       try {
         const userId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone;
-        if (!userId) return;
-        const res: any = await apiService.getMemberProfile(userId);
-        if (res.success && res.data?.gym) {
-          setLiveGym(res.data.gym);
+        if (userId) {
+          const res: any = await apiService.getMemberProfile(userId);
+          if (res.success && res.data?.gym) {
+            setLiveGym(res.data.gym);
+          }
         }
       } catch (err) {
-        console.log('Using local cached gym info');
+        console.log('Using cached gym info');
+      }
+
+      if (gymId) {
+        try {
+          setLoadingTrainers(true);
+          const tRes: any = await apiService.getOwnerTrainers(gymId);
+          if (tRes?.success && Array.isArray(tRes.data)) {
+            setTrainers(tRes.data);
+          }
+        } catch (e) {
+          console.log('Error loading trainers for gym:', e);
+        } finally {
+          setLoadingTrainers(false);
+        }
       }
     }
-    loadGym();
-  }, [currentMember?.id, currentUser?.id]);
+    loadGymAndTrainers();
+  }, [currentMember?.id, currentUser?.id, gymId]);
 
   const gym = liveGym || currentGym || {
     name: 'FitCore Elite Fitness Club',
@@ -36,43 +56,34 @@ export default function MyGymScreen() {
     rating: 4.9,
     openTime: '06:00 AM',
     closeTime: '10:00 PM',
+    address: 'Civil Lines',
+    city: 'Nagpur',
+    phone: '+91 98765 43210',
+    email: 'contact@fitcore.in',
   };
+
   const gymFacilityIds = gym?.facilities?.map((f: any) =>
     typeof f === 'string' ? f : f.id,
   ) ?? ['fac_1', 'fac_2', 'fac_3', 'fac_4'];
 
   const gymFacilities = FACILITIES.filter(f => gymFacilityIds.includes(f.id));
 
-  const [photoIdx, setPhotoIdx] = useState(0);
-  const mockPhotos = ['🏋️', '🧘', '🚴', '🥊', '💪'];
-
-  if (!gym) {
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🏢</Text>
-          <Text style={styles.emptyText}>No gym found</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0EA5E9" />
+      <StatusBar barStyle="light-content" backgroundColor="#6C5CE7" />
       <View style={styles.root}>
 
         {/* HEADER */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View>
-              <Text style={styles.headerSub}>Your Gym</Text>
+              <Text style={styles.headerSub}>Active Franchise</Text>
               <Text style={styles.headerTitle}>{gym.name}</Text>
             </View>
             <View style={[styles.statusBadge, { backgroundColor: gym.isOpen ? '#ECFDF5' : '#FEE2E2' }]}>
               <View style={[styles.statusDot, { backgroundColor: gym.isOpen ? '#10B981' : '#EF4444' }]} />
               <Text style={[styles.statusText, { color: gym.isOpen ? '#10B981' : '#EF4444' }]}>
-                {gym.isOpen ? 'Open' : 'Closed'}
+                {gym.isOpen ? 'Open Now' : 'Closed'}
               </Text>
             </View>
           </View>
@@ -85,30 +96,27 @@ export default function MyGymScreen() {
             <Text style={styles.gymTagline}>"{gym.tagline}"</Text>
             <View style={styles.ratingRow}>
               {[1, 2, 3, 4, 5].map(i => (
-                <Text key={i} style={{ fontSize: 18, color: i <= Math.floor(gym.rating) ? '#F59E0B' : '#E2E8F0' }}>★</Text>
+                <Icon
+                  key={i}
+                  name="star"
+                  size={moderateScale(16)}
+                  color={i <= Math.floor(gym.rating || 5) ? '#F59E0B' : '#E2E8F0'}
+                />
               ))}
-              <Text style={styles.ratingText}>{gym.rating} · Excellent</Text>
+              <Text style={styles.ratingText}>{gym.rating || 4.9} · Premium Facility</Text>
             </View>
-            <Text style={styles.gymHours}>⏰ {gym.openTime} – {gym.closeTime}</Text>
+            <View style={styles.hoursRow}>
+              <Icon name="time-outline" size={moderateScale(14)} color="#64748B" />
+              <Text style={styles.gymHours}>{gym.openTime || '06:00 AM'} – {gym.closeTime || '10:00 PM'}</Text>
+            </View>
           </View>
-
-          {/* Photo Gallery */}
-          <Text style={styles.sectionTitle}>Gallery 📸</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.photoScroll}>
-            {mockPhotos.map((emoji, i) => (
-              <View key={i} style={[styles.photoCard, i === photoIdx && styles.photoCardActive]}>
-                <Text style={{ fontSize: 56 }}>{emoji}</Text>
-                <Text style={styles.photoLabel}>Gym Area {i + 1}</Text>
-              </View>
-            ))}
-          </ScrollView>
 
           {/* Facilities */}
           <Text style={styles.sectionTitle}>Facilities & Amenities</Text>
           <View style={styles.facilitiesGrid}>
             {gymFacilities.map(f => (
               <View key={f.id} style={styles.facilityChip}>
-                <Text style={styles.facilityIcon}>{f.icon}</Text>
+                <Icon name="checkmark-circle" size={moderateScale(16)} color="#6C5CE7" />
                 <Text style={styles.facilityName}>{f.name}</Text>
               </View>
             ))}
@@ -118,50 +126,64 @@ export default function MyGymScreen() {
           </View>
 
           {/* Trainers */}
-          <Text style={styles.sectionTitle}>Our Trainers 🏋️</Text>
-          <View style={styles.trainersRow}>
-            {TRAINERS.map(trainer => (
-              <View key={trainer.id} style={styles.trainerCard}>
-                <View style={styles.trainerAvatar}>
-                  <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
-                </View>
-                <Text style={styles.trainerName}>{trainer.name}</Text>
-                <Text style={styles.trainerSpec} numberOfLines={2}>{trainer.specialization}</Text>
-                <Text style={styles.trainerExp}>{trainer.experience}</Text>
-                <View style={[styles.availPill, { backgroundColor: trainer.available ? '#ECFDF5' : '#FEF3C7' }]}>
-                  <Text style={[styles.availText, { color: trainer.available ? '#10B981' : '#F59E0B' }]}>
-                    {trainer.available ? '● Available' : '○ Busy'}
+          <Text style={styles.sectionTitle}>Certified Coaches & Trainers</Text>
+          {loadingTrainers ? (
+            <ActivityIndicator size="small" color="#6C5CE7" style={{ marginVertical: 16 }} />
+          ) : trainers.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <Icon name="person-outline" size={moderateScale(28)} color="#94A3B8" />
+              <Text style={styles.emptySub}>No coaches listed yet for this branch.</Text>
+            </View>
+          ) : (
+            <View style={styles.trainersRow}>
+              {trainers.map(trainer => (
+                <View key={trainer._id || trainer.id} style={styles.trainerCard}>
+                  <View style={styles.trainerAvatar}>
+                    <Text style={styles.trainerAvatarText}>
+                      {trainer.avatar || (trainer.name ? trainer.name.slice(0, 2).toUpperCase() : 'TR')}
+                    </Text>
+                  </View>
+                  <Text style={styles.trainerName}>{trainer.name}</Text>
+                  <Text style={styles.trainerSpec} numberOfLines={2}>
+                    {trainer.specialization || trainer.specialty || 'General Fitness'}
                   </Text>
+                  <Text style={styles.trainerExp}>{trainer.experience || 'Experienced'}</Text>
+                  <View style={[styles.availPill, { backgroundColor: trainer.available !== false ? '#ECFDF5' : '#FEF3C7' }]}>
+                    <Text style={[styles.availText, { color: trainer.available !== false ? '#10B981' : '#F59E0B' }]}>
+                      {trainer.available !== false ? '● Available' : '○ Busy'}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
-          </View>
+              ))}
+            </View>
+          )}
 
           {/* Location & Contact */}
           <Text style={styles.sectionTitle}>Location & Contact</Text>
           <View style={styles.contactCard}>
             <View style={styles.contactRow}>
-              <Text style={styles.contactIcon}>📍</Text>
-              <Text style={styles.contactText}>{gym.address}, {gym.city}</Text>
+              <Icon name="location-outline" size={moderateScale(18)} color="#6C5CE7" />
+              <Text style={styles.contactText}>{gym.address || 'Civil Lines'}, {gym.city || 'Nagpur'}</Text>
             </View>
             <View style={styles.contactDivider} />
-            <View style={styles.contactRow}>
-              <Text style={styles.contactIcon}>📞</Text>
-              <Text style={styles.contactText}>{gym.phone}</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.contactRow}
+              onPress={() => gym.phone && Linking.openURL(`tel:${gym.phone}`)}
+            >
+              <Icon name="call-outline" size={moderateScale(18)} color="#00C48C" />
+              <Text style={styles.contactText}>{gym.phone || '+91 98765 43210'}</Text>
+            </TouchableOpacity>
             <View style={styles.contactDivider} />
-            <View style={styles.contactRow}>
-              <Text style={styles.contactIcon}>✉️</Text>
-              <Text style={styles.contactText}>{gym.email}</Text>
-            </View>
+            <TouchableOpacity
+              style={styles.contactRow}
+              onPress={() => gym.email && Linking.openURL(`mailto:${gym.email}`)}
+            >
+              <Icon name="mail-outline" size={moderateScale(18)} color="#38BDF8" />
+              <Text style={styles.contactText}>{gym.email || 'contact@fitcore.in'}</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Map placeholder */}
-          <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapIcon}>🗺️</Text>
-            <Text style={styles.mapText}>Tap to open in Maps</Text>
-            <Text style={styles.mapAddress}>{gym.address}</Text>
-          </View>
+          <View style={{ height: hp(10) }} />
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -219,6 +241,9 @@ const styles = StyleSheet.create({
   mapIcon: { fontSize: fontScale(36) },
   mapText: { fontSize: fontScale(13), fontWeight: '700', color: '#0EA5E9' },
   mapAddress: { fontSize: fontScale(11), color: '#94A3B8', textAlign: 'center', paddingHorizontal: 20 },
+  hoursRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  emptyCard: { backgroundColor: '#FFFFFF', borderRadius: moderateScale(16), padding: moderateScale(24), alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#E2E8F0', marginBottom: hp(2.5) },
+  emptySub: { fontSize: fontScale(12), color: '#94A3B8', marginTop: 6, textAlign: 'center' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyIcon: { fontSize: fontScale(60) },
   emptyText: { fontSize: fontScale(16), color: '#94A3B8', marginTop: 12 },

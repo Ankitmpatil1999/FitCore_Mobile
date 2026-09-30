@@ -20,6 +20,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { getMembersByTrainer } from '../../data/mockData';
 import apiService from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -59,6 +60,8 @@ export default function TrainerDashboard({ navigation }: any) {
   const [totalShiftsCount, setTotalShiftsCount] = useState(0);
   const [coachRating, setCoachRating] = useState('5.0');
   const [todayPTSessions, setTodayPTSessions] = useState<any[]>([]);
+  const [assignedClientsCount, setAssignedClientsCount] = useState<number>(0);
+  const { unreadCount: globalUnreadCount } = useNotifications();
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   // ── Leave Request State ──
@@ -119,6 +122,17 @@ export default function TrainerDashboard({ navigation }: any) {
       });
       if (ptRes?.success && Array.isArray(ptRes.data)) {
         setTodayPTSessions(ptRes.data);
+      }
+
+      // Fetch Live Assigned Clients Count from MongoDB
+      const targetGymId = currentGym?.id || (currentUser as any)?.gymId;
+      const clientsRes: any = await apiService.getOwnerMembers(targetGymId, {
+        trainerId,
+        trainerName,
+        trainerPhone: currentUser?.phone,
+      });
+      if (clientsRes?.success && Array.isArray(clientsRes.data)) {
+        setAssignedClientsCount(clientsRes.data.length);
       }
 
       // Fetch dynamic unread notifications for trainer
@@ -351,10 +365,12 @@ export default function TrainerDashboard({ navigation }: any) {
                 style={{ width: moderateScale(22), height: moderateScale(22) }}
                 resizeMode="contain"
               />
-              {unreadNotifCount > 0 && (
+              {(globalUnreadCount > 0 || unreadNotifCount > 0) && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>
-                    {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                    {(globalUnreadCount > 0 ? globalUnreadCount : unreadNotifCount) > 9
+                      ? '9+'
+                      : (globalUnreadCount > 0 ? globalUnreadCount : unreadNotifCount)}
                   </Text>
                 </View>
               )}
@@ -433,7 +449,7 @@ export default function TrainerDashboard({ navigation }: any) {
                 <View style={[styles.metricIconBg, { backgroundColor: '#EEF2FF' }]}>
                   <Icon name="people" size={moderateScale(15)} color="#4F46E5" />
                 </View>
-                <Text style={[styles.metricValue, { color: '#1E1B4B' }]}>{clients.length || 2}</Text>
+                <Text style={[styles.metricValue, { color: '#1E1B4B' }]}>{assignedClientsCount}</Text>
               </View>
               <Text style={styles.metricLabel} numberOfLines={1}>Assigned Clients</Text>
             </TouchableOpacity>

@@ -53,7 +53,7 @@ const emergencyUserIcon = require('../../assets/Icons2/user (1).png');
 export default function ProfileScreen({ navigation }: any) {
   const { currentUser, currentMember, currentGym, logout } = useAppContext();
   const plan = currentMember ? getPlanById(currentMember.planId) : undefined;
-  const daysLeft = currentMember ? getDaysRemaining(currentMember.expiryDate) : 149;
+  const daysLeft = currentMember?.expiryDate ? getDaysRemaining(currentMember.expiryDate) : (currentMember?.daysRemaining || 0);
 
   // Modals
   const [showPersonalInfoModal, setShowPersonalInfoModal] = useState(false);
@@ -76,14 +76,14 @@ export default function ProfileScreen({ navigation }: any) {
   const [gender, setGender] = useState<'Male' | 'Female'>('Male');
   const [memberAge, setMemberAge] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
-  const [bloodGroup, setBloodGroup] = useState('O+');
+  const [bloodGroup, setBloodGroup] = useState('');
   const [emergencyContact, setEmergencyContact] = useState('');
   const [emergencyPhone, setEmergencyPhone] = useState('');
-  const [memberAddress, setMemberAddress] = useState('Civil Lines, Nagpur');
+  const [memberAddress, setMemberAddress] = useState(currentMember?.address || '');
   const [savingProfile, setSavingProfile] = useState(false);
 
   // Dynamic Stats & Collections from API
-  const [liveWeight, setLiveWeight] = useState<number | string>(currentMember?.weight || 70);
+  const [liveWeight, setLiveWeight] = useState<number | string>(currentMember?.weight || 0);
   const [liveSessionsDone, setLiveSessionsDone] = useState<number>(0);
   const [liveDaysRemaining, setLiveDaysRemaining] = useState<number>(daysLeft);
   const [livePayments, setLivePayments] = useState<any[]>([]);
@@ -255,10 +255,10 @@ export default function ProfileScreen({ navigation }: any) {
   const handleSavePersonalInfo = async () => {
     try {
       setSavingProfile(true);
-      const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'GYM-1076';
+      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
       const res: any = await apiService.savePersonalDetails({
         memberId,
-        name: memberName || 'Mayank Agrawal',
+        name: memberName || currentMember?.name || currentUser?.name || 'Member',
         phone: memberPhone || currentMember?.phone || currentUser?.phone || '',
         email: memberEmail,
         gender,
@@ -294,8 +294,8 @@ export default function ProfileScreen({ navigation }: any) {
   const handleSavePhotoDirectly = async (photoUri: string | null) => {
     try {
       setAvatarPhoto(photoUri);
-      const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'GYM-1076';
-      const phone = currentMember?.phone || currentUser?.phone || '1000000065';
+      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+      const phone = currentMember?.phone || currentUser?.phone || '';
 
       // Cache locally for instant offline/re-open persistence
       const photoCacheKey = `@fitcore_avatar_${phone || memberId}`;
@@ -308,7 +308,7 @@ export default function ProfileScreen({ navigation }: any) {
       // Save to MongoDB via API
       await apiService.savePersonalDetails({
         memberId,
-        name: memberName || 'Mayank Agrawal',
+        name: memberName || currentMember?.name || currentUser?.name || 'Member',
         phone,
         photo: photoUri || '',
       });
@@ -409,7 +409,7 @@ export default function ProfileScreen({ navigation }: any) {
       <View style={styles.root}>
         {/* ── TOP HEADER ── */}
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerCenterContent}>
             <Text style={styles.headerTitle}>My Profile</Text>
             <View style={styles.memberStatusBadge}>
               <View style={styles.memberStatusDot} />
@@ -519,125 +519,29 @@ export default function ProfileScreen({ navigation }: any) {
               </Animated.View>
             </View>
 
-            {/* ── 2. SECTION: PERSONAL & ACCOUNT ── */}
-            <Text style={styles.sectionHeader}>PERSONAL & ACCOUNT</Text>
-            <View style={styles.menuGroupCard}>
-              {/* Personal Details Row */}
-              <TouchableOpacity
-                style={styles.menuRow}
-                onPress={() => setShowPersonalInfoModal(true)}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.menuIconBox, { backgroundColor: '#EEF2FF' }]}>
-                  <Image source={userIcon} style={[styles.menuIcon, { tintColor: '#6C5CE7' }]} resizeMode="contain" />
-                </View>
-                <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                  <Text style={styles.menuTitle}>Personal Details</Text>
-                  <Text style={styles.menuSub}>
-                    {(() => {
-                      const rawPhone = memberPhone || currentMember?.phone || currentUser?.phone || '';
-                      const cleanPhone = rawPhone.length > 10 ? rawPhone.slice(-10) : rawPhone;
-                      const formattedPhone = cleanPhone.length === 10 ? `+91 ${cleanPhone.slice(0, 5)} ${cleanPhone.slice(5)}` : (cleanPhone || 'Not set');
-                      const items = [
-                        gender || 'Male',
-                        memberAge ? `${memberAge} yrs` : (dateOfBirth ? `${dateOfBirth}` : null),
-                        formattedPhone,
-                      ].filter(Boolean);
-                      return items.join(' • ');
-                    })()}
-                  </Text>
-                </View>
-                <Icon name="chevron-forward" size={moderateScale(16)} color="#CBD5E1" />
-              </TouchableOpacity>
-
-              <View style={styles.menuRowDivider} />
-
-              {/* Membership Plan */}
-              <TouchableOpacity
-                style={styles.menuRow}
-                onPress={() => navigation.navigate('Membership')}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.menuIconBox, { backgroundColor: '#EEF2FF' }]}>
-                  <Image source={gymIcon} style={[styles.menuIcon, { tintColor: '#6C5CE7' }]} resizeMode="contain" />
-                </View>
-                <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                  <Text style={styles.menuTitle}>My Membership Plan</Text>
-                  <Text style={styles.menuSub}>
-                    {[
-                      livePlanName || currentMember?.planName || 'Active Membership',
-                      (liveDaysRemaining !== undefined && liveDaysRemaining > 0) ? `Expires in ${liveDaysRemaining} days` : 'Active Pass',
-                    ].filter(Boolean).join(' • ')}
-                  </Text>
-                </View>
-                <Icon name="chevron-forward" size={moderateScale(16)} color="#CBD5E1" />
-              </TouchableOpacity>
-
-              <View style={styles.menuRowDivider} />
-
-              {/* Payment & Invoices */}
-              <TouchableOpacity
-                style={styles.menuRow}
-                onPress={() => setShowPaymentHistoryModal(true)}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.menuIconBox, { backgroundColor: '#ECFDF5' }]}>
-                  <Image source={payIcon} style={[styles.menuIcon, { tintColor: '#00A86B' }]} resizeMode="contain" />
-                </View>
-                <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                  <Text style={styles.menuTitle}>Payment & Receipts</Text>
-                  <Text style={styles.menuSub}>
-                    {livePayments.length > 0
-                      ? `${livePayments.length} recorded receipt${livePayments.length > 1 ? 's' : ''}`
-                      : 'Billing history & payment receipts'}
-                  </Text>
-                </View>
-                <Icon name="chevron-forward" size={moderateScale(16)} color="#CBD5E1" />
-              </TouchableOpacity>
-
-              {/* Personal Trainer (Shows ONLY if assigned to member) */}
-              {liveTrainerData && (
-                <>
-                  <View style={styles.menuRowDivider} />
-                  <TouchableOpacity
-                    style={styles.menuRow}
-                    onPress={() => setShowTrainerModal(true)}
-                    activeOpacity={0.75}
-                  >
-                    <View style={[styles.menuIconBox, { backgroundColor: '#FEF3C7' }]}>
-                      <Image source={kettlebellIcon} style={[styles.menuIcon, { tintColor: '#D97706' }]} resizeMode="contain" />
-                    </View>
-                    <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                      <Text style={styles.menuTitle}>My Personal Trainer</Text>
-                      <Text style={styles.menuSub}>
-                        {liveTrainerData?.name
-                          ? `${liveTrainerData.name} • ${liveTrainerData.role || 'Fitness Coach'}`
-                          : 'Dedicated strength & conditioning guidance'}
-                      </Text>
-                    </View>
-                    <Icon name="chevron-forward" size={moderateScale(16)} color="#CBD5E1" />
-                  </TouchableOpacity>
-                </>
-              )}
-
-              <View style={styles.menuRowDivider} />
-
-              {/* Delete Account (Red Danger Action) */}
-              <TouchableOpacity
-                style={styles.menuRow}
-                onPress={() => navigation.navigate('DeleteAccount')}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.menuIconBox, { backgroundColor: '#FEF2F2' }]}>
-                  <Icon name="trash-outline" size={moderateScale(18)} color="#EF4444" />
-                </View>
-                <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                  <Text style={[styles.menuTitle, { color: '#EF4444' }]}>Delete Account</Text>
-                  <Text style={styles.menuSub}>Permanently purge profile & fitness records</Text>
-                </View>
-                <Icon name="chevron-forward" size={moderateScale(16)} color="#FCA5A5" />
-              </TouchableOpacity>
-            </View>
+            {/* Personal Trainer (Shows ONLY if assigned to member) */}
+            {liveTrainerData && (
+              <View style={styles.menuGroupCard}>
+                <TouchableOpacity
+                  style={styles.menuRow}
+                  onPress={() => setShowTrainerModal(true)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.menuIconBox, { backgroundColor: '#FEF3C7' }]}>
+                    <Image source={kettlebellIcon} style={[styles.menuIcon, { tintColor: '#D97706' }]} resizeMode="contain" />
+                  </View>
+                  <View style={{ flex: 1, paddingHorizontal: 12 }}>
+                    <Text style={styles.menuTitle}>My Personal Trainer</Text>
+                    <Text style={styles.menuSub}>
+                      {liveTrainerData?.name
+                        ? `${liveTrainerData.name} • ${liveTrainerData.role || 'Fitness Coach'}`
+                        : 'Dedicated strength & conditioning guidance'}
+                    </Text>
+                  </View>
+                  <Icon name="chevron-forward" size={moderateScale(16)} color="#CBD5E1" />
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* ── 3. SECTION: PRIVACY & LEGAL ── */}
             <Text style={styles.sectionHeader}>SUPPORT & LEGAL</Text>
@@ -712,23 +616,6 @@ export default function ProfileScreen({ navigation }: any) {
                 <Icon name="chevron-forward" size={moderateScale(16)} color="#CBD5E1" />
               </TouchableOpacity>
 
-              <View style={styles.menuRowDivider} />
-
-              {/* About FitCore */}
-              <TouchableOpacity
-                style={styles.menuRow}
-                onPress={() => navigation.navigate('About')}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.menuIconBox, { backgroundColor: '#F1F5F9' }]}>
-                  <Icon name="information-circle-outline" size={moderateScale(18)} color="#475569" />
-                </View>
-                <View style={{ flex: 1, paddingHorizontal: 12 }}>
-                  <Text style={styles.menuTitle}>About FitCore</Text>
-                  <Text style={styles.menuSub}>App v0.0.1 • FitCore Gym</Text>
-                </View>
-                <Icon name="chevron-forward" size={moderateScale(16)} color="#CBD5E1" />
-              </TouchableOpacity>
             </View>
 
             {/* ── 4. LOGOUT BUTTON ── */}
@@ -742,10 +629,10 @@ export default function ProfileScreen({ navigation }: any) {
                 style={{ width: moderateScale(16), height: moderateScale(16), tintColor: '#EF4444', marginRight: 8 }}
                 resizeMode="contain"
               />
-              <Text style={styles.logoutBtnText}>LOGOUT FROM FITCORE</Text>
+              <Text style={styles.logoutBtnText}>Log Out</Text>
             </TouchableOpacity>
 
-            <Text style={styles.appVersionText}>FitCore Member App • Version 0.0.1 (Build 1)</Text>
+            <Text style={styles.appVersionText}>Version 0.0.1</Text>
 
             <View style={{ height: hp(12) }} />
           </Animated.View>
@@ -797,7 +684,7 @@ export default function ProfileScreen({ navigation }: any) {
                         style={styles.modernInputText}
                         value={memberName}
                         onChangeText={setMemberName}
-                        placeholder="e.g. Mayank Agrawal"
+                        placeholder="Enter your full name"
                         placeholderTextColor="#94A3B8"
                       />
                     </View>
@@ -846,7 +733,7 @@ export default function ProfileScreen({ navigation }: any) {
                         activeOpacity={0.8}
                       >
                         <Text style={[styles.genderChipModernText, gender === 'Male' && styles.genderChipModernTextActive]}>
-                          ♂ Male
+                          Male
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -855,7 +742,7 @@ export default function ProfileScreen({ navigation }: any) {
                         activeOpacity={0.8}
                       >
                         <Text style={[styles.genderChipModernText, gender === 'Female' && styles.genderChipModernTextActive]}>
-                          ♀ Female
+                          Female
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -870,7 +757,7 @@ export default function ProfileScreen({ navigation }: any) {
                         style={styles.modernInputText}
                         value={dateOfBirth}
                         onChangeText={setDateOfBirth}
-                        placeholder="1998-05-15"
+                        placeholder="e.g. 1998-05-15"
                         placeholderTextColor="#94A3B8"
                       />
                     </View>
@@ -885,7 +772,7 @@ export default function ProfileScreen({ navigation }: any) {
                         style={styles.modernInputText}
                         value={memberAddress}
                         onChangeText={setMemberAddress}
-                        placeholder="e.g. Flat 402, Civil Lines, Nagpur"
+                        placeholder="Enter your residential address"
                         placeholderTextColor="#94A3B8"
                       />
                     </View>
@@ -900,7 +787,7 @@ export default function ProfileScreen({ navigation }: any) {
                         style={styles.modernInputText}
                         value={emergencyContact}
                         onChangeText={setEmergencyContact}
-                        placeholder="e.g. Ramesh Agrawal"
+                        placeholder="Enter emergency contact name"
                         placeholderTextColor="#94A3B8"
                       />
                     </View>
@@ -1036,15 +923,30 @@ export default function ProfileScreen({ navigation }: any) {
                 {(() => {
                   const displayPayments = (livePayments && livePayments.length > 0)
                     ? livePayments
-                    : [
+                    : (livePlanName || currentMember?.planName)
+                    ? [
                         {
                           id: `INV-${new Date().getFullYear()}-01`,
-                          desc: livePlanName || currentMember?.planName || '3 Months Pro Studio Pass',
+                          desc: livePlanName || currentMember?.planName || 'Gym Membership Pass',
                           date: currentMember?.joinDate || currentMember?.startDate || 'Active',
-                          amount: typeof (currentMember?.planPrice) === 'number' ? `₹${currentMember.planPrice.toLocaleString()}` : '₹3,899',
+                          amount: typeof (currentMember?.planPrice) === 'number' ? `₹${currentMember.planPrice.toLocaleString()}` : (currentMember?.planPrice || 'Active'),
                           status: 'PAID ✓',
                         }
-                      ];
+                      ]
+                    : [];
+
+                  if (displayPayments.length === 0) {
+                    return (
+                      <View style={{ alignItems: 'center', paddingVertical: moderateScale(24) }}>
+                        <Text style={{ fontSize: fontScale(13), fontWeight: '700', color: '#64748B' }}>
+                          No payment receipts recorded yet
+                        </Text>
+                        <Text style={{ fontSize: fontScale(11), color: '#94A3B8', marginTop: 4 }}>
+                          Receipts will appear here once membership fees or store invoices are paid.
+                        </Text>
+                      </View>
+                    );
+                  }
 
                   return displayPayments.map((inv: any, idx: number) => (
                     <View key={inv.id || `inv-${idx}`} style={styles.receiptCardModern}>
@@ -1091,9 +993,9 @@ export default function ProfileScreen({ navigation }: any) {
                 />
               </View>
 
-              <Text style={styles.logoutModalTitle}>Logout from FitCore?</Text>
+              <Text style={styles.logoutModalTitle}>Log Out?</Text>
               <Text style={styles.logoutModalSub}>
-                Are you sure you want to log out of your member account?
+                Are you sure you want to log out of your account?
               </Text>
 
               <TouchableOpacity
@@ -1101,7 +1003,7 @@ export default function ProfileScreen({ navigation }: any) {
                 onPress={() => setShowLogoutModal(false)}
                 activeOpacity={0.85}
               >
-                <Text style={styles.cancelLogoutBtnText}>KEEP WORKING OUT ▶</Text>
+                <Text style={styles.cancelLogoutBtnText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -1281,28 +1183,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F7FD',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: wp(5),
     paddingTop: hp(1),
     paddingBottom: hp(1.2),
+  },
+  headerCenterContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
     fontSize: fontScale(20),
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
   memberStatusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 2,
+    marginTop: 3,
     backgroundColor: 'rgba(0, 196, 140, 0.08)',
     paddingHorizontal: moderateScale(8),
     paddingVertical: moderateScale(2),
     borderRadius: moderateScale(10),
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
   memberStatusDot: {
     width: 6,
@@ -1504,7 +1410,7 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     letterSpacing: 0.5,
     marginBottom: moderateScale(8),
-    marginLeft: 4,
+    textAlign: 'center',
   },
   menuGroupCard: {
     backgroundColor: '#FFFFFF',

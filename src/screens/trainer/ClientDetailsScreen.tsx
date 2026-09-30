@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,17 +11,14 @@ import {
   Animated,
   Easing,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
-import {
-  getMemberById,
-  getWorkoutPlanByMember,
-  DIET_PLANS,
-  getDaysRemaining,
-} from '../../data/mockData';
+import { getDaysRemaining } from '../../data/mockData';
+import apiService from '../../services/api';
 
 // ── Interactive Scale on Press Component ──
 function AnimatedPressable({
@@ -70,31 +67,90 @@ const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 
 export default function ClientDetailsScreen({ route, navigation }: any) {
   const { memberId, member } = route.params || {};
-  const client = member || getMemberById(memberId) || {
-    id: 'm1',
-    name: 'Arjun Mehta',
-    phone: '9209282289',
-    avatar: 'AM',
-    weight: 78,
-    height: 175,
-    bmi: 25.5,
-    goal: 'muscle_building',
-    emergencyContact: 'Suresh Mehta',
-    emergencyPhone: '9876543210',
-    expiryDate: '2027-01-14',
-    joinDate: '2026-01-15',
+
+  // Use passed member object as initial state; will be enriched by live fetch
+  const initialClient = member || {
+    id: memberId || 'm1',
+    name: 'Loading...',
+    phone: '',
+    avatar: '--',
+    weight: null,
+    height: null,
+    bmi: null,
+    goal: 'general_fitness',
+    medicalIssues: '',
+    emergencyContact: '',
+    emergencyPhone: '',
+    planName: '',
+    expiryDate: '',
+    joinDate: '',
     status: 'active',
   };
 
-  const workoutPlan = getWorkoutPlanByMember(client.id);
-  const diet = DIET_PLANS[0];
-  const daysLeft = getDaysRemaining(client.expiryDate);
+  const [client, setClient] = useState<any>(initialClient);
+  const [liveWorkoutPlan, setLiveWorkoutPlan] = useState<any | null>(null);
+  const [liveDietPlan, setLiveDietPlan] = useState<any | null>(null);
+  const [loadingData, setLoadingData] = useState(false);
+
+  const daysLeft = client.expiryDate ? getDaysRemaining(client.expiryDate) : 0;
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  const fetchClientDetails = async () => {
+    const targetId = memberId || client?.id || client?._id;
+    if (!targetId) return;
+
+    try {
+      setLoadingData(true);
+
+      // Fetch live member profile from backend (enriches data beyond nav params)
+      const memberRes: any = await apiService.getMemberProfile(targetId);
+      if (memberRes?.success && memberRes.data) {
+        const m = memberRes.data;
+        setClient((prev: any) => ({
+          ...prev,
+          name: m.name || prev.name,
+          phone: m.phone || prev.phone,
+          email: m.email || prev.email,
+          weight: m.weight ?? prev.weight,
+          height: m.height ?? prev.height,
+          bmi: m.bmi ?? prev.bmi,
+          goal: m.goal || prev.goal,
+          medicalIssues: m.medicalIssues || prev.medicalIssues || 'None',
+          emergencyContact: m.emergencyContact || prev.emergencyContact || '',
+          emergencyPhone: m.emergencyPhone || prev.emergencyPhone || '',
+          planName: m.planName || m.plan || prev.planName || '',
+          expiryDate: m.expiryDate || prev.expiryDate || '',
+          joinDate: m.joinDate || m.startDate || prev.joinDate || '',
+          status: m.status || prev.status || 'active',
+          avatar: m.avatar || prev.avatar,
+        }));
+      }
+
+      // Fetch live Diet Plan
+      const dietRes: any = await apiService.getMemberDiet(targetId);
+      if (dietRes?.success && dietRes.data) {
+        setLiveDietPlan(dietRes.data);
+      }
+
+      // Fetch live Workout Plan
+      const workoutRes: any = await apiService.getMemberWorkout(targetId);
+      if (workoutRes?.success && workoutRes.data) {
+        setLiveWorkoutPlan(workoutRes.data);
+      }
+    } catch (err) {
+      console.log('Error fetching live client details:', err);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
   useEffect(() => {
+    // Always start from passed member data, then enrich with API
+    if (member) setClient(member);
+    fetchClientDetails();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -109,7 +165,11 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [memberId]);
+
+  const memberStatus = (client.status || 'active').toLowerCase();
+  const statusColor = memberStatus === 'active' ? '#059669' : memberStatus === 'expired' ? '#EF4444' : '#F59E0B';
+  const statusBg = memberStatus === 'active' ? '#ECFDF5' : memberStatus === 'expired' ? '#FFF1F2' : '#FFFBEB';
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -146,80 +206,205 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
           {/* ── HERO PROFILE CARD ── */}
           <View style={styles.heroCard}>
             <View style={styles.avatarBox}>
-              <Text style={styles.avatarText}>{client.avatar || 'M'}</Text>
+              <Text style={styles.avatarText}>{client.avatar || (client.name ? client.name.slice(0, 2).toUpperCase() : 'M')}</Text>
             </View>
 
             <Text style={styles.clientName}>{client.name}</Text>
-            <Text style={styles.clientPhone}>{client.phone}</Text>
+            <Text style={styles.clientPhone}>{client.phone || 'No phone on record'}</Text>
 
             <View style={styles.goalBadge}>
               <Text style={styles.goalBadgeText}>
-                GOAL: {client.goal.replace('_', ' ').toUpperCase()}
+                GOAL: {(client.goal || 'general_fitness').replace(/_/g, ' ').toUpperCase()}
+              </Text>
+            </View>
+
+            {/* Membership status pill */}
+            <View style={[styles.statusPill, { backgroundColor: statusBg }]}>
+              <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+              <Text style={[styles.statusText, { color: statusColor }]}>
+                {memberStatus.charAt(0).toUpperCase() + memberStatus.slice(1)} Membership
               </Text>
             </View>
 
             <View style={styles.statGrid}>
               <View style={styles.statCol}>
-                <Text style={styles.statVal}>{client.weight} kg</Text>
+                <Text style={styles.statVal}>{client.weight ? `${client.weight} kg` : '—'}</Text>
                 <Text style={styles.statLbl}>Weight</Text>
               </View>
               <View style={styles.statCol}>
-                <Text style={styles.statVal}>{client.height} cm</Text>
+                <Text style={styles.statVal}>{client.height ? `${client.height} cm` : '—'}</Text>
                 <Text style={styles.statLbl}>Height</Text>
               </View>
               <View style={styles.statCol}>
-                <Text style={styles.statVal}>{client.bmi}</Text>
+                <Text style={styles.statVal}>{client.bmi || '—'}</Text>
                 <Text style={styles.statLbl}>BMI</Text>
               </View>
               <View style={styles.statCol}>
-                <Text style={styles.statVal}>{daysLeft}d</Text>
+                <Text style={styles.statVal}>{daysLeft > 0 ? `${daysLeft}d` : '—'}</Text>
                 <Text style={styles.statLbl}>Pass Left</Text>
               </View>
             </View>
+
+            {loadingData && (
+              <ActivityIndicator size="small" color="#6C5CE7" style={{ marginTop: 8 }} />
+            )}
           </View>
 
-          {/* ── QUICK ASSIGN ACTION BUTTONS ── */}
+          {/* ── 3 QUICK ASSIGN ACTIONS ── */}
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={styles.assignActionBtn}
-              onPress={() => navigation.navigate('AssignWorkout', { memberId: client.id })}
+              onPress={() => navigation.navigate('AssignWorkout', { memberId: client.id, memberName: client.name })}
               activeOpacity={0.85}
             >
-              <Icon name="barbell-outline" size={moderateScale(20)} color="#6C5CE7" />
-              <Text style={styles.assignActionText}>Assign Routine</Text>
+              <Icon name="barbell-outline" size={moderateScale(18)} color="#6C5CE7" />
+              <Text style={styles.assignActionText}>Assign{"\n"}Routine</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.assignActionBtn}
-              onPress={() => navigation.navigate('AssignDiet', { memberId: client.id })}
+              onPress={() => navigation.navigate('AssignDiet', { memberId: client.id, memberName: client.name })}
               activeOpacity={0.85}
             >
-              <Icon name="nutrition-outline" size={moderateScale(20)} color="#00C48C" />
-              <Text style={styles.assignActionText}>Assign Diet</Text>
+              <Icon name="nutrition-outline" size={moderateScale(18)} color="#00C48C" />
+              <Text style={styles.assignActionText}>Assign{"\n"}Diet</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.assignActionBtn}
+              onPress={() => navigation.navigate('ScheduleSessions', { memberId: client.id, memberName: client.name })}
+              activeOpacity={0.85}
+            >
+              <Icon name="calendar-outline" size={moderateScale(18)} color="#F59E0B" />
+              <Text style={styles.assignActionText}>Schedule{"\n"}Session</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.assignActionBtn}
+              onPress={() => navigation.navigate('TrainerChat', { memberId: client.id, memberName: client.name })}
+              activeOpacity={0.85}
+            >
+              <Icon name="chatbubble-ellipses-outline" size={moderateScale(18)} color="#6366F1" />
+              <Text style={styles.assignActionText}>Message{"\n"}Client</Text>
             </TouchableOpacity>
           </View>
 
           {/* ── CURRENT ACTIVE WORKOUT CARD ── */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Assigned Workout Split</Text>
-            <Text style={styles.cardSub}>{workoutPlan?.name ?? 'Power Hypertrophy 5-Day Split'}</Text>
-            <View style={styles.tagRow}>
-              {['Chest', 'Back', 'Legs', 'Shoulders', 'Arms'].map((split) => (
-                <View key={split} style={styles.splitTag}>
-                  <Text style={styles.splitTagText}>{split}</Text>
-                </View>
-              ))}
+            <View style={styles.cardHeaderRow}>
+              <View>
+                <Text style={styles.cardTitle}>Assigned Workout Split</Text>
+                <Text style={styles.cardSub}>
+                  {liveWorkoutPlan?.title || liveWorkoutPlan?.name || 'Personalized Coaching Split'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AssignWorkout', { memberId: client.id, memberName: client.name })}
+              >
+                <Text style={styles.cardEditAction}>Edit Plan</Text>
+              </TouchableOpacity>
             </View>
+
+            {liveWorkoutPlan?.days && Array.isArray(liveWorkoutPlan.days) ? (
+              <View style={styles.tagRow}>
+                {liveWorkoutPlan.days.map((d: any, idx: number) => (
+                  <View key={d.day || idx} style={styles.splitTag}>
+                    <Text style={styles.splitTagText}>{d.day ? d.day.slice(0, 3) : `Day ${idx + 1}`}: {d.focus || 'Workout'}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : (
+              <View style={styles.tagRow}>
+                {['Chest', 'Back', 'Legs', 'Shoulders', 'Arms'].map((split) => (
+                  <View key={split} style={styles.splitTag}>
+                    <Text style={styles.splitTagText}>{split}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* ── CURRENT ACTIVE DIET TARGETS ── */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Assigned Nutrition Protocol</Text>
-            <Text style={styles.cardSub}>{diet?.name ?? 'High Protein Lean Bulk (2,800 kcal)'}</Text>
+            <View style={styles.cardHeaderRow}>
+              <View>
+                <Text style={styles.cardTitle}>Assigned Nutrition Protocol</Text>
+                <Text style={styles.cardSub}>
+                  {liveDietPlan?.title || 'Daily Calorie & Macro Target'}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => navigation.navigate('AssignDiet', { memberId: client.id, memberName: client.name })}
+              >
+                <Text style={styles.cardEditAction}>Edit Diet</Text>
+              </TouchableOpacity>
+            </View>
+
             <View style={styles.macroRow}>
-              <Text style={styles.macroText}>🥩 180g Protein</Text>
-              <Text style={styles.macroText}>🍚 320g Carbs</Text>
-              <Text style={styles.macroText}>🥑 65g Fats</Text>
+              <View style={styles.macroItem}>
+                <View style={[styles.macroDot, { backgroundColor: '#6C5CE7' }]} />
+                <Text style={styles.macroText}>{liveDietPlan?.proteinGrams || 160}g Protein</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <View style={[styles.macroDot, { backgroundColor: '#00C48C' }]} />
+                <Text style={styles.macroText}>{liveDietPlan?.carbsGrams || 240}g Carbs</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <View style={[styles.macroDot, { backgroundColor: '#F59E0B' }]} />
+                <Text style={styles.macroText}>{liveDietPlan?.fatsGrams || 60}g Fats</Text>
+              </View>
+              <View style={styles.macroItem}>
+                <View style={[styles.macroDot, { backgroundColor: '#38BDF8' }]} />
+                <Text style={styles.macroText}>{liveDietPlan?.targetCalories || 2400} kcal</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ── MEMBERSHIP INFO CARD ── */}
+          {(client.planName || client.joinDate || client.expiryDate) && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Membership Details</Text>
+              <View style={styles.infoGrid}>
+                {client.planName ? (
+                  <View style={styles.infoItem}>
+                    <Text style={styles.infoLabel}>Active Plan</Text>
+                    <Text style={styles.infoValue}>{client.planName}</Text>
+                  </View>
+                ) : null}
+                {client.joinDate ? (
+                  <View style={styles.infoItem}>
+                    <Text style={styles.infoLabel}>Joined On</Text>
+                    <Text style={styles.infoValue}>{client.joinDate}</Text>
+                  </View>
+                ) : null}
+                {client.expiryDate ? (
+                  <View style={styles.infoItem}>
+                    <Text style={styles.infoLabel}>Expires On</Text>
+                    <Text style={[styles.infoValue, { color: daysLeft < 15 ? '#EF4444' : '#0F172A' }]}>
+                      {client.expiryDate}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+          )}
+
+          {/* ── MEDICAL & EMERGENCY CARD ── */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Medical & Emergency Info</Text>
+            <View style={styles.infoGrid}>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Medical Issues</Text>
+                <Text style={styles.infoValue}>{client.medicalIssues || 'None reported'}</Text>
+              </View>
+              {(client.emergencyContact || client.emergencyPhone) ? (
+                <View style={styles.infoItem}>
+                  <Text style={styles.infoLabel}>Emergency Contact</Text>
+                  <Text style={styles.infoValue}>
+                    {client.emergencyContact}{client.emergencyContact && client.emergencyPhone ? ` — ${client.emergencyPhone}` : (client.emergencyPhone || '')}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
@@ -229,6 +414,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   safeArea: {
@@ -376,18 +562,20 @@ const styles = StyleSheet.create({
   // Action Row
   actionRow: {
     flexDirection: 'row',
-    gap: moderateScale(10),
+    flexWrap: 'wrap',
+    gap: moderateScale(8),
     marginBottom: hp(2),
   },
   assignActionBtn: {
-    flex: 1,
-    flexDirection: 'row',
+    width: '22%',
+    flexGrow: 1,
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 4,
     backgroundColor: '#FFFFFF',
     borderRadius: moderateScale(14),
-    paddingVertical: moderateScale(14),
+    paddingVertical: moderateScale(12),
     borderWidth: 1,
     borderColor: '#ECEAFD',
     elevation: 2,
@@ -397,9 +585,10 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   assignActionText: {
-    fontSize: fontScale(13),
+    fontSize: fontScale(11),
     fontWeight: '700',
     color: '#0F172A',
+    textAlign: 'center',
   },
 
   // Cards
@@ -445,15 +634,83 @@ const styles = StyleSheet.create({
   },
   macroRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     backgroundColor: '#F8FAFC',
     borderRadius: moderateScale(10),
     padding: moderateScale(10),
     marginTop: hp(0.5),
+    gap: moderateScale(6),
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: hp(0.5),
+  },
+  cardEditAction: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#6C5CE7',
+  },
+  macroItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  macroDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
   },
   macroText: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(11.5),
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+
+  // Status pill
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(5),
+    borderRadius: moderateScale(20),
+    marginVertical: hp(0.8),
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusText: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+  },
+
+  // Info grid for membership / medical cards
+  infoGrid: {
+    marginTop: hp(1),
+    gap: moderateScale(10),
+  },
+  infoItem: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(10),
+    padding: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#F0EEF9',
+  },
+  infoLabel: {
+    fontSize: fontScale(10.5),
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: fontScale(13),
     fontWeight: '700',
     color: '#0F172A',
   },
 });
+

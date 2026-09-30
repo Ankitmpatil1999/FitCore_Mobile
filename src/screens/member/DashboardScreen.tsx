@@ -20,13 +20,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppContext } from '../../context/AppContext';
+import { useNotifications } from '../../context/NotificationContext';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale, Metrics } from '../../theme/responsive';
 import {
-  getPlanById,
-  getWorkoutPlanByMember,
   getDaysRemaining,
-  DIET_PLANS,
 } from '../../data/mockData';
 import { apiService } from '../../services/api';
 import { CheckInOutModal } from '../../components/common/CheckInOutModal';
@@ -296,6 +294,9 @@ export default function DashboardScreen({ navigation }: any) {
   const [hasAssignedDiet, setHasAssignedDiet] = useState(false);
   const [hasAssignedTrainer, setHasAssignedTrainer] = useState(false);
 
+  // ── Avatar Photo State ──
+  const [avatarPhoto, setAvatarPhoto] = useState<string | null>(null);
+
   // ── Live Gym Check-In / Check-Out Stopwatch Timer ──
   const [isCheckedIn, setIsCheckedIn] = useState(false);
   const [isTodayCompleted, setIsTodayCompleted] = useState(false);
@@ -325,10 +326,12 @@ export default function DashboardScreen({ navigation }: any) {
   });
 
   // ── Unread Notifications State ──
+  const { unreadCount: globalUnreadCount } = useNotifications();
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
-  // ── First-Time Member Fitness Onboarding (Weight, Height, Goal) ──
+  // ── First-Time Member Fitness Onboarding (Email, Weight, Height, Goal) ──
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [onboardingEmail, setOnboardingEmail] = useState('');
   const [onboardingWeight, setOnboardingWeight] = useState('');
   const [onboardingHeight, setOnboardingHeight] = useState('');
   const [onboardingGoal, setOnboardingGoal] = useState<'Weight Loss' | 'Weight Gain' | 'Muscle Building' | 'Stay Fit'>('Weight Loss');
@@ -343,51 +346,40 @@ export default function DashboardScreen({ navigation }: any) {
 
   const dismissOnboardingModal = async () => {
     setShowOnboardingModal(false);
-    const ids = [
-      currentMember?.id,
-      currentUser?.id,
-      currentMember?.phone,
-      currentUser?.phone,
-      'global_member_onboarding',
-    ].filter(Boolean);
-    try {
-      await Promise.all(ids.map(id => AsyncStorage.setItem(`fitcore_onboarding_done_${id}`, 'true')));
-    } catch (e) { }
+    const id = currentMember?.phone || currentUser?.phone || currentMember?.id || currentUser?.id;
+    if (id) {
+      try {
+        await AsyncStorage.setItem(`fitcore_onboarding_done_${id}`, 'true');
+      } catch (e) { }
+    }
   };
 
   useEffect(() => {
     const checkOnboardingPrompt = async () => {
       try {
-        const id = currentMember?.id || currentUser?.id || currentMember?.phone || currentUser?.phone;
-        if (!id) return;
+        const phone = currentMember?.phone || currentUser?.phone;
+        const id = currentMember?.id || currentUser?.id || phone;
+        if (!id && !phone) return;
 
-        // Check if member already has height & weight in live profile
+        if (currentMember?.email || currentUser?.email) {
+          setOnboardingEmail(String(currentMember?.email || currentUser?.email || ''));
+        }
+
         const mem: any = (liveData as any)?.member || currentMember;
-        if (mem?.weight && mem?.height) {
+        const currentW = Number(mem?.weight || 0);
+        const currentH = Number(mem?.height || 0);
+
+        // If weight & height already exist in database, member is already onboarded
+        if (currentW > 0 && currentH > 0) {
           setShowOnboardingModal(false);
-          await dismissOnboardingModal();
           return;
         }
 
-        const keysToCheck = [
-          `fitcore_onboarding_done_${id}`,
-          currentUser?.phone ? `fitcore_onboarding_done_${currentUser.phone}` : null,
-          currentMember?.phone ? `fitcore_onboarding_done_${currentMember.phone}` : null,
-          currentMember?.id ? `fitcore_onboarding_done_${currentMember.id}` : null,
-          currentUser?.id ? `fitcore_onboarding_done_${currentUser.id}` : null,
-          'fitcore_onboarding_done_global_member_onboarding',
-        ].filter(Boolean);
+        // Check if this specific member has completed onboarding
+        const memberKey = `fitcore_onboarding_done_${phone || id}`;
+        const done = await AsyncStorage.getItem(memberKey);
 
-        let alreadyDone = false;
-        for (const k of keysToCheck) {
-          const val = await AsyncStorage.getItem(k as string);
-          if (val === 'true') {
-            alreadyDone = true;
-            break;
-          }
-        }
-
-        if (!alreadyDone) {
+        if (!done && (currentW <= 0 || currentH <= 0)) {
           setShowOnboardingModal(true);
         } else {
           setShowOnboardingModal(false);
@@ -401,6 +393,7 @@ export default function DashboardScreen({ navigation }: any) {
 
   const handleSaveFitnessProfile = async () => {
     const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+    const phone = currentMember?.phone || currentUser?.phone || '';
     const w = parseFloat(onboardingWeight);
     const h = parseFloat(onboardingHeight);
 
@@ -417,10 +410,14 @@ export default function DashboardScreen({ navigation }: any) {
     try {
       const payload: any = {
         memberId,
+        phone,
         weight: w,
         height: h,
         goal: onboardingGoal,
       };
+      if (onboardingEmail.trim()) {
+        payload.email = onboardingEmail.trim();
+      }
       if (calculatedBMI) {
         payload.bmi = calculatedBMI;
       }
@@ -452,8 +449,7 @@ export default function DashboardScreen({ navigation }: any) {
       if (dietRes?.success && (dietRes?.hasDietPlan === true || (dietRes?.data && !String(dietRes?.data?.id).startsWith('default')))) {
         setHasAssignedDiet(true);
       } else {
-        const localAssigned = DIET_PLANS.find(dp => (dp as any).memberId === memberId || (dp as any).memberId === currentMember?.id);
-        setHasAssignedDiet(Boolean(localAssigned));
+        setHasAssignedDiet(false);
       }
 
       if (profileRes.success && profileRes.data) {
@@ -469,13 +465,35 @@ export default function DashboardScreen({ navigation }: any) {
           if (mem.weight) setOnboardingWeight(String(mem.weight));
           if (mem.height) setOnboardingHeight(String(mem.height));
           if (mem.goal) setOnboardingGoal(mem.goal);
-          if (mem.weight && mem.height) {
-            const ids = [mem.id, mem.userId, mem.phone, currentMember?.id, currentUser?.id].filter(Boolean);
-            ids.forEach(id => AsyncStorage.setItem(`fitcore_onboarding_done_${id}`, 'true').catch(() => { }));
+          const w = Number(mem.weight || 0);
+          const h = Number(mem.height || 0);
+          if (w > 0 && h > 0) {
+            const phone = mem.phone || currentMember?.phone || currentUser?.phone;
+            const id = mem.id || mem.userId || currentMember?.id || currentUser?.id || phone;
+            if (id) {
+              AsyncStorage.setItem(`fitcore_onboarding_done_${id}`, 'true').catch(() => { });
+            }
             setShowOnboardingModal(false);
           }
         }
       }
+
+      // Fetch avatar photo from cache or profile
+      try {
+        const phone = currentMember?.phone || currentUser?.phone;
+        const userId = currentMember?.userId || currentMember?.id || currentUser?.id || phone;
+        const photoCacheKey = `@fitcore_avatar_${phone || userId}`;
+        const cachedPhoto = await AsyncStorage.getItem(photoCacheKey);
+        if (cachedPhoto) {
+          setAvatarPhoto(cachedPhoto);
+        } else if (profileRes?.data?.member?.photo) {
+          setAvatarPhoto(profileRes.data.member.photo);
+        } else if (currentUser?.avatar && (currentUser.avatar.startsWith('http') || currentUser.avatar.startsWith('data:'))) {
+          setAvatarPhoto(currentUser.avatar);
+        } else {
+          setAvatarPhoto(null);
+        }
+      } catch (e) { }
       if (workoutRes.success && workoutRes.data) {
         setLiveWorkout(workoutRes.data);
       }
@@ -533,7 +551,7 @@ export default function DashboardScreen({ navigation }: any) {
             try {
               const arr = JSON.parse(res);
               if (Array.isArray(arr)) arr.forEach(i => locallyReadIds.add(String(i)));
-            } catch (e) {}
+            } catch (e) { }
           }
         });
 
@@ -566,8 +584,6 @@ export default function DashboardScreen({ navigation }: any) {
     fetchLiveMemberData();
   }, [currentUser?.id, currentMember?.id, isFocused]);
 
-  const plan = currentMember ? getPlanById(currentMember.planId) : undefined;
-  const fallbackWorkoutPlan = currentMember ? getWorkoutPlanByMember(currentMember.id) : undefined;
   const daysLeft = liveData?.member?.daysRemaining !== undefined
     ? liveData.member.daysRemaining
     : (currentMember?.expiryDate ? getDaysRemaining(currentMember.expiryDate) : 0);
@@ -578,7 +594,6 @@ export default function DashboardScreen({ navigation }: any) {
       d?.day?.toLowerCase() === today.toLowerCase() ||
       d?.dayName?.toLowerCase()?.startsWith(today.toLowerCase())
     ) ||
-    fallbackWorkoutPlan?.days?.find((d: any) => d?.day?.toLowerCase() === today.toLowerCase()) ||
     liveWorkout?.days?.[0];
 
   const firstName = liveData?.member?.name?.split(' ')[0] || currentMember?.name?.split(' ')[0] || currentUser?.name?.split(' ')[0] || 'Member';
@@ -771,10 +786,12 @@ export default function DashboardScreen({ navigation }: any) {
                 style={{ width: moderateScale(22), height: moderateScale(22) }}
                 resizeMode="contain"
               />
-              {unreadNotifCount > 0 && (
+              {(globalUnreadCount > 0 || unreadNotifCount > 0) && (
                 <View style={styles.notifBadge}>
                   <Text style={styles.notifBadgeText}>
-                    {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                    {(globalUnreadCount > 0 ? globalUnreadCount : unreadNotifCount) > 9
+                      ? '9+'
+                      : (globalUnreadCount > 0 ? globalUnreadCount : unreadNotifCount)}
                   </Text>
                 </View>
               )}
@@ -783,11 +800,24 @@ export default function DashboardScreen({ navigation }: any) {
             <TouchableOpacity
               style={styles.avatarBtn}
               onPress={() => navigation.navigate('Profile')}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
-              <Text style={styles.avatarText}>
-                {currentUser?.avatar ?? 'AM'}
-              </Text>
+              {avatarPhoto ? (
+                <Image
+                  source={{ uri: avatarPhoto }}
+                  style={styles.avatarImg}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.avatarText}>
+                  {(liveData?.member?.name || currentMember?.name || currentUser?.name || 'Member')
+                    .split(' ')
+                    .map((n: string) => n[0])
+                    .join('')
+                    .substring(0, 2)
+                    .toUpperCase() || 'M'}
+                </Text>
+              )}
               <View style={styles.avatarOnlineDot} />
             </TouchableOpacity>
           </View>
@@ -1085,7 +1115,6 @@ export default function DashboardScreen({ navigation }: any) {
             <View style={[styles.sectionHeaderRow, { marginTop: hp(1.2) }]}>
               <View>
                 <Text style={styles.sectionTitleText}>Member Quick Access</Text>
-                <Text style={styles.sectionSubHeading}>Shortcuts & gym utilities</Text>
               </View>
               <View style={styles.quickAccessHeaderBadge}>
                 <Text style={styles.quickAccessHeaderBadgeText}>4 Services</Text>
@@ -1119,30 +1148,30 @@ export default function DashboardScreen({ navigation }: any) {
                 onPress={() => navigation.navigate('Membership')}
               />
 
-              {/* 3. Nutrition & Diet */}
+              {/* 3. Workout Routine OR Trainer Diet (Dynamic based on PT status) */}
               <QuickAccessCard
-                title="Diet Plan"
-                subtitle="Macro Targets"
-                tag="Nutrition"
-                icon={nutritionIconImg}
-                iconBg="#ECFDF5"
-                iconColor="#059669"
-                tagBg="#ECFDF5"
-                tagColor="#059669"
-                onPress={() => navigation.navigate('Diet')}
+                title={hasAssignedTrainer ? 'Diet Plan' : 'Workout Plan'}
+                subtitle={hasAssignedTrainer ? 'Macro Targets' : 'Daily Split'}
+                tag={hasAssignedTrainer ? 'Trainer Diet' : 'Gym Routine'}
+                icon={hasAssignedTrainer ? nutritionIconImg : barbellImg}
+                iconBg={hasAssignedTrainer ? '#ECFDF5' : '#F5F3FF'}
+                iconColor={hasAssignedTrainer ? '#059669' : '#7C3AED'}
+                tagBg={hasAssignedTrainer ? '#ECFDF5' : '#F5F3FF'}
+                tagColor={hasAssignedTrainer ? '#059669' : '#7C3AED'}
+                onPress={() => navigation.navigate(hasAssignedTrainer ? 'Diet' : 'Workout')}
               />
 
-              {/* 4. My Trainer / Classes */}
+              {/* 4. My Trainer OR FitStore */}
               <QuickAccessCard
-                title={hasAssignedTrainer ? 'My Trainer' : 'Gym Classes'}
-                subtitle={hasAssignedTrainer ? 'Direct Guidance' : 'Book Sessions'}
-                tag={hasAssignedTrainer ? '1-on-1 Coach' : 'Live Bookings'}
-                icon={hasAssignedTrainer ? trainerIconImg : calendarIconImg}
+                title={hasAssignedTrainer ? 'My Trainer' : 'FitStore'}
+                subtitle={hasAssignedTrainer ? 'Direct Guidance' : 'Supplements'}
+                tag={hasAssignedTrainer ? '1-on-1 Coach' : 'Shop Now'}
+                icon={hasAssignedTrainer ? trainerIconImg : kettlebellImg}
                 iconBg="#FEF3C7"
                 iconColor="#D97706"
                 tagBg="#FEF3C7"
                 tagColor="#D97706"
-                onPress={() => navigation.navigate(hasAssignedTrainer ? 'Trainer' : 'Classes')}
+                onPress={() => navigation.navigate(hasAssignedTrainer ? 'Trainer' : 'Shop')}
               />
             </View>
 
@@ -1184,7 +1213,27 @@ export default function DashboardScreen({ navigation }: any) {
                 </TouchableOpacity>
               </View>
 
-              {/* 1. Weight & Height Dual Input Row */}
+              {/* 1. Email Address Input */}
+              <View style={styles.emailInputCard}>
+                <View style={styles.statCardHeader}>
+                  <Icon name="mail-outline" size={moderateScale(14)} color="#6C5CE7" />
+                  <Text style={styles.statCardLabel}>EMAIL ADDRESS (OPTIONAL)</Text>
+                </View>
+                <View style={styles.emailInputWrapper}>
+                  <TextInput
+                    style={styles.emailTextInput}
+                    value={onboardingEmail}
+                    onChangeText={setOnboardingEmail}
+                    placeholder="e.g. member@fitcore.com"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                </View>
+              </View>
+
+              {/* 2. Weight & Height Dual Input Row */}
               <View style={styles.statsInputsRow}>
                 {/* Weight Input */}
                 <View style={styles.statInputCard}>
@@ -1431,6 +1480,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#6C5CE7',
+    overflow: 'hidden',
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%',
+    borderRadius: moderateScale(19),
   },
   avatarText: {
     fontSize: fontScale(12.5),
@@ -2403,6 +2458,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#E0E7FF',
+  },
+  emailInputCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(14),
+    padding: moderateScale(11),
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: hp(1.2),
+  },
+  emailInputWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: moderateScale(10),
+    height: moderateScale(38),
+    justifyContent: 'center',
+  },
+  emailTextInput: {
+    fontSize: fontScale(13),
+    fontWeight: '600',
+    color: '#0F172A',
+    paddingVertical: 0,
   },
   statsInputsRow: {
     flexDirection: 'row',

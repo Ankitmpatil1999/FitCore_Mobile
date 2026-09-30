@@ -16,6 +16,7 @@ import TrainerProfileScreen from '../screens/trainer/TrainerProfileScreen';
 import TrainerAttendanceScreen from '../screens/trainer/TrainerAttendanceScreen';
 import TrainerReviewsScreen from '../screens/trainer/TrainerReviewsScreen';
 import TrainerLeaveRequestScreen from '../screens/trainer/TrainerLeaveRequestScreen';
+import UploadVideosScreen from '../screens/trainer/UploadVideosScreen';
 import NotificationsScreen from '../screens/member/NotificationsScreen';
 
 const Tab = createBottomTabNavigator();
@@ -141,6 +142,7 @@ export default function TrainerNavigator() {
       <Stack.Screen name="TrainerAttendance" component={TrainerAttendanceScreen} />
       <Stack.Screen name="TrainerReviews" component={TrainerReviewsScreen} />
       <Stack.Screen name="TrainerLeaveRequest" component={TrainerLeaveRequestScreen} />
+      <Stack.Screen name="UploadVideos" component={UploadVideosScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
     </Stack.Navigator>
   );

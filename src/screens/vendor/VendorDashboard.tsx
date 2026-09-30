@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,17 +11,15 @@ import {
   Animated,
   Easing,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
-import {
-  getVendorOrdersByStore,
-  getVendorProductsByStore,
-  VENDOR_ANALYTICS,
-} from '../../data/mockData';
+import apiService from '../../services/api';
 
 // ── Interactive Scale on Press Component ──
 function AnimatedPressable({
@@ -67,17 +65,54 @@ function AnimatedPressable({
 }
 
 export default function VendorDashboard({ navigation }: any) {
-  const { currentVendor } = useAppContext();
-  const vendorId = currentVendor?.id ?? 'vs1';
+  const { currentVendor, currentUser } = useAppContext();
+  const vendorId = currentVendor?.id || currentVendor?.userId || currentUser?.id || 'vs1';
 
-  const allOrders = getVendorOrdersByStore(vendorId);
-  const products = getVendorProductsByStore(vendorId);
-  const newOrders = allOrders.filter((o) => o.status === 'new');
-  const lowStock = products.filter((p) => p.stock <= p.lowStockThreshold);
+  const [allOrders, setAllOrders] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const newOrders = allOrders.filter((o) => o.status === 'new' || o.status === 'placed');
+  const lowStock = products.filter((p) => (p.stock || 0) <= (p.lowStockThreshold || 5));
+
+  const todayRevenue = analytics?.todayRevenue ?? allOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+  const totalOrdersCount = analytics?.totalOrders ?? allOrders.length;
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+
+  const fetchVendorData = async () => {
+    try {
+      setLoading(true);
+      const [ordersRes, productsRes, analyticsRes]: any = await Promise.all([
+        apiService.getVendorOrders(vendorId),
+        apiService.getVendorProducts(vendorId),
+        apiService.getVendorAnalytics(vendorId),
+      ]);
+
+      if (ordersRes?.success && Array.isArray(ordersRes.orders)) {
+        setAllOrders(ordersRes.orders);
+      }
+      if (productsRes?.success && Array.isArray(productsRes.products)) {
+        setProducts(productsRes.products);
+      }
+      if (analyticsRes?.success && analyticsRes.analytics) {
+        setAnalytics(analyticsRes.analytics);
+      }
+    } catch (e) {
+      console.log('Error fetching vendor dashboard data:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchVendorData();
+    }, [vendorId])
+  );
 
   useEffect(() => {
     Animated.parallel([
@@ -129,7 +164,7 @@ export default function VendorDashboard({ navigation }: any) {
               <View style={[styles.metricIconBg, { backgroundColor: 'rgba(0, 196, 140, 0.10)' }]}>
                 <Icon name="cash" size={moderateScale(18)} color="#00C48C" />
               </View>
-              <Text style={styles.metricVal}>₹84,200</Text>
+              <Text style={styles.metricVal}>₹{todayRevenue.toLocaleString()}</Text>
               <Text style={styles.metricLbl}>Today's Sales</Text>
             </View>
 
@@ -137,7 +172,7 @@ export default function VendorDashboard({ navigation }: any) {
               <View style={[styles.metricIconBg, { backgroundColor: 'rgba(108, 92, 231, 0.10)' }]}>
                 <Icon name="receipt" size={moderateScale(18)} color="#6C5CE7" />
               </View>
-              <Text style={styles.metricVal}>28</Text>
+              <Text style={styles.metricVal}>{totalOrdersCount}</Text>
               <Text style={styles.metricLbl}>Total Orders</Text>
             </View>
 

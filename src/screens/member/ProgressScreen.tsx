@@ -15,9 +15,11 @@ import {
   TouchableWithoutFeedback,
   BackHandler,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppContext } from '../../context/AppContext';
@@ -53,84 +55,48 @@ interface MeasurementItem {
   unit: string;
 }
 
-const DEFAULT_MALE_MEASUREMENTS: MeasurementItem[] = [
-  { id: 'chest', part: 'Chest & Pecks', value: 98, startValue: 95, unit: 'cm' },
-  { id: 'waist', part: 'Waist & Abdomen', value: 82, startValue: 86, unit: 'cm' },
-  { id: 'arms', part: 'Arms & Biceps', value: 36, startValue: 33, unit: 'cm' },
-  { id: 'shoulders', part: 'Shoulders Width', value: 114, startValue: 110, unit: 'cm' },
-  { id: 'thighs', part: 'Thighs & Quads', value: 57, startValue: 55, unit: 'cm' },
-  { id: 'calves', part: 'Calves', value: 38, startValue: 37, unit: 'cm' },
+const MALE_MEASUREMENT_TEMPLATES: MeasurementItem[] = [
+  { id: 'waist', part: 'Waist & Abdomen', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'chest', part: 'Chest & Pecks', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'arms', part: 'Arms & Biceps', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'shoulders', part: 'Shoulders Width', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'thighs', part: 'Thighs & Quads', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'calves', part: 'Calves', value: 0, startValue: 0, unit: 'cm' },
 ];
 
-const DEFAULT_FEMALE_MEASUREMENTS: MeasurementItem[] = [
-  { id: 'waist', part: 'Waist & Core', value: 70, startValue: 74, unit: 'cm' },
-  { id: 'hips', part: 'Hips & Glutes', value: 96, startValue: 99, unit: 'cm' },
-  { id: 'bust', part: 'Bust / Chest', value: 88, startValue: 88, unit: 'cm' },
-  { id: 'thighs', part: 'Thighs & Legs', value: 54, startValue: 56, unit: 'cm' },
-  { id: 'arms', part: 'Arms', value: 28, startValue: 29, unit: 'cm' },
-  { id: 'calves', part: 'Calves', value: 35, startValue: 35, unit: 'cm' },
-];
-
-const DEFAULT_INITIAL_CHECKPOINTS: CheckpointItem[] = [
-  {
-    id: 'chk_1',
-    date: 'Today, 16 Sep',
-    weight: 72.4,
-    delta: '-0.6 kg',
-    isLoss: true,
-    isBest: true,
-    note: 'Morning post-workout weigh in',
-  },
-  {
-    id: 'chk_2',
-    date: '09 Sep 2026',
-    weight: 73.0,
-    delta: '-0.8 kg',
-    isLoss: true,
-    note: 'Weekly progress check',
-  },
-  {
-    id: 'chk_3',
-    date: '02 Sep 2026',
-    weight: 73.8,
-    delta: '-1.2 kg',
-    isLoss: true,
-    note: 'Diet on point',
-  },
-  {
-    id: 'chk_4',
-    date: '25 Aug 2026',
-    weight: 75.0,
-    delta: '0.0 kg',
-    isLoss: true,
-    isStart: true,
-    note: 'Initial starting weight',
-  },
+const FEMALE_MEASUREMENT_TEMPLATES: MeasurementItem[] = [
+  { id: 'waist', part: 'Waist & Core', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'hips', part: 'Hips & Glutes', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'bust', part: 'Bust / Chest', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'thighs', part: 'Thighs & Legs', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'arms', part: 'Arms', value: 0, startValue: 0, unit: 'cm' },
+  { id: 'calves', part: 'Calves', value: 0, startValue: 0, unit: 'cm' },
 ];
 
 export default function ProgressScreen({ navigation }: any) {
   const { currentMember, currentUser } = useAppContext();
+  const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
 
   const [gender, setGender] = useState<string>(
     currentMember?.gender || currentUser?.gender || 'Male'
   );
-  const [activeTab, setActiveTab] = useState<'weight' | 'measurements'>('weight');
+  const [activeTab, setActiveTab] = useState<'measurements' | 'weight'>('measurements');
   const [checkpoints, setCheckpoints] = useState<CheckpointItem[]>([]);
   const [measurements, setMeasurements] = useState<MeasurementItem[]>([]);
   const [unitMode, setUnitMode] = useState<'cm' | 'in'>('cm');
 
   const [startWeight, setStartWeight] = useState<number>(
-    currentMember?.startWeight || currentMember?.weight || 75
+    Number(currentMember?.startWeight || currentMember?.weight || 0)
   );
   const [goalWeight, setGoalWeight] = useState<number>(
-    currentMember?.goalWeight || 68
+    Number(currentMember?.goalWeight || (currentMember as any)?.targetWeight || 0)
   );
   const [currentWeight, setCurrentWeight] = useState<number>(
-    currentMember?.weight || 72.4
+    Number(currentMember?.weight || 0)
   );
-  const [bmi, setBmi] = useState<number>(23.6);
+  const [bmi, setBmi] = useState<number>(0);
 
   const [isSaving, setIsSaving] = useState(false);
 
@@ -160,81 +126,106 @@ export default function ProgressScreen({ navigation }: any) {
     }
   };
 
-  // ── Load Body Analytics from Storage + Sync API ──
+  // ── Load Body Analytics from Storage + Backend API ──
   const fetchBodyAnalytics = async () => {
     try {
       const storageKey = `@fitcore_body_analytics_${memberId}`;
       const cached = await AsyncStorage.getItem(storageKey);
 
+      const memGender = String(currentMember?.gender || currentUser?.gender || 'Male');
+      const isFemale = memGender.toLowerCase() === 'female';
+      const initialTemplate = isFemale ? FEMALE_MEASUREMENT_TEMPLATES : MALE_MEASUREMENT_TEMPLATES;
+      const memWeight = Number(currentMember?.weight || 0);
+      const memStartWeight = Number(currentMember?.startWeight || currentMember?.weight || 0);
+      const memGoalWeight = Number(currentMember?.goalWeight || (currentMember as any)?.targetWeight || 0);
+      const memHeight = Number(currentMember?.height || 0);
+      const heightM = memHeight > 0 ? memHeight / 100 : 0;
+      const memBmi = (heightM > 0 && memWeight > 0) ? Number((memWeight / (heightM * heightM)).toFixed(1)) : 0;
+
       if (cached) {
         const parsed = JSON.parse(cached);
         if (parsed.gender) setGender(parsed.gender);
-        if (parsed.checkpoints && Array.isArray(parsed.checkpoints)) setCheckpoints(parsed.checkpoints);
-        if (parsed.measurements && Array.isArray(parsed.measurements)) {
+        if (parsed.checkpoints && Array.isArray(parsed.checkpoints)) {
+          setCheckpoints(parsed.checkpoints);
+        } else if (memWeight > 0) {
+          setCheckpoints([{ id: 'chk_reg', date: 'Registered Weight', weight: memWeight, delta: 'Start', isLoss: false, isStart: true }]);
+        }
+        if (parsed.measurements && Array.isArray(parsed.measurements) && parsed.measurements.length > 0) {
           setMeasurements(parsed.measurements);
           const formMap: Record<string, string> = {};
           parsed.measurements.forEach((m: MeasurementItem) => {
             formMap[m.id] = m.value > 0 ? String(m.value) : '';
           });
           setMeasurementForm(formMap);
+        } else {
+          setMeasurements(initialTemplate);
         }
-        if (parsed.startWeight !== undefined) setStartWeight(Number(parsed.startWeight));
-        if (parsed.goalWeight !== undefined) setGoalWeight(Number(parsed.goalWeight));
-        if (parsed.currentWeight !== undefined) setCurrentWeight(Number(parsed.currentWeight));
-        if (parsed.bmi !== undefined) setBmi(Number(parsed.bmi));
+        if (parsed.startWeight !== undefined && Number(parsed.startWeight) > 0) setStartWeight(Number(parsed.startWeight));
+        else if (memStartWeight > 0) setStartWeight(memStartWeight);
+
+        if (parsed.goalWeight !== undefined && Number(parsed.goalWeight) > 0) setGoalWeight(Number(parsed.goalWeight));
+        else if (memGoalWeight > 0) setGoalWeight(memGoalWeight);
+
+        if (parsed.currentWeight !== undefined && Number(parsed.currentWeight) > 0) setCurrentWeight(Number(parsed.currentWeight));
+        else if (memWeight > 0) setCurrentWeight(memWeight);
+
+        if (parsed.bmi !== undefined && Number(parsed.bmi) > 0) setBmi(Number(parsed.bmi));
+        else if (memBmi > 0) setBmi(memBmi);
       } else {
-        // Initialize rich default fallback
-        const initGender = currentMember?.gender || currentUser?.gender || 'Male';
-        const initWeight = Number(currentMember?.weight) || 72.4;
-        const initStart = Number(currentMember?.startWeight) || Number(currentMember?.weight) || 75.0;
-        const initGoal = Number(currentMember?.goalWeight) || 68.0;
-        const heightM = (Number(currentMember?.height) || 175) / 100;
-        const initBmi = Number((initWeight / (heightM * heightM)).toFixed(1));
+        // Initial state from real member data
+        const initialCheckpoints: CheckpointItem[] = memWeight > 0 ? [
+          { id: 'chk_reg', date: 'Registered Weight', weight: memWeight, delta: 'Start', isLoss: false, isStart: true }
+        ] : [];
 
-        const initMeas = initGender === 'Female' ? DEFAULT_FEMALE_MEASUREMENTS : DEFAULT_MALE_MEASUREMENTS;
-        const initChecks = DEFAULT_INITIAL_CHECKPOINTS;
-
-        setGender(initGender);
-        setCurrentWeight(initWeight);
-        setStartWeight(initStart);
-        setGoalWeight(initGoal);
-        setBmi(initBmi);
-        setCheckpoints(initChecks);
-        setMeasurements(initMeas);
+        setGender(memGender);
+        setCurrentWeight(memWeight);
+        setStartWeight(memStartWeight);
+        setGoalWeight(memGoalWeight);
+        setBmi(memBmi);
+        setCheckpoints(initialCheckpoints);
+        setMeasurements(initialTemplate);
 
         const formMap: Record<string, string> = {};
-        initMeas.forEach((m) => {
-          formMap[m.id] = String(m.value);
+        initialTemplate.forEach((m) => {
+          formMap[m.id] = m.value > 0 ? String(m.value) : '';
         });
         setMeasurementForm(formMap);
 
         persistAnalytics({
-          gender: initGender,
-          currentWeight: initWeight,
-          startWeight: initStart,
-          goalWeight: initGoal,
-          bmi: initBmi,
-          checkpoints: initChecks,
-          measurements: initMeas,
+          gender: memGender,
+          currentWeight: memWeight,
+          startWeight: memStartWeight,
+          goalWeight: memGoalWeight,
+          bmi: memBmi,
+          checkpoints: initialCheckpoints,
+          measurements: initialTemplate,
         });
       }
 
-      // Sync with backend API in background
+      // Sync with backend API in real-time
       try {
         const res: any = await apiService.getBodyAnalytics(memberId);
         if (res?.success && res?.data) {
           const data = res.data;
           if (data.gender) setGender(data.gender);
-          if (data.checkpoints && Array.isArray(data.checkpoints) && data.checkpoints.length > 0) {
+          if (data.checkpoints && Array.isArray(data.checkpoints)) {
             setCheckpoints(data.checkpoints);
           }
           if (data.measurements && Array.isArray(data.measurements) && data.measurements.length > 0) {
             setMeasurements(data.measurements);
+            const formMap: Record<string, string> = {};
+            data.measurements.forEach((m: MeasurementItem) => {
+              formMap[m.id] = m.value > 0 ? String(m.value) : '';
+            });
+            setMeasurementForm(formMap);
           }
-          if (data.startWeight) setStartWeight(Number(data.startWeight));
-          if (data.goalWeight) setGoalWeight(Number(data.goalWeight));
-          if (data.currentWeight) setCurrentWeight(Number(data.currentWeight));
-          if (data.bmi) setBmi(Number(data.bmi));
+          if (data.startWeight !== undefined && Number(data.startWeight) > 0) setStartWeight(Number(data.startWeight));
+          if (data.goalWeight !== undefined && Number(data.goalWeight) > 0) setGoalWeight(Number(data.goalWeight));
+          if (data.currentWeight !== undefined && Number(data.currentWeight) > 0) setCurrentWeight(Number(data.currentWeight));
+          if (data.bmi !== undefined && Number(data.bmi) > 0) setBmi(Number(data.bmi));
+
+          // Update storage with live backend sync
+          persistAnalytics(data);
         }
       } catch (err) {
         console.log('Background API sync info:', err);
@@ -376,6 +367,13 @@ export default function ProgressScreen({ navigation }: any) {
       measurements,
     });
 
+    // Background backend sync
+    apiService.saveBodyAnalytics({
+      memberId,
+      startWeight: finalStart,
+      goalWeight: finalGoal,
+    }).catch((e) => console.log('Save goal API sync error:', e));
+
     setGoalModal(false);
     Alert.alert('✓ Goal Updated', `Target goal set to ${finalGoal} kg!`);
   };
@@ -409,15 +407,14 @@ export default function ProgressScreen({ navigation }: any) {
       });
 
       // Background API sync
-      apiService.updateBodyMeasurements({
+      apiService.saveBodyMeasurements({
         memberId,
         measurements: updated,
-        unit: unitMode,
       }).catch((e) => console.log('Measurement sync error:', e));
 
       setMeasurementModal(false);
       Alert.alert('✓ Measurements Updated', 'Body tape measurements have been saved successfully!');
-    } catch (e) {
+    } catch (e: any) {
       setMeasurements(updated);
       setMeasurementModal(false);
       Alert.alert('✓ Measurements Updated', 'Measurements saved successfully!');
@@ -461,10 +458,14 @@ export default function ProgressScreen({ navigation }: any) {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
       <View style={styles.root}>
-        {/* ── HEADER ── */}
+        {/* ── 1. AMBIENT BACKGROUND GLOWS (FITCORE LUXURY THEME) ── */}
+        <View style={styles.ambientGlowTop} />
+        <View style={styles.ambientGlowRight} />
+
+        {/* ── 2. TOP NAV HEADER (CENTERED TITLE & FITCORE BRANDING) ── */}
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backBtn}
@@ -473,14 +474,14 @@ export default function ProgressScreen({ navigation }: any) {
           >
             <Image
               source={leftArrowIcon}
-              style={{ width: moderateScale(16), height: moderateScale(16), tintColor: '#0F172A' }}
+              style={{ width: moderateScale(16), height: moderateScale(16), tintColor: '#6C5CE7' }}
               resizeMode="contain"
             />
           </TouchableOpacity>
 
-          <View style={styles.headerTitleWrap}>
+          <View style={styles.headerTitleWrap} pointerEvents="none">
             <Text style={styles.headerTitle}>Body Analytics</Text>
-            <Text style={styles.headerSub}>
+            <Text style={styles.headerSub} numberOfLines={1}>
               {gender === 'Female' ? 'Female Fitness & Transformation' : 'Male Physique & Body Stats'}
             </Text>
           </View>
@@ -488,42 +489,28 @@ export default function ProgressScreen({ navigation }: any) {
           <TouchableOpacity
             style={styles.addEntryBtn}
             onPress={() => {
-              setNWeight(latestWeight > 0 ? String(latestWeight) : '');
-              setAddModal(true);
+              if (activeTab === 'measurements') {
+                setMeasurementModal(true);
+              } else {
+                setNWeight(latestWeight > 0 ? String(latestWeight) : '');
+                setAddModal(true);
+              }
             }}
             activeOpacity={0.8}
           >
             <Image
               source={editIcon}
-              style={{ width: moderateScale(13), height: moderateScale(13), tintColor: '#FFFFFF', marginRight: moderateScale(4) }}
+              style={{ width: moderateScale(12), height: moderateScale(12), tintColor: '#FFFFFF', marginRight: moderateScale(3) }}
               resizeMode="contain"
             />
-            <Text style={styles.addEntryBtnText}>Log Weight</Text>
+            <Text style={styles.addEntryBtnText}>
+              {activeTab === 'measurements' ? 'Update' : 'Log'}
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* ── 2 CLEAN SEGMENTED TABS ── */}
+        {/* ── 3. SEGMENTED TABS (BODY TAPE 1ST, WEIGHT & GOALS 2ND) ── */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'weight' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('weight')}
-            activeOpacity={0.75}
-          >
-            <Image
-              source={scaleIcon}
-              style={{
-                width: moderateScale(15),
-                height: moderateScale(15),
-                tintColor: activeTab === 'weight' ? '#6C5CE7' : '#64748B',
-                marginRight: moderateScale(6),
-              }}
-              resizeMode="contain"
-            />
-            <Text style={[styles.tabText, activeTab === 'weight' && styles.tabTextActive]}>
-              Weight & Goals
-            </Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.tabBtn, activeTab === 'measurements' && styles.tabBtnActive]}
             onPress={() => setActiveTab('measurements')}
@@ -543,9 +530,32 @@ export default function ProgressScreen({ navigation }: any) {
               Body Tape ({gender})
             </Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabBtn, activeTab === 'weight' && styles.tabBtnActive]}
+            onPress={() => setActiveTab('weight')}
+            activeOpacity={0.75}
+          >
+            <Image
+              source={scaleIcon}
+              style={{
+                width: moderateScale(15),
+                height: moderateScale(15),
+                tintColor: activeTab === 'weight' ? '#6C5CE7' : '#64748B',
+                marginRight: moderateScale(6),
+              }}
+              resizeMode="contain"
+            />
+            <Text style={[styles.tabText, activeTab === 'weight' && styles.tabTextActive]}>
+              Weight & Goals
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + hp(4) }]}
+          showsVerticalScrollIndicator={false}
+        >
           <Animated.View
             style={{
               opacity: fadeAnim,
@@ -560,9 +570,9 @@ export default function ProgressScreen({ navigation }: any) {
                 {/* 1. HERO WEIGHT CARD */}
                 <View style={styles.heroCard}>
                   <View style={styles.heroTopRow}>
-                    <View>
+                    <View style={{ flex: 1 }}>
                       <Text style={styles.heroSubLabel}>CURRENT WEIGHT</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', marginTop: 4, flexWrap: 'wrap' }}>
                         <Text style={styles.heroMainWeight}>
                           {hasWeightLogged ? latestWeight : '--'}
                         </Text>
@@ -580,8 +590,8 @@ export default function ProgressScreen({ navigation }: any) {
                     <TouchableOpacity
                       style={styles.goalTargetBox}
                       onPress={() => {
-                        setFGoalWeight(String(goalWeight || 68));
-                        setFStartWeight(String(startWeight || 75));
+                        setFGoalWeight(goalWeight > 0 ? String(goalWeight) : '');
+                        setFStartWeight(startWeight > 0 ? String(startWeight) : (currentWeight > 0 ? String(currentWeight) : ''));
                         setGoalModal(true);
                       }}
                       activeOpacity={0.85}
@@ -639,15 +649,6 @@ export default function ProgressScreen({ navigation }: any) {
                 {/* 2. RECENT CHECKPOINTS TIMELINE */}
                 <View style={styles.sectionHeaderRow}>
                   <Text style={styles.sectionTitleText}>Recent Checkpoints</Text>
-                  <TouchableOpacity
-                    onPress={() => {
-                      setNWeight(latestWeight > 0 ? String(latestWeight) : '');
-                      setAddModal(true);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.sectionLinkText}>+ Add Checkpoint</Text>
-                  </TouchableOpacity>
                 </View>
 
                 {checkpoints.length === 0 ? (
@@ -659,7 +660,7 @@ export default function ProgressScreen({ navigation }: any) {
                     />
                     <Text style={styles.emptyCheckpointTitle}>No Checkpoints Logged Yet</Text>
                     <Text style={styles.emptyCheckpointSub}>
-                      Tap "Log Weight" above to record your first weight measurement.
+                      Tap "Log" above to record your first weight measurement.
                     </Text>
                   </View>
                 ) : (
@@ -691,12 +692,12 @@ export default function ProgressScreen({ navigation }: any) {
 
                           <View style={{ flex: 1, marginLeft: moderateScale(10) }}>
                             <Text style={styles.timelineDateText}>{item.date}</Text>
-                            <Text style={styles.timelineSubText}>
+                            <Text style={styles.timelineSubText} numberOfLines={1}>
                               {item.note || (isFirst ? 'Latest Checkpoint' : item.isStart ? 'Initial Weight' : 'Logged Entry')}
                             </Text>
                           </View>
 
-                          <View style={{ alignItems: 'flex-end' }}>
+                          <View style={{ alignItems: 'flex-end', marginLeft: moderateScale(6) }}>
                             <Text style={styles.timelineWeightText}>{item.weight} kg</Text>
                             <View style={[styles.deltaBadge, item.isLoss ? styles.deltaBadgeGood : styles.deltaBadgeNeutral]}>
                               <Text style={[styles.deltaBadgeText, item.isLoss ? styles.deltaTextGood : styles.deltaTextNeutral]}>
@@ -719,10 +720,10 @@ export default function ProgressScreen({ navigation }: any) {
               <>
                 {/* Header Controls: Title + Unit Switcher (cm/in) + Update Button */}
                 <View style={styles.tapeHeaderRow}>
-                  <View>
+                  <View style={{ flex: 1, marginRight: moderateScale(8) }}>
                     <Text style={styles.sectionTitleText}>Tape Measurements</Text>
-                    <Text style={styles.tapeProfileSub}>
-                      {gender === 'Female' ? 'Customized for Female Body Metrics' : 'Customized for Male Physique'}
+                    <Text style={styles.tapeProfileSub} numberOfLines={1}>
+                      {gender === 'Female' ? 'Female Body Metrics' : 'Male Physique Metrics'}
                     </Text>
                   </View>
 
@@ -745,20 +746,6 @@ export default function ProgressScreen({ navigation }: any) {
                         <Text style={[styles.unitToggleText, unitMode === 'in' && styles.unitToggleTextActive]}>in</Text>
                       </TouchableOpacity>
                     </View>
-
-                    {/* + Update Tape Button */}
-                    <TouchableOpacity
-                      style={styles.updateTapeBtn}
-                      onPress={() => setMeasurementModal(true)}
-                      activeOpacity={0.85}
-                    >
-                      <Image
-                        source={editIcon}
-                        style={{ width: moderateScale(12), height: moderateScale(12), tintColor: '#FFFFFF', marginRight: moderateScale(4) }}
-                        resizeMode="contain"
-                      />
-                      <Text style={styles.updateTapeBtnText}>Update</Text>
-                    </TouchableOpacity>
                   </View>
                 </View>
 
@@ -782,7 +769,7 @@ export default function ProgressScreen({ navigation }: any) {
                         <Text style={styles.measureVal}>
                           {formatVal(item.value)} {isSet && <Text style={styles.measureUnit}>{unitMode}</Text>}
                         </Text>
-                        <Text style={styles.measureStartHint}>
+                        <Text style={styles.measureStartHint} numberOfLines={1}>
                           {isSet && item.startValue > 0 ? `Start: ${formatVal(item.startValue)} ${unitMode}` : 'Tap Update to record'}
                         </Text>
                       </View>
@@ -805,8 +792,6 @@ export default function ProgressScreen({ navigation }: any) {
                 </View>
               </>
             )}
-
-            <View style={{ height: hp(10) }} />
           </Animated.View>
         </ScrollView>
 
@@ -817,10 +802,13 @@ export default function ProgressScreen({ navigation }: any) {
           animationType="fade"
           onRequestClose={() => setAddModal(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.modalTitle}>Log Body Weight</Text>
                   <Text style={styles.modalSub}>Track your weekly weight transformation</Text>
                 </View>
@@ -870,7 +858,7 @@ export default function ProgressScreen({ navigation }: any) {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* ── MODAL 2: UPDATE TARGET GOAL & START WEIGHT ── */}
@@ -880,10 +868,13 @@ export default function ProgressScreen({ navigation }: any) {
           animationType="fade"
           onRequestClose={() => setGoalModal(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
             <View style={styles.modalCard}>
               <View style={styles.modalHeader}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.modalTitle}>Set Target Goal</Text>
                   <Text style={styles.modalSub}>Define your transformation milestone</Text>
                 </View>
@@ -929,7 +920,7 @@ export default function ProgressScreen({ navigation }: any) {
                 <Text style={styles.modalSubmitBtnText}>Save Target Goal</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* ── MODAL 3: UPDATE TAPE MEASUREMENTS (GENDER ADAPTIVE FORM) ── */}
@@ -939,12 +930,15 @@ export default function ProgressScreen({ navigation }: any) {
           animationType="fade"
           onRequestClose={() => setMeasurementModal(false)}
         >
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView
+            style={styles.modalOverlay}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
             <View style={[styles.modalCard, { maxHeight: hp(82) }]}>
               <View style={styles.modalHeader}>
-                <View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.modalTitle}>Update Tape Measurements</Text>
-                  <Text style={styles.modalSub}>
+                  <Text style={styles.modalSub} numberOfLines={1}>
                     {gender === 'Female' ? 'Female Body Metrics' : 'Male Physique Metrics'} ({unitMode})
                   </Text>
                 </View>
@@ -961,7 +955,7 @@ export default function ProgressScreen({ navigation }: any) {
                 <View style={styles.modalGridInputs}>
                   {measurements.map((m) => (
                     <View key={m.id} style={styles.modalGridCol}>
-                      <Text style={styles.inputLabel}>{m.part.toUpperCase()} ({unitMode})</Text>
+                      <Text style={styles.inputLabel} numberOfLines={1}>{m.part.toUpperCase()} ({unitMode})</Text>
                       <TextInput
                         style={styles.modalInput}
                         value={measurementForm[m.id] || ''}
@@ -988,7 +982,7 @@ export default function ProgressScreen({ navigation }: any) {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </View>
     </SafeAreaView>
@@ -1005,19 +999,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7F7FD',
   },
 
-  // ── Header ──
+  // ── Ambient Background Glows ──
+  ambientGlowTop: {
+    position: 'absolute',
+    top: -wp(25),
+    left: -wp(15),
+    width: wp(80),
+    height: wp(80),
+    borderRadius: wp(40),
+    backgroundColor: '#E8E5FD',
+    opacity: 0.6,
+  },
+  ambientGlowRight: {
+    position: 'absolute',
+    top: hp(25),
+    right: -wp(25),
+    width: wp(70),
+    height: wp(70),
+    borderRadius: wp(35),
+    backgroundColor: '#F0EEFF',
+    opacity: 0.5,
+  },
+
+  // ── Header (Centered Layout matching FitCore standards) ──
   header: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: wp(5),
+    paddingHorizontal: wp(4.5),
     paddingTop: hp(1),
     paddingBottom: hp(1.2),
+    minHeight: hp(6),
   },
   backBtn: {
     width: moderateScale(40),
     height: moderateScale(40),
-    borderRadius: moderateScale(14),
+    borderRadius: moderateScale(13),
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1026,40 +1044,51 @@ const styles = StyleSheet.create({
     elevation: 2,
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    zIndex: 2,
   },
   headerTitleWrap: {
-    flex: 1,
-    marginLeft: moderateScale(12),
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+    paddingHorizontal: wp(18),
   },
   headerTitle: {
-    fontSize: fontScale(18),
+    fontSize: fontScale(17),
     fontWeight: '900',
     color: '#0F172A',
     letterSpacing: -0.3,
+    textAlign: 'center',
   },
   headerSub: {
-    fontSize: fontScale(11.5),
+    fontSize: fontScale(11),
     color: '#64748B',
     fontWeight: '600',
     marginTop: 1,
+    textAlign: 'center',
   },
   addEntryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#6C5CE7',
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(8),
-    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(11),
+    paddingVertical: moderateScale(7),
+    borderRadius: moderateScale(11),
     elevation: 3,
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowRadius: 5,
+    zIndex: 2,
   },
   addEntryBtnText: {
-    fontSize: fontScale(11.5),
+    fontSize: fontScale(11),
     fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: 0.2,
@@ -1068,30 +1097,29 @@ const styles = StyleSheet.create({
   // ── Segmented Tabs ──
   tabContainer: {
     flexDirection: 'row',
-    marginHorizontal: wp(5),
-    backgroundColor: '#EDE9FE',
-    borderRadius: moderateScale(14),
-    padding: moderateScale(4),
+    marginHorizontal: wp(4.5),
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(13),
+    padding: 3,
     marginBottom: hp(1.5),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
   },
   tabBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: moderateScale(9),
-    borderRadius: moderateScale(11),
+    paddingVertical: hp(0.85),
+    borderRadius: moderateScale(10),
   },
   tabBtnActive: {
-    backgroundColor: '#FFFFFF',
-    elevation: 2,
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
+    backgroundColor: '#F3F2FE',
+    borderWidth: 1,
+    borderColor: '#C4B5FD',
   },
   tabText: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(11.5),
     fontWeight: '700',
     color: '#64748B',
   },
@@ -1101,29 +1129,30 @@ const styles = StyleSheet.create({
   },
 
   scroll: {
-    paddingHorizontal: wp(5),
+    paddingHorizontal: wp(4.5),
     paddingTop: hp(0.5),
   },
 
   // ── Hero Card ──
   heroCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(22),
-    padding: moderateScale(18),
+    borderRadius: moderateScale(20),
+    padding: moderateScale(16),
     borderWidth: 1,
     borderColor: '#ECEAFD',
-    elevation: 4,
+    elevation: 3,
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 12,
-    marginBottom: hp(2),
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    marginBottom: hp(1.8),
   },
   heroTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: hp(1.5),
+    marginBottom: hp(1.4),
+    gap: moderateScale(8),
   },
   heroSubLabel: {
     fontSize: fontScale(9.5),
@@ -1132,25 +1161,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   heroMainWeight: {
-    fontSize: fontScale(32),
+    fontSize: fontScale(28),
     fontWeight: '900',
     color: '#0F172A',
-    letterSpacing: -0.8,
+    letterSpacing: -0.6,
   },
   heroUnitText: {
-    fontSize: fontScale(16),
+    fontSize: fontScale(15),
     fontWeight: '800',
     color: '#64748B',
   },
   heroLossBadge: {
-    paddingHorizontal: moderateScale(8),
-    paddingVertical: moderateScale(3),
-    borderRadius: moderateScale(8),
-    marginLeft: moderateScale(8),
+    paddingHorizontal: moderateScale(7),
+    paddingVertical: moderateScale(2.5),
+    borderRadius: moderateScale(6),
+    marginLeft: moderateScale(6),
     alignSelf: 'center',
   },
   heroLossBadgeText: {
-    fontSize: fontScale(11),
+    fontSize: fontScale(10.5),
     fontWeight: '800',
   },
   goalTargetBox: {
@@ -1169,10 +1198,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   goalTargetVal: {
-    fontSize: fontScale(18),
+    fontSize: fontScale(17),
     fontWeight: '900',
     color: '#0F172A',
-    marginTop: 2,
+    marginTop: 1,
   },
   goalTargetRemain: {
     fontSize: fontScale(9.5),
@@ -1183,13 +1212,13 @@ const styles = StyleSheet.create({
 
   // ── Progress Track ──
   progTrackSection: {
-    marginBottom: hp(1.5),
+    marginBottom: hp(1.4),
   },
   progTrackHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: 5,
   },
   progTrackMilestone: {
     fontSize: fontScale(10),
@@ -1202,15 +1231,15 @@ const styles = StyleSheet.create({
     color: '#6C5CE7',
   },
   progTrackBar: {
-    height: 7,
+    height: moderateScale(6),
     backgroundColor: '#F1F5F9',
-    borderRadius: 4,
+    borderRadius: moderateScale(3),
     overflow: 'hidden',
   },
   progTrackFill: {
     height: '100%',
     backgroundColor: '#6C5CE7',
-    borderRadius: 4,
+    borderRadius: moderateScale(3),
   },
 
   // ── Island Info Row ──
@@ -1219,16 +1248,18 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    borderRadius: moderateScale(14),
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(7),
     borderWidth: 1,
     borderColor: '#ECEAFD',
+    flexWrap: 'wrap',
+    gap: moderateScale(6),
   },
   bmiChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(6),
+    gap: moderateScale(5),
   },
   bmiChipLabel: {
     fontSize: fontScale(9),
@@ -1237,12 +1268,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   bmiChipVal: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(11.5),
     fontWeight: '900',
     color: '#0F172A',
   },
   bmiChipCategory: {
-    fontSize: fontScale(9.5),
+    fontSize: fontScale(9),
     fontWeight: '800',
     color: '#10B981',
     backgroundColor: '#ECFDF5',
@@ -1266,6 +1297,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: moderateScale(10),
+    marginTop: hp(0.5),
   },
   sectionTitleText: {
     fontSize: fontScale(15),
@@ -1274,7 +1306,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.2,
   },
   sectionLinkText: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(11.5),
     fontWeight: '800',
     color: '#6C5CE7',
   },
@@ -1282,8 +1314,8 @@ const styles = StyleSheet.create({
   // ── Empty State ──
   emptyCheckpointBox: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(20),
-    padding: moderateScale(28),
+    borderRadius: moderateScale(18),
+    padding: moderateScale(24),
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ECEAFD',
@@ -1305,13 +1337,13 @@ const styles = StyleSheet.create({
   // ── Timeline Card ──
   timelineCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(20),
+    borderRadius: moderateScale(18),
     paddingHorizontal: moderateScale(14),
-    paddingVertical: moderateScale(6),
+    paddingVertical: moderateScale(4),
     borderWidth: 1,
     borderColor: '#ECEAFD',
     elevation: 2,
-    shadowColor: '#0F172A',
+    shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
@@ -1320,7 +1352,7 @@ const styles = StyleSheet.create({
   timelineRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: moderateScale(10),
+    paddingVertical: moderateScale(9),
   },
   timelineRowBorder: {
     borderBottomWidth: 1,
@@ -1377,7 +1409,7 @@ const styles = StyleSheet.create({
   tapeHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: moderateScale(12),
   },
   tapeProfileSub: {
@@ -1389,7 +1421,7 @@ const styles = StyleSheet.create({
   tapeControlsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(8),
+    gap: moderateScale(6),
   },
   unitToggleBox: {
     flexDirection: 'row',
@@ -1398,15 +1430,15 @@ const styles = StyleSheet.create({
     padding: 2,
   },
   unitToggleBtn: {
-    paddingHorizontal: moderateScale(8),
-    paddingVertical: moderateScale(4),
+    paddingHorizontal: moderateScale(7),
+    paddingVertical: moderateScale(3.5),
     borderRadius: moderateScale(6),
   },
   unitToggleBtnActive: {
     backgroundColor: '#6C5CE7',
   },
   unitToggleText: {
-    fontSize: fontScale(10.5),
+    fontSize: fontScale(10),
     fontWeight: '700',
     color: '#64748B',
   },
@@ -1418,12 +1450,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#6C5CE7',
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(6),
-    borderRadius: moderateScale(9),
+    paddingHorizontal: moderateScale(9),
+    paddingVertical: moderateScale(5.5),
+    borderRadius: moderateScale(8),
   },
   updateTapeBtnText: {
-    fontSize: fontScale(10.5),
+    fontSize: fontScale(10),
     fontWeight: '800',
     color: '#FFFFFF',
   },
@@ -1433,20 +1465,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    gap: moderateScale(10),
+    rowGap: hp(1.4),
   },
   measureCard: {
-    width: '48%',
+    width: '48.2%',
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(14),
-    borderWidth: 1,
+    borderRadius: moderateScale(18),
+    padding: moderateScale(13),
+    borderWidth: 1.2,
     borderColor: '#ECEAFD',
     elevation: 2,
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 5,
+    shadowRadius: 6,
   },
   measureTopRow: {
     flexDirection: 'row',
@@ -1489,12 +1521,12 @@ const styles = StyleSheet.create({
     color: '#D97706',
   },
   measureVal: {
-    fontSize: fontScale(20),
+    fontSize: fontScale(19),
     fontWeight: '900',
     color: '#0F172A',
   },
   measureUnit: {
-    fontSize: fontScale(11.5),
+    fontSize: fontScale(11),
     fontWeight: '700',
     color: '#64748B',
   },
@@ -1512,14 +1544,14 @@ const styles = StyleSheet.create({
     padding: moderateScale(12),
     borderWidth: 1,
     borderColor: '#F3E8FF',
-    marginTop: hp(2),
+    marginTop: hp(1.8),
   },
   measureInfoText: {
     flex: 1,
-    fontSize: fontScale(11),
+    fontSize: fontScale(10.5),
     color: '#6B21A8',
     fontWeight: '600',
-    lineHeight: 16,
+    lineHeight: 15,
   },
 
   // ── Modals ──
@@ -1528,13 +1560,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: wp(5),
+    paddingHorizontal: wp(4.5),
   },
   modalCard: {
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(24),
-    padding: moderateScale(20),
+    borderRadius: moderateScale(22),
+    padding: moderateScale(18),
     elevation: 8,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 8 },
@@ -1545,18 +1577,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: hp(1.5),
+    marginBottom: hp(1.4),
   },
   modalTitle: {
-    fontSize: fontScale(18),
+    fontSize: fontScale(17),
     fontWeight: '900',
     color: '#0F172A',
   },
   modalSub: {
-    fontSize: fontScale(11.5),
+    fontSize: fontScale(11),
     color: '#64748B',
     fontWeight: '500',
-    marginTop: 2,
+    marginTop: 1,
   },
   modalCloseBtn: {
     width: moderateScale(28),
@@ -1572,10 +1604,10 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   inputGroup: {
-    marginBottom: hp(1.5),
+    marginBottom: hp(1.4),
   },
   inputLabel: {
-    fontSize: fontScale(10),
+    fontSize: fontScale(9.5),
     fontWeight: '800',
     color: '#64748B',
     letterSpacing: 0.4,
@@ -1587,7 +1619,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#CBD5E1',
     paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(9),
+    paddingVertical: moderateScale(8),
     fontSize: fontScale(13.5),
     fontWeight: '700',
     color: '#0F172A',
@@ -1603,11 +1635,11 @@ const styles = StyleSheet.create({
   },
   modalSubmitBtn: {
     backgroundColor: '#6C5CE7',
-    borderRadius: moderateScale(14),
-    paddingVertical: moderateScale(13),
+    borderRadius: moderateScale(13),
+    paddingVertical: moderateScale(12),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: hp(1),
+    marginTop: hp(0.8),
     elevation: 3,
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 3 },
@@ -1615,7 +1647,7 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
   },
   modalSubmitBtnText: {
-    fontSize: fontScale(13.5),
+    fontSize: fontScale(13),
     fontWeight: '800',
     color: '#FFFFFF',
   },

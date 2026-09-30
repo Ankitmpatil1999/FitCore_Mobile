@@ -72,6 +72,7 @@ export default function TrainersScreen() {
   const [trainers, setTrainers] = useState<Trainer[]>(() =>
     TRAINERS.filter((t) => t.gymId === gymId || !t.gymId || t.gymId === 'gym1')
   );
+  const [loadingTrainers, setLoadingTrainers] = useState(false);
   const [addModal, setAddModal] = useState(false);
   const [detailTrainer, setDetailTrainer] = useState<Trainer | null>(null);
 
@@ -91,6 +92,40 @@ export default function TrainersScreen() {
   const [processingLeaveId, setProcessingLeaveId] = useState<string | null>(null);
   const [rejectingLeaveReq, setRejectingLeaveReq] = useState<any | null>(null);
   const [ownerRejectNote, setOwnerRejectNote] = useState('');
+
+  const fetchTrainers = async () => {
+    try {
+      setLoadingTrainers(true);
+      const res = await apiService.getOwnerTrainers(gymId);
+      if (res.success && Array.isArray(res.data)) {
+        if (res.data.length === 0) {
+          setTrainers([]);
+        } else {
+          const mapped: Trainer[] = res.data.map((t: any) => ({
+            id: t._id || t.id || `t_${Date.now()}`,
+            gymId: t.gymId || gymId,
+            name: t.name || 'Coach',
+            avatar: t.avatar || (t.name ? t.name.slice(0, 2).toUpperCase() : 'TR'),
+            specialization: t.specialization || t.specialty || 'Fitness Coach',
+            experience: t.experience || '3+ years',
+            salary: t.salary ? String(t.salary) : '35,000',
+            timings: t.timings || t.shift || '06:00 AM – 02:00 PM',
+            available: t.available !== false && t.status !== 'inactive',
+            assignedMemberIds: t.assignedMemberIds || [],
+            certifications: t.certifications || 'Certified Fitness Coach',
+            phone: t.phone || '',
+            joinDate: t.joinDate || t.joiningDate || new Date().toISOString().split('T')[0],
+          }));
+          setTrainers(mapped);
+        }
+      }
+    } catch (err) {
+      console.log('Error fetching trainers:', err);
+    } finally {
+      setLoadingTrainers(false);
+    }
+  };
+
 
   const loadLeaveRequests = async () => {
     try {
@@ -131,6 +166,7 @@ export default function TrainersScreen() {
   const slideAnim = useRef(new Animated.Value(20)).current;
 
   useEffect(() => {
+    fetchTrainers();
     loadLeaveRequests();
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -182,7 +218,7 @@ export default function TrainersScreen() {
     };
 
     try {
-      await apiService.createOwnerTrainer({
+      const res: any = await apiService.createOwnerTrainer({
         gymId: gymId,
         name: fName.trim(),
         phone: fPhone.trim() || '9876543210',
@@ -192,6 +228,9 @@ export default function TrainersScreen() {
         shift: fTimings.trim() || '06:00 AM – 02:00 PM',
         joinDate: chosenJoinDate,
       });
+      if (res?.success) {
+        fetchTrainers();
+      }
     } catch (err) {
       console.log('Error creating trainer in backend DB:', err);
     }

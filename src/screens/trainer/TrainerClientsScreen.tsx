@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,13 +11,16 @@ import {
   Animated,
   Easing,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
-import { getMembersByTrainer, Member, getDaysRemaining } from '../../data/mockData';
+import { Member, getDaysRemaining } from '../../data/mockData';
+import apiService from '../../services/api';
 
 // ── Interactive Scale on Press Component ──
 function AnimatedPressable({
@@ -67,13 +70,73 @@ export default function TrainerClientsScreen({ navigation }: any) {
   const trainerId = currentTrainer?.id || currentUser?.id || 't1';
   const gymId = currentGym?.id || currentTrainer?.gymId;
 
-  const allClients = getMembersByTrainer(trainerId, gymId);
+  const [clients, setClients] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [goalFilter, setGoalFilter] = useState<string>('all');
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
+
+  const fetchTrainerClients = async () => {
+    try {
+      setLoading(true);
+      const res = await apiService.getOwnerMembers(gymId, {
+        trainerId,
+        trainerName: currentTrainer?.name,
+        trainerPhone: currentUser?.phone,
+      });
+      if (res.success && Array.isArray(res.data)) {
+        if (res.data.length === 0) {
+          setClients([]);
+        } else {
+          const mapped: Member[] = res.data.map((m: any) => ({
+            id: m._id || m.id || `m_${Date.now()}`,
+            userId: m.userId || m._id || m.id,
+            gymId: m.gymId || gymId || 'g1',
+            gymName: m.gymName || currentGym?.name || 'FitCore Gym',
+            name: m.name || 'Client',
+            phone: m.phone || '',
+            email: m.email || '',
+            age: m.age || 26,
+            height: m.height || 175,
+            weight: m.weight || 72,
+            bmi: m.bmi || 23.5,
+            goal: (m.goal || 'general_fitness') as any,
+            medicalIssues: m.medicalIssues || 'None',
+            emergencyContact: m.emergencyContact || '',
+            emergencyPhone: m.emergencyPhone || '',
+            planId: m.planId || m.packageId || 'p1',
+            planName: m.plan || m.planName || m.packageName || 'Pro Pass',
+            status: (m.status || 'active').toLowerCase() as any,
+            joinDate: m.joinDate || m.joinedDate || new Date().toISOString().split('T')[0],
+            startDate: m.startDate || m.joinedDate || new Date().toISOString().split('T')[0],
+            expiryDate: m.expiryDate || new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
+            trainerId: m.trainerId || trainerId,
+            photo: m.photo || '',
+            dietGoal: m.dietGoal || '',
+            attendanceCount: m.attendanceCount || 0,
+            qrCode: m.qrCode || `QR-${m.phone || 'pass'}`,
+            avatar: m.avatar || (m.name ? m.name.slice(0, 2).toUpperCase() : 'CL'),
+          }));
+          setClients(mapped);
+        }
+      }
+
+    } catch (err) {
+      console.log('Error fetching trainer clients:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Refresh every time the tab gains focus (avoids stale mock data)
+  useFocusEffect(
+    useCallback(() => {
+      fetchTrainerClients();
+    }, [gymId, trainerId])
+  );
 
   useEffect(() => {
     Animated.parallel([
@@ -99,7 +162,7 @@ export default function TrainerClientsScreen({ navigation }: any) {
     { id: 'general_fitness', label: 'General Fitness' },
   ];
 
-  const filtered = allClients.filter((c) => {
+  const filtered = clients.filter((c) => {
     const matchSearch =
       c.name.toLowerCase().includes(search.toLowerCase()) || c.phone.includes(search);
     const matchGoal = goalFilter === 'all' || c.goal === goalFilter;
@@ -118,7 +181,9 @@ export default function TrainerClientsScreen({ navigation }: any) {
         <View style={styles.header}>
           <View>
             <Text style={styles.headerTitle}>Assigned Clients</Text>
-            <Text style={styles.headerSub}>{allClients.length} Active Trainees</Text>
+            <Text style={styles.headerSub}>
+              {loading ? 'Loading...' : `${clients.length} Active Trainees`}
+            </Text>
           </View>
           <TouchableOpacity
             style={styles.chatHeaderBtn}
@@ -172,7 +237,12 @@ export default function TrainerClientsScreen({ navigation }: any) {
         </ScrollView>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <View style={styles.emptyCard}>
+              <ActivityIndicator size="large" color="#6C5CE7" />
+              <Text style={[styles.emptySub, { marginTop: 12 }]}>Fetching clients...</Text>
+            </View>
+          ) : filtered.length === 0 ? (
             <View style={styles.emptyCard}>
               <Icon name="people-outline" size={moderateScale(42)} color="#94A3B8" />
               <Text style={styles.emptyTitle}>No Clients Found</Text>
@@ -219,6 +289,7 @@ export default function TrainerClientsScreen({ navigation }: any) {
     </SafeAreaView>
   );
 }
+
 
 const styles = StyleSheet.create({
   safeArea: {

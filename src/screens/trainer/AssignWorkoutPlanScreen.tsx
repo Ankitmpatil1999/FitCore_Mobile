@@ -13,15 +13,13 @@ import {
   Animated,
   Easing,
   TouchableWithoutFeedback,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import {
-  getMemberById,
-  getWorkoutPlanByMember,
-  updateWorkoutPlanForMember,
   Exercise,
   WorkoutDay,
 } from '../../data/mockData';
@@ -73,24 +71,31 @@ function AnimatedPressable({
 const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export default function AssignWorkoutPlanScreen({ route, navigation }: any) {
-  const { memberId, memberName } = route.params || {};
-  const client = getMemberById(memberId);
-  const existingPlan = getWorkoutPlanByMember(memberId);
+import { useAppContext } from '../../context/AppContext';
 
-  const [days, setDays] = useState<WorkoutDay[]>(() => {
-    if (existingPlan) {
-      return JSON.parse(JSON.stringify(existingPlan.days));
-    }
-    return WEEKDAYS.map((d) => ({
-      day: d,
-      focus: d === 'Sunday' ? 'Rest Day' : 'General Fitness',
-      exercises: [],
-    }));
-  });
+export default function AssignWorkoutPlanScreen({ route, navigation }: any) {
+  const { currentTrainer, currentGym, currentUser } = useAppContext();
+  const trainerId = currentTrainer?.id || currentUser?.id || 't1';
+  const trainerName = currentTrainer?.name || currentUser?.name || 'Coach';
+  const gymId = currentGym?.id || currentTrainer?.gymId;
+
+  const { memberId: routeMemberId, memberName: routeMemberName } = route.params || {};
+
+  const [assignedClients, setAssignedClients] = useState<any[]>([]);
+  const [selectedMemberId, setSelectedMemberId] = useState<string>(routeMemberId || '');
+  const [selectedMemberName, setSelectedMemberName] = useState<string>(routeMemberName || '');
+  const [clientPickerModal, setClientPickerModal] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const [loadingClients, setLoadingClients] = useState(false);
+
+  const [days, setDays] = useState<WorkoutDay[]>(WEEKDAYS.map((d) => ({
+    day: d,
+    focus: d === 'Sunday' ? 'Rest Day' : 'General Fitness',
+    exercises: [],
+  })));
 
   const [activeDayIndex, setActiveDayIndex] = useState(0);
-  const currentDayData = days[activeDayIndex];
+  const currentDayData = days[activeDayIndex] || { day: 'Monday', focus: 'General Fitness', exercises: [] };
 
   // Modal form states
   const [exerciseModal, setExerciseModal] = useState(false);
@@ -99,12 +104,55 @@ export default function AssignWorkoutPlanScreen({ route, navigation }: any) {
   const [exSets, setExSets] = useState('4');
   const [exReps, setExReps] = useState('12');
   const [exWeight, setExWeight] = useState('40 kg');
+  const [isSaving, setIsSaving] = useState(false);
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  // ── Load Assigned Clients ──
+  const loadAssignedClients = async () => {
+    try {
+      setLoadingClients(true);
+      const res: any = await apiService.getOwnerMembers(gymId, {
+        trainerId,
+        trainerName,
+        trainerPhone: currentUser?.phone,
+      });
+      if (res?.success && Array.isArray(res.data) && res.data.length > 0) {
+        setAssignedClients(res.data);
+        if (!selectedMemberId) {
+          const first = res.data[0];
+          const fId = first._id || first.id;
+          setSelectedMemberId(fId);
+          setSelectedMemberName(first.name || 'Client');
+          loadClientWorkout(fId);
+        }
+      }
+    } catch (e) {
+      console.log('Error loading assigned clients:', e);
+    } finally {
+      setLoadingClients(false);
+    }
+  };
+
+  const loadClientWorkout = async (mId: string) => {
+    if (!mId) return;
+    try {
+      const res: any = await apiService.getMemberWorkout(mId);
+      if (res?.success && res.data?.days && Array.isArray(res.data.days)) {
+        setDays(res.data.days);
+      }
+    } catch (e) {
+      console.log('Error loading member workout plan:', e);
+    }
+  };
+
   useEffect(() => {
+    loadAssignedClients();
+    if (routeMemberId) {
+      loadClientWorkout(routeMemberId);
+    }
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -119,7 +167,7 @@ export default function AssignWorkoutPlanScreen({ route, navigation }: any) {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [gymId, trainerId, routeMemberId]);
 
   const updateFocus = (text: string) => {
     const updated = [...days];
@@ -156,23 +204,50 @@ export default function AssignWorkoutPlanScreen({ route, navigation }: any) {
     setDays(updated);
   };
 
-  const handleSavePlan = async () => {
-    if (memberId) {
-      updateWorkoutPlanForMember(memberId, days);
-      try {
-        await apiService.assignWorkoutPlan({
-          memberId,
-          trainerName: 'Assigned Trainer',
-          title: `Custom Split for ${memberName || 'Member'}`,
-          days,
-        });
-      } catch (e) {
-        console.log('Error saving plan to server:', e);
-      }
-    }
-    Alert.alert('✓ Plan Assigned', `Custom workout routine assigned to ${memberName || 'client'}!`);
-    navigation.goBack();
+  const handleSelectClient = (c: any) => {
+    const cId = c._id || c.id;
+    setSelectedMemberId(cId);
+    setSelectedMemberName(c.name || 'Client');
+    setClientPickerModal(false);
+    loadClientWorkout(cId);
   };
+
+  const handleSavePlan = async () => {
+    if (!selectedMemberId) {
+      Alert.alert('Select Client', 'Please select a trainee before assigning the workout routine.');
+      setClientPickerModal(true);
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const res: any = await apiService.assignWorkoutPlan({
+        memberId: selectedMemberId,
+        trainerId,
+        trainerName,
+        title: `Custom Split for ${selectedMemberName || 'Member'}`,
+        days,
+      });
+      if (res?.success) {
+        Alert.alert('✓ Plan Assigned', `Custom workout routine assigned to ${selectedMemberName || 'client'}!`);
+        if (routeMemberId) {
+          navigation.goBack();
+        }
+      } else {
+        Alert.alert('Saved Offline', 'Plan saved locally. Will sync with server automatically.');
+      }
+    } catch (e: any) {
+      console.log('Error saving plan to server:', e);
+      Alert.alert('Saved Offline', 'Plan saved locally. Will sync with server.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const filteredClients = assignedClients.filter((c) =>
+    (c.name || '').toLowerCase().includes(clientSearch.toLowerCase()) ||
+    (c.phone || '').includes(clientSearch)
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -195,19 +270,36 @@ export default function AssignWorkoutPlanScreen({ route, navigation }: any) {
               resizeMode="contain"
             />
           </TouchableOpacity>
-          <View>
-            <Text style={styles.headerTitle}>Workout Builder</Text>
-            <Text style={styles.headerSub}>Client: {memberName || client?.name || 'Arjun Mehta'}</Text>
-          </View>
           <TouchableOpacity
-            style={styles.saveHeaderBtn}
+            style={styles.headerTitleContainer}
+            onPress={() => setClientPickerModal(true)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.headerTitle}>Workout Builder</Text>
+            <View style={styles.clientPickerTrigger}>
+              <Text style={styles.headerSub} numberOfLines={1}>
+                {selectedMemberName ? `Client: ${selectedMemberName}` : 'Tap to Select Client'}
+              </Text>
+              <Icon name="chevron-down" size={moderateScale(13)} color="#6C5CE7" />
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.saveHeaderBtn, isSaving && { opacity: 0.7 }]}
             onPress={handleSavePlan}
+            disabled={isSaving}
             activeOpacity={0.85}
           >
-            <Icon name="checkmark" size={moderateScale(16)} color="#FFFFFF" />
-            <Text style={styles.saveHeaderBtnText}>SAVE</Text>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Icon name="checkmark" size={moderateScale(16)} color="#FFFFFF" />
+                <Text style={styles.saveHeaderBtnText}>SAVE</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
+
 
         {/* ── WEEKDAY SELECTOR ── */}
         <ScrollView
@@ -353,9 +445,71 @@ export default function AssignWorkoutPlanScreen({ route, navigation }: any) {
             </View>
           </View>
         </Modal>
+
+        {/* ── CLIENT PICKER MODAL ── */}
+        <Modal visible={clientPickerModal} transparent animationType="slide">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalCard, { maxHeight: hp(70) }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Trainee</Text>
+                <TouchableOpacity onPress={() => setClientPickerModal(false)}>
+                  <Icon name="close" size={moderateScale(22)} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+
+              <TextInput
+                style={[styles.modalInput, { marginBottom: hp(1.5) }]}
+                value={clientSearch}
+                onChangeText={setClientSearch}
+                placeholder="Search trainee name or phone..."
+                placeholderTextColor="#94A3B8"
+              />
+
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {filteredClients.length > 0 ? (
+                  filteredClients.map((c) => {
+                    const cId = c._id || c.id;
+                    const isSelected = cId === selectedMemberId;
+                    return (
+                      <TouchableOpacity
+                        key={cId}
+                        style={[
+                          styles.clientSelectItem,
+                          isSelected && styles.clientSelectItemActive,
+                        ]}
+                        onPress={() => handleSelectClient(c)}
+                        activeOpacity={0.8}
+                      >
+                        <View style={styles.clientSelectAvatar}>
+                          <Text style={styles.clientSelectAvatarText}>
+                            {c.name ? c.name.slice(0, 2).toUpperCase() : 'M'}
+                          </Text>
+                        </View>
+                        <View style={{ flex: 1, marginLeft: 10 }}>
+                          <Text style={styles.clientSelectName}>{c.name || 'Member'}</Text>
+                          <Text style={styles.clientSelectPhone}>{c.phone || 'No phone'}</Text>
+                        </View>
+                        {isSelected && (
+                          <Icon name="checkmark-circle" size={moderateScale(20)} color="#6C5CE7" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })
+                ) : (
+                  <View style={{ paddingVertical: hp(3), alignItems: 'center' }}>
+                    <Text style={{ color: '#64748B', fontSize: fontScale(13) }}>
+                      {loadingClients ? 'Loading trainees roster...' : 'No assigned trainees found.'}
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
       </Animated.View>
     </SafeAreaView>
   );
+
 }
 
 const styles = StyleSheet.create({
@@ -642,4 +796,51 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#FFFFFF',
   },
+  headerTitleContainer: {
+    alignItems: 'center',
+  },
+  clientPickerTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 1,
+  },
+  clientSelectItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: moderateScale(12),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    marginBottom: moderateScale(8),
+  },
+  clientSelectItemActive: {
+    borderColor: '#6C5CE7',
+    backgroundColor: '#F3F2FE',
+  },
+  clientSelectAvatar: {
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(19),
+    backgroundColor: '#ECEAFD',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clientSelectAvatarText: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  clientSelectName: {
+    fontSize: fontScale(13.5),
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  clientSelectPhone: {
+    fontSize: fontScale(11),
+    color: '#64748B',
+    marginTop: 1,
+  },
 });
+

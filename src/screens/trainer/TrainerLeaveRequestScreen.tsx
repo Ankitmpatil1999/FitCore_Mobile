@@ -288,7 +288,7 @@ export default function TrainerLeaveRequestScreen({ navigation }: any) {
 
                 const badgeBg = isApproved ? '#DCFCE7' : isRejected ? '#FFE4E6' : '#FEF3C7';
                 const badgeColor = isApproved ? '#059669' : isRejected ? '#E11D48' : '#D97706';
-                const badgeLabel = isApproved ? 'Approved ✅' : isRejected ? 'Rejected ❌' : 'Pending ⏳';
+                const badgeLabel = isApproved ? 'Approved' : isRejected ? 'Rejected' : 'Pending Approval';
 
                 return (
                   <View key={req._id || req.id} style={styles.historyCard}>

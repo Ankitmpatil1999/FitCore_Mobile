@@ -19,9 +19,8 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
+import { apiService } from '../../services/api';
 import {
-  getVendorProductsByStore,
-  VENDOR_PRODUCTS,
   VendorProduct,
   ProductCategory,
 } from '../../data/mockData';
@@ -86,9 +85,10 @@ const CAT_ICONS: Record<string, string> = {
 
 export default function VendorProductsScreen() {
   const { currentVendor } = useAppContext();
-  const vendorId = currentVendor?.id ?? 'vs1';
+  const vendorId = currentVendor?.id ?? '';
 
-  const [products, setProducts] = useState<VendorProduct[]>(getVendorProductsByStore(vendorId));
+  const [products, setProducts] = useState<VendorProduct[]>([]);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState<'all' | ProductCategory>('all');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -104,7 +104,25 @@ export default function VendorProductsScreen() {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  const loadProducts = async () => {
+    if (!vendorId) return;
+    setLoading(true);
+    try {
+      const res = await apiService.getVendorProducts(vendorId);
+      if (res && res.success && Array.isArray(res.data)) {
+        setProducts(res.data);
+      } else if (Array.isArray(res)) {
+        setProducts(res);
+      }
+    } catch (e) {
+      console.log('Error fetching vendor products:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
+    loadProducts();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -119,7 +137,7 @@ export default function VendorProductsScreen() {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [vendorId]);
 
   const categories = [...new Set(products.map((p) => p.category))] as ProductCategory[];
 
@@ -131,14 +149,13 @@ export default function VendorProductsScreen() {
     return matchSearch && matchCat;
   });
 
-  const handleSaveProduct = () => {
+  const handleSaveProduct = async () => {
     if (!nName || !nBrand || !nMemberPrice || !nStock) {
       Alert.alert('Required', 'Name, Brand, Price and Stock are required.');
       return;
     }
 
-    const newProduct: VendorProduct = {
-      id: `vp${Date.now()}`,
+    const newProductPayload = {
       vendorId,
       name: nName,
       brand: nBrand,
@@ -167,14 +184,19 @@ export default function VendorProductsScreen() {
       offer: 'In Stock',
     };
 
-    setProducts((prev) => [newProduct, ...prev]);
-    VENDOR_PRODUCTS.push(newProduct);
-    Alert.alert('✓ Added', `${nName} has been added to your catalog!`);
-    setShowAddModal(false);
-    setNName('');
-    setNBrand('');
-    setNMemberPrice('');
-    setNStock('');
+    try {
+      const res = await apiService.createVendorProduct(newProductPayload);
+      const createdItem: VendorProduct = (res && (res as any).data ? (res as any).data : { id: `vp_${Date.now()}`, ...newProductPayload }) as VendorProduct;
+      setProducts((prev) => [createdItem, ...prev]);
+      Alert.alert('✓ Added', `${nName} has been added to your catalog!`);
+      setShowAddModal(false);
+      setNName('');
+      setNBrand('');
+      setNMemberPrice('');
+      setNStock('');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Could not save product');
+    }
   };
 
   return (

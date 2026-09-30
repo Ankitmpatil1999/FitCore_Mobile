@@ -19,12 +19,9 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
+import { apiService } from '../../services/api';
 import {
-  getVendorWallet,
-  getVendorTransactions,
   VendorStore,
-  VendorTransaction,
-  VendorWallet as WalletType,
 } from '../../data/mockData';
 
 // ── Interactive Scale on Press Component ──
@@ -72,17 +69,34 @@ function AnimatedPressable({
 
 export default function VendorProfileScreen() {
   const { currentVendor, logout } = useAppContext();
-  const vendorId = currentVendor?.id ?? 'vs1';
+  const vendorId = currentVendor?.id ?? '';
 
   const [store, setStore] = useState<VendorStore | null>(currentVendor);
-  const [freeDelAbove, setFreeDelAbove] = useState(store?.freeDeliveryAbove.toString() ?? '999');
-  const [delCharges, setDelCharges] = useState(store?.deliveryCharges.toString() ?? '49');
+  const [freeDelAbove, setFreeDelAbove] = useState(store?.freeDeliveryAbove?.toString() ?? '999');
+  const [delCharges, setDelCharges] = useState(store?.deliveryCharges?.toString() ?? '49');
+  const [saving, setSaving] = useState(false);
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  const loadProfile = async () => {
+    if (!vendorId) return;
+    try {
+      const res = await apiService.getVendorProfile(vendorId);
+      const vData: any = (res as any)?.data || res;
+      if (vData && typeof vData === 'object') {
+        setStore(vData as VendorStore);
+        if (vData.freeDeliveryAbove !== undefined) setFreeDelAbove(vData.freeDeliveryAbove.toString());
+        if (vData.deliveryCharges !== undefined) setDelCharges(vData.deliveryCharges.toString());
+      }
+    } catch (e) {
+      console.log('Error loading vendor profile:', e);
+    }
+  };
+
   useEffect(() => {
+    loadProfile();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -97,7 +111,23 @@ export default function VendorProfileScreen() {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [vendorId]);
+
+  const handleSaveSettings = async () => {
+    if (!vendorId) return;
+    setSaving(true);
+    try {
+      await apiService.updateVendorProfile(vendorId, {
+        freeDeliveryAbove: Number(freeDelAbove) || 0,
+        deliveryCharges: Number(delCharges) || 0,
+      });
+      Alert.alert('Success', 'Store delivery settings updated successfully.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to update store settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert('Logout', 'Are you sure you want to logout of the vendor store account?', [
@@ -123,19 +153,19 @@ export default function VendorProfileScreen() {
           {/* ── STORE PROFILE CARD ── */}
           <View style={styles.profileCard}>
             <View style={styles.storeLogoBox}>
-              <Text style={styles.storeEmoji}>{store?.shopImage ?? '🏪'}</Text>
+              <Icon name="storefront" size={moderateScale(32)} color="#6C5CE7" />
             </View>
 
-            <Text style={styles.storeTitle}>{store?.storeName ?? 'Muscle Store India'}</Text>
-            <Text style={styles.ownerText}>Owner: {store?.ownerName ?? 'Karan Shetty'}</Text>
-            <Text style={styles.gstText}>GSTIN: {store?.gstNumber ?? '27AABCU9603R1ZM'}</Text>
+            <Text style={styles.storeTitle}>{store?.storeName || 'FitCore Official Partner Store'}</Text>
+            <Text style={styles.ownerText}>Owner: {store?.ownerName || 'Store Manager'}</Text>
+            <Text style={styles.gstText}>GSTIN: {store?.gstNumber || 'Active Enterprise'}</Text>
 
             <View style={styles.badgeRow}>
               <View style={styles.verifiedBadge}>
                 <Text style={styles.verifiedBadgeText}>✓ GST Verified</Text>
               </View>
               <View style={[styles.verifiedBadge, { backgroundColor: '#F3F2FE' }]}>
-                <Text style={[styles.verifiedBadgeText, { color: '#6C5CE7' }]}>⭐ 4.9 Rating</Text>
+                <Text style={[styles.verifiedBadgeText, { color: '#6C5CE7' }]}>4.9 Rating</Text>
               </View>
             </View>
           </View>
@@ -148,9 +178,9 @@ export default function VendorProfileScreen() {
                 <Icon name="business" size={moderateScale(20)} color="#6C5CE7" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.bankName}>HDFC Bank Primary Settlement</Text>
-                <Text style={styles.bankDetails}>A/C: •••• 8492 • IFSC: HDFC0001824</Text>
-                <Text style={styles.upiDetails}>UPI ID: {store?.upiId || 'musclestore@okhdfcbank'}</Text>
+                <Text style={styles.bankName}>Verified Settlement Account</Text>
+                <Text style={styles.bankDetails}>A/C: •••• {typeof store?.bankAccount === 'string' ? store.bankAccount.slice(-4) : '8492'} • IFSC: {store?.ifsc || 'HDFC0001824'}</Text>
+                <Text style={styles.upiDetails}>UPI ID: {store?.upiId || 'store@upi'}</Text>
               </View>
             </View>
           </View>
@@ -178,6 +208,15 @@ export default function VendorProfileScreen() {
               />
             </View>
           </View>
+
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && { opacity: 0.6 }]}
+            onPress={handleSaveSettings}
+            disabled={saving}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.saveBtnText}>{saving ? 'Saving Settings...' : 'Save Delivery Settings'}</Text>
+          </TouchableOpacity>
 
           {/* ── LOGOUT BUTTON ── */}
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.85}>
@@ -374,6 +413,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
+  saveBtn: {
+    backgroundColor: '#6C5CE7',
+    borderRadius: moderateScale(14),
+    paddingVertical: moderateScale(14),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: hp(1),
+    marginBottom: hp(1),
+    elevation: 3,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  saveBtnText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',

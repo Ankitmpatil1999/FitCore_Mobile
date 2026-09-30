@@ -16,9 +16,10 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
+import apiService from '../../services/api';
 
-export default function TrainerProfileScreen() {
-  const { currentTrainer, logout } = useAppContext();
+export default function TrainerProfileScreen({ navigation }: any) {
+  const { currentTrainer, currentUser, logout } = useAppContext();
   const [available, setAvailable] = useState(currentTrainer?.available !== false);
 
   // ── Entrance Animation ──
@@ -42,10 +43,19 @@ export default function TrainerProfileScreen() {
     ]).start();
   }, []);
 
-  const handleToggleAvailable = (val: boolean) => {
+  const handleToggleAvailable = async (val: boolean) => {
     setAvailable(val);
     if (currentTrainer) {
       currentTrainer.available = val;
+    }
+    // Persist to backend
+    try {
+      const trainerId = currentTrainer?.id || currentUser?.id;
+      if (trainerId) {
+        await apiService.updateOwnerTrainer(trainerId, { available: val });
+      }
+    } catch (e) {
+      console.log('Availability sync error:', e);
     }
     Alert.alert('Status Updated', `Your status has been set to ${val ? 'Available ●' : 'Busy ○'}.`);
   };
@@ -83,7 +93,10 @@ export default function TrainerProfileScreen() {
 
             <Text style={styles.trainerName}>{currentTrainer?.name ?? 'Coach Vikram Singh'}</Text>
             <Text style={styles.trainerSpec}>{currentTrainer?.specialization ?? 'Hypertrophy & Strength Conditioning'}</Text>
-            <Text style={styles.trainerPhone}>📞 {currentTrainer?.phone ?? '8180093401'}</Text>
+            <View style={styles.trainerPhoneRow}>
+              <Icon name="call-outline" size={moderateScale(14)} color="#64748B" />
+              <Text style={styles.trainerPhone}>{currentTrainer?.phone ?? '8180093401'}</Text>
+            </View>
 
             <View style={styles.availRow}>
               <Text style={styles.availLabel}>Live Availability Status</Text>
@@ -111,6 +124,78 @@ export default function TrainerProfileScreen() {
               <Text style={styles.infoLabel}>Operating Shift</Text>
               <Text style={styles.infoVal}>{currentTrainer?.timings || '06:00 AM – 02:00 PM'}</Text>
             </View>
+          </View>
+
+          {/* ── QUICK LINKS ── */}
+          <Text style={styles.sectionHeader}>Coach Tools</Text>
+          <View style={styles.infoCard}>
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => navigation && navigation.navigate('TrainerAttendance')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.linkIconBg, { backgroundColor: '#ECFDF5' }]}>
+                <Icon name="checkmark-done" size={moderateScale(16)} color="#059669" />
+              </View>
+              <Text style={styles.linkLabel}>My Attendance Record</Text>
+              <Icon name="chevron-forward" size={moderateScale(14)} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <View style={styles.linkSeparator} />
+
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => navigation && navigation.navigate('ScheduleSessions')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.linkIconBg, { backgroundColor: '#FEF3C7' }]}>
+                <Icon name="calendar-outline" size={moderateScale(16)} color="#D97706" />
+              </View>
+              <Text style={styles.linkLabel}>Schedule PT Sessions</Text>
+              <Icon name="chevron-forward" size={moderateScale(14)} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <View style={styles.linkSeparator} />
+
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => navigation && navigation.navigate('TrainerLeaveRequest')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.linkIconBg, { backgroundColor: '#FFF1F2' }]}>
+                <Icon name="umbrella-outline" size={moderateScale(16)} color="#E11D48" />
+              </View>
+              <Text style={styles.linkLabel}>Apply for Leave</Text>
+              <Icon name="chevron-forward" size={moderateScale(14)} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <View style={styles.linkSeparator} />
+
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => navigation && navigation.navigate('TrainerReviews')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.linkIconBg, { backgroundColor: '#FFFBEB' }]}>
+                <Icon name="star-outline" size={moderateScale(16)} color="#F59E0B" />
+              </View>
+              <Text style={styles.linkLabel}>Coach Ratings & Reviews</Text>
+              <Icon name="chevron-forward" size={moderateScale(14)} color="#94A3B8" />
+            </TouchableOpacity>
+
+            <View style={styles.linkSeparator} />
+
+            <TouchableOpacity
+              style={styles.linkRow}
+              onPress={() => navigation && navigation.navigate('UploadVideos')}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.linkIconBg, { backgroundColor: '#EDE9FE' }]}>
+                <Icon name="videocam-outline" size={moderateScale(16)} color="#6C5CE7" />
+              </View>
+              <Text style={styles.linkLabel}>Exercise Video Library</Text>
+              <Icon name="chevron-forward" size={moderateScale(14)} color="#94A3B8" />
+            </TouchableOpacity>
           </View>
 
           {/* ── LOGOUT BUTTON ── */}
@@ -219,6 +304,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
     marginBottom: hp(1.5),
   },
+  trainerPhoneRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: 5,
+    marginTop: 2,
+    marginBottom: hp(1.5),
+  },
 
   availRow: {
     flexDirection: 'row',
@@ -291,5 +383,31 @@ const styles = StyleSheet.create({
     fontSize: fontScale(13.5),
     fontWeight: '700',
     color: '#FF4D6D',
+  },
+
+  // Coach Tools link rows
+  linkRow: {
+    flexDirection: 'row' as const,
+    alignItems: 'center' as const,
+    gap: moderateScale(12),
+    paddingVertical: moderateScale(10),
+  },
+  linkIconBg: {
+    width: moderateScale(34),
+    height: moderateScale(34),
+    borderRadius: moderateScale(10),
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+  },
+  linkLabel: {
+    flex: 1,
+    fontSize: fontScale(13),
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  linkSeparator: {
+    height: 1,
+    backgroundColor: '#F3F2FE',
+    marginLeft: moderateScale(46),
   },
 });

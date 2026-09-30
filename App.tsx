@@ -6,6 +6,9 @@ import { enableScreens } from 'react-native-screens';
 
 import { Colors } from './src/theme';
 import { AppProvider, useAppContext } from './src/context/AppContext';
+import { NotificationProvider } from './src/context/NotificationContext';
+import TopNotificationBanner from './src/components/common/TopNotificationBanner';
+import { navigationRef } from './src/navigation/navigationRef';
 import SplashScreen from './src/screens/shared/SplashScreen';
 import OnboardingScreen from './src/screens/shared/OnboardingScreen';
 import LoginScreen from './src/screens/shared/LoginScreen';
@@ -44,7 +47,8 @@ function AppInner() {
         barStyle="dark-content"
         backgroundColor="#F7F7FD"
       />
-      <NavigationContainer>
+      <TopNotificationBanner />
+      <NavigationContainer ref={navigationRef}>
         {role === 'owner' ? (
           <OwnerNavigator />
         ) : role === 'vendor' ? (
@@ -63,7 +67,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <AppInner />
+        <NotificationProvider>
+          <AppInner />
+        </NotificationProvider>
       </AppProvider>
     </SafeAreaProvider>
   );

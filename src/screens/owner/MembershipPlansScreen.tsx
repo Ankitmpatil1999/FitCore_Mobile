@@ -20,6 +20,7 @@ import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { MEMBERSHIP_PLANS, MembershipPlan } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
+import apiService from '../../services/api';
 
 // ── Interactive Scale on Press Component ──
 function AnimatedPressable({
@@ -73,6 +74,7 @@ export default function MembershipPlansScreen({ navigation }: any) {
   const [plans, setPlans] = useState<MembershipPlan[]>(() =>
     MEMBERSHIP_PLANS.filter((p) => p.gymId === gymId || !p.gymId || p.gymId === 'gym1')
   );
+  const [loading, setLoading] = useState(false);
   const [addModal, setAddModal] = useState(false);
   const [editPlan, setEditPlan] = useState<MembershipPlan | null>(null);
 
@@ -85,7 +87,41 @@ export default function MembershipPlansScreen({ navigation }: any) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(20)).current;
 
+  const fetchPlans = async () => {
+    try {
+      setLoading(true);
+      const res = await apiService.getOwnerPackages(gymId);
+      if (res.success && Array.isArray(res.data)) {
+        if (res.data.length === 0) {
+          setPlans([]);
+        } else {
+          const mapped: MembershipPlan[] = res.data.map((p: any) => ({
+            id: p._id || p.id || `plan_${Date.now()}`,
+            gymId: p.gymId || gymId,
+            name: p.name || 'Membership Plan',
+            duration: Number(p.durationMonths || p.durationDays ? Math.round(Number(p.durationDays) / 30) : p.duration || 1),
+            price: Number(p.price || 0),
+            originalPrice: Number(p.originalPrice || Number(p.price || 0) * 1.25),
+            tier: (p.tier || 'gold') as any,
+            features: Array.isArray(p.features) && p.features.length > 0
+              ? p.features
+              : ['Full gym access', 'Trainer assistance', 'Locker access', 'Diet consultation'],
+            isActive: p.isActive !== false && p.status !== 'inactive',
+            discount: Number(p.discount || 20),
+          }));
+          setPlans(mapped);
+        }
+      }
+    } catch (err) {
+      console.log('Error fetching membership plans:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   useEffect(() => {
+    fetchPlans();
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -100,7 +136,7 @@ export default function MembershipPlansScreen({ navigation }: any) {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-  }, []);
+  }, [gymId]);
 
   const openAdd = () => {
     setEditPlan(null);
@@ -110,7 +146,7 @@ export default function MembershipPlansScreen({ navigation }: any) {
     setAddModal(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!fName.trim() || !fDuration || !fPrice) {
       Alert.alert('Required', 'Name, duration and price are required.');
       return;
@@ -130,8 +166,32 @@ export default function MembershipPlansScreen({ navigation }: any) {
 
     if (editPlan) {
       setPlans((prev) => prev.map((p) => (p.id === editPlan.id ? newP : p)));
+      try {
+        await apiService.updateOwnerPackage(editPlan.id, {
+          gymId,
+          name: fName.trim(),
+          durationMonths: parseInt(fDuration, 10),
+          price: parseFloat(fPrice),
+          features: newP.features,
+        });
+        fetchPlans();
+      } catch (err) {
+        console.log('Error updating package on backend:', err);
+      }
     } else {
       setPlans((prev) => [newP, ...prev]);
+      try {
+        await apiService.createOwnerPackage({
+          gymId,
+          name: fName.trim(),
+          durationMonths: parseInt(fDuration, 10),
+          price: parseFloat(fPrice),
+          features: newP.features,
+        });
+        fetchPlans();
+      } catch (err) {
+        console.log('Error creating package on backend:', err);
+      }
     }
     setAddModal(false);
     Alert.alert('✓ Saved', 'Membership plan updated successfully!');
