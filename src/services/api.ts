@@ -25,19 +25,17 @@ const dynamicHost = getDynamicHost();
 // Loaded securely from .env (hidden from source code repo)
 export const PRODUCTION_API_URL = ENV_API_URL || 'http://localhost:7000/api';
 
-// Candidate URLs: Prioritizes Environment URL, with local development fallbacks
+// Candidate URLs: Prioritizes active Wi-Fi IP and adb-reversed local ports
 const CANDIDATE_URLS = [
+  'http://192.168.0.104:7000/api',
   PRODUCTION_API_URL,
   ...(dynamicHost ? [`http://${dynamicHost}:7000/api`] : []),
-  'http://192.168.88.28:7000/api',
-  'http://192.168.0.106:7000/api',
-  'http://192.168.0.109:7000/api',
   'http://localhost:7000/api',
-  'http://127.0.0.1:7000/api',
   'http://10.0.2.2:7000/api',
+  'http://127.0.0.1:7000/api',
 ];
 
-export let API_BASE_URL = PRODUCTION_API_URL;
+export let API_BASE_URL = CANDIDATE_URLS[0];
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -56,7 +54,7 @@ class ApiService {
     }).catch(() => {});
 
     AsyncStorage.getItem('@fitcore_active_base_url').then((cached) => {
-      if (cached) {
+      if (cached && !cached.includes('192.168.88.28')) {
         this.activeBaseUrl = cached;
         API_BASE_URL = cached;
       }
