@@ -632,7 +632,7 @@ export default function ProfileScreen({ navigation }: any) {
               <Text style={styles.logoutBtnText}>Log Out</Text>
             </TouchableOpacity>
 
-            <Text style={styles.appVersionText}>Version 0.0.1</Text>
+            <Text style={styles.appVersionText}>Version 1.0.0</Text>
 
             <View style={{ height: hp(12) }} />
           </Animated.View>

@@ -426,7 +426,7 @@ export default function HelpSupportScreen({ navigation }: any) {
                   <View style={styles.deviceMetaBox}>
                     <Icon name="information-circle-outline" size={moderateScale(16)} color="#64748B" />
                     <Text style={styles.deviceMetaText}>
-                      App Version 0.0.1
+                      App Version 1.0.0
                     </Text>
                   </View>
 

@@ -55,7 +55,7 @@ export default function AboutScreen({ navigation }: any) {
             <Text style={styles.brandTagline}>Smarter Gym Management & Member Fitness Platform</Text>
 
             <View style={styles.versionBadge}>
-              <Text style={styles.versionBadgeText}>VERSION 0.0.1 • PRODUCTION BUILD</Text>
+              <Text style={styles.versionBadgeText}>VERSION 1.0.0 • PRODUCTION BUILD</Text>
             </View>
           </View>
 

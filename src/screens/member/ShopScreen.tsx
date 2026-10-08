@@ -102,10 +102,10 @@ export default function ShopScreen({ navigation }: any) {
             },
           ]}
         >
-          {/* Version 2.0 Pill */}
+          {/* Version 1.0.0 Pill */}
           <View style={styles.versionBadge}>
             <View style={styles.badgeDot} />
-            <Text style={styles.versionText}>VERSION 2.0</Text>
+            <Text style={styles.versionText}>VERSION 1.0.0</Text>
           </View>
 
           {/* Animated Center Icon Emblem */}
