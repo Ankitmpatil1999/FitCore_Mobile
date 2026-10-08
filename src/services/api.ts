@@ -27,12 +27,13 @@ export const PRODUCTION_API_URL = ENV_API_URL || 'http://localhost:7000/api';
 
 // Candidate URLs: Prioritizes active Wi-Fi IP and adb-reversed local ports
 const CANDIDATE_URLS = [
-  'http://192.168.0.104:7000/api',
-  PRODUCTION_API_URL,
   ...(dynamicHost ? [`http://${dynamicHost}:7000/api`] : []),
+  'http://10.0.0.17:7000/api',
   'http://localhost:7000/api',
-  'http://10.0.2.2:7000/api',
   'http://127.0.0.1:7000/api',
+  PRODUCTION_API_URL,
+  'http://10.0.2.2:7000/api',
+  'http://192.168.0.104:7000/api',
 ];
 
 export let API_BASE_URL = CANDIDATE_URLS[0];
@@ -54,7 +55,7 @@ class ApiService {
     }).catch(() => {});
 
     AsyncStorage.getItem('@fitcore_active_base_url').then((cached) => {
-      if (cached && !cached.includes('192.168.88.28')) {
+      if (cached && !cached.includes('192.168.88.28') && !cached.includes('192.168.0.104')) {
         this.activeBaseUrl = cached;
         API_BASE_URL = cached;
       }
@@ -97,7 +98,9 @@ class ApiService {
       } catch {}
     }
 
+    const currentDynamicHost = getDynamicHost();
     const urlsToTry = Array.from(new Set([
+      ...(currentDynamicHost ? [`http://${currentDynamicHost}:7000/api`] : []),
       this.activeBaseUrl,
       ...CANDIDATE_URLS,
     ]));
@@ -108,8 +111,8 @@ class ApiService {
       try {
         const url = `${baseUrl}${endpoint}`;
         const controller = new AbortController();
-        // Allow adequate time (10s) for SMS gateway calls and DB operations
-        const timeoutMs = this.activeBaseUrl === baseUrl ? 10000 : 3500;
+        // Allow adequate time for SMS gateway calls and DB operations
+        const timeoutMs = this.activeBaseUrl === baseUrl ? 8000 : 3000;
         const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
         const response = await fetch(url, {
@@ -693,6 +696,20 @@ class ApiService {
   async getOwnerAttendanceStats(gymId?: string) {
     const query = gymId ? `?gymId=${gymId}` : '';
     return this.request(`/gym-admin/attendance/stats${query}`);
+  }
+
+  async ownerCheckIn(data: { memberId: string; gymId?: string; method?: string }) {
+    return this.request('/gym-admin/attendance/check-in', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async ownerCheckOut(data: { memberId: string; gymId?: string }) {
+    return this.request('/gym-admin/attendance/check-out', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async getOwnerGymSettings(gymId?: string) {

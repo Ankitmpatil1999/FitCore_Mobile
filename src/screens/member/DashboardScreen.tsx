@@ -28,6 +28,7 @@ import {
 } from '../../data/mockData';
 import { apiService } from '../../services/api';
 import { CheckInOutModal } from '../../components/common/CheckInOutModal';
+import InitialProfileSetupModal from '../../components/common/InitialProfileSetupModal';
 
 // ── Asset Icons ──
 const gymDumbbellImg = require('../../assets/Icons2/gym.png');
@@ -326,112 +327,50 @@ export default function DashboardScreen({ navigation }: any) {
   });
 
   // ── Unread Notifications State ──
-  const { unreadCount: globalUnreadCount } = useNotifications();
+  const { unreadCount: globalUnreadCount, showInAppNotification } = useNotifications();
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
-  // ── First-Time Member Fitness Onboarding (Email, Weight, Height, Goal) ──
-  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
-  const [onboardingEmail, setOnboardingEmail] = useState('');
-  const [onboardingWeight, setOnboardingWeight] = useState('');
-  const [onboardingHeight, setOnboardingHeight] = useState('');
-  const [onboardingGoal, setOnboardingGoal] = useState<'Weight Loss' | 'Weight Gain' | 'Muscle Building' | 'Stay Fit'>('Weight Loss');
-  const [isOnboardingSaving, setIsOnboardingSaving] = useState(false);
-
-  // Dynamic calculated BMI
-  const parsedWeight = parseFloat(onboardingWeight) || 0;
-  const parsedHeight = parseFloat(onboardingHeight) || 0;
-  const calculatedBMI = (parsedWeight > 0 && parsedHeight > 0)
-    ? Math.round((parsedWeight / Math.pow(parsedHeight / 100, 2)) * 10) / 10
-    : null;
-
-  const dismissOnboardingModal = async () => {
-    setShowOnboardingModal(false);
-    const id = currentMember?.phone || currentUser?.phone || currentMember?.id || currentUser?.id;
-    if (id) {
-      try {
-        await AsyncStorage.setItem(`fitcore_onboarding_done_${id}`, 'true');
-      } catch (e) { }
-    }
-  };
+  // ── Mandatory First-Time Member Profile Setup (Weight, Height, Emergency Contact, Phone, Address) ──
+  const [showInitialSetupModal, setShowInitialSetupModal] = useState(false);
 
   useEffect(() => {
-    const checkOnboardingPrompt = async () => {
+    const checkInitialProfileSetup = async () => {
       try {
-        const phone = currentMember?.phone || currentUser?.phone;
-        const id = currentMember?.id || currentUser?.id || phone;
+        const mem: any = (liveData as any)?.member || currentMember || currentUser;
+        const phone = mem?.phone || currentMember?.phone || currentUser?.phone;
+        const id = mem?.userId || mem?.id || mem?._id || currentMember?.userId || currentMember?.id || currentUser?.id || phone;
         if (!id && !phone) return;
 
-        if (currentMember?.email || currentUser?.email) {
-          setOnboardingEmail(String(currentMember?.email || currentUser?.email || ''));
-        }
-
-        const mem: any = (liveData as any)?.member || currentMember;
         const currentW = Number(mem?.weight || 0);
         const currentH = Number(mem?.height || 0);
+        const currentEmer = mem?.emergencyPhone || '';
+        const currentAddr = mem?.address || '';
 
-        // If weight & height already exist in database, member is already onboarded
-        if (currentW > 0 && currentH > 0) {
-          setShowOnboardingModal(false);
-          return;
-        }
-
-        // Check if this specific member has completed onboarding
-        const memberKey = `fitcore_onboarding_done_${phone || id}`;
+        // Check if this specific member has marked setup as done locally
+        const memberKey = `@fitcore_profile_setup_done_${id || phone}`;
         const done = await AsyncStorage.getItem(memberKey);
 
-        if (!done && (currentW <= 0 || currentH <= 0)) {
-          setShowOnboardingModal(true);
+        // If completed or if mandatory fields already exist in database
+        if (done || (currentW > 0 && currentH > 0 && currentEmer && currentAddr)) {
+          setShowInitialSetupModal(false);
         } else {
-          setShowOnboardingModal(false);
+          setShowInitialSetupModal(true);
         }
       } catch (err) {
         // fallback
       }
     };
-    checkOnboardingPrompt();
-  }, [currentUser?.id, currentUser?.phone, currentMember?.id, currentMember?.phone, liveData]);
+    checkInitialProfileSetup();
+  }, [currentUser, currentMember, liveData]);
 
-  const handleSaveFitnessProfile = async () => {
-    const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
-    const phone = currentMember?.phone || currentUser?.phone || '';
-    const w = parseFloat(onboardingWeight);
-    const h = parseFloat(onboardingHeight);
-
-    if (!w || w <= 0) {
-      Alert.alert('Missing Weight', 'Please enter your current body weight in kg.');
-      return;
-    }
-    if (!h || h <= 0) {
-      Alert.alert('Missing Height', 'Please enter your height in cm.');
-      return;
-    }
-
-    setIsOnboardingSaving(true);
-    try {
-      const payload: any = {
-        memberId,
-        phone,
-        weight: w,
-        height: h,
-        goal: onboardingGoal,
-      };
-      if (onboardingEmail.trim()) {
-        payload.email = onboardingEmail.trim();
-      }
-      if (calculatedBMI) {
-        payload.bmi = calculatedBMI;
-      }
-
-      await apiService.savePersonalDetails(payload);
-      await dismissOnboardingModal();
-
-      // Refresh live member data
-      fetchLiveMemberData();
-    } catch (e: any) {
-      Alert.alert('Error', e?.message || 'Failed to save fitness details.');
-    } finally {
-      setIsOnboardingSaving(false);
-    }
+  const handleInitialSetupComplete = (updatedData: any) => {
+    setShowInitialSetupModal(false);
+    showInAppNotification({
+      title: 'Profile Setup Completed',
+      message: 'Your athlete metrics are saved. Welcome to FitCore!',
+      type: 'workout',
+    });
+    fetchLiveMemberData();
   };
 
   const fetchLiveMemberData = async () => {
@@ -462,18 +401,17 @@ export default function DashboardScreen({ navigation }: any) {
         ));
         const mem: any = (profileRes.data as any)?.member;
         if (mem) {
-          if (mem.weight) setOnboardingWeight(String(mem.weight));
-          if (mem.height) setOnboardingHeight(String(mem.height));
-          if (mem.goal) setOnboardingGoal(mem.goal);
           const w = Number(mem.weight || 0);
           const h = Number(mem.height || 0);
-          if (w > 0 && h > 0) {
+          const emer = mem.emergencyPhone || '';
+          const addr = mem.address || '';
+          if (w > 0 && h > 0 && emer && addr) {
             const phone = mem.phone || currentMember?.phone || currentUser?.phone;
             const id = mem.id || mem.userId || currentMember?.id || currentUser?.id || phone;
             if (id) {
-              AsyncStorage.setItem(`fitcore_onboarding_done_${id}`, 'true').catch(() => { });
+              AsyncStorage.setItem(`@fitcore_profile_setup_done_${id}`, 'true').catch(() => { });
             }
-            setShowOnboardingModal(false);
+            setShowInitialSetupModal(false);
           }
         }
       }
@@ -665,6 +603,12 @@ export default function DashboardScreen({ navigation }: any) {
         type: 'checkin',
         message: `Welcome ${memberName}! Session tracking active. Have an awesome workout!`,
       });
+      showInAppNotification({
+        title: 'Gym Check-In Successful',
+        message: `Welcome ${memberName}! Your workout session timer is active.`,
+        type: 'attendance',
+        actionScreen: 'AttendanceHistory',
+      });
 
       // 2. Background Sync
       apiService.checkIn(
@@ -684,6 +628,12 @@ export default function DashboardScreen({ navigation }: any) {
         type: 'checkout',
         duration: durationStr,
         message: `You spent ${durationStr} training today. Outstanding effort!`,
+      });
+      showInAppNotification({
+        title: 'Workout Completed',
+        message: `Awesome effort! You spent ${durationStr} training today.`,
+        type: 'workout',
+        actionScreen: 'AttendanceHistory',
       });
 
       // 2. Background Sync
@@ -1180,182 +1130,12 @@ export default function DashboardScreen({ navigation }: any) {
           <View style={{ height: hp(1.5) }} />
         </ScrollView>
 
-        {/* ── FIRST-TIME MEMBER BASIC FITNESS PROFILE MODAL (WEIGHT, HEIGHT, GOAL) ── */}
-        <Modal
-          visible={showOnboardingModal}
-          transparent
-          animationType="fade"
-          onRequestClose={dismissOnboardingModal}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              {/* Modal Header */}
-              <View style={styles.modalHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(10), flex: 1 }}>
-                  <View style={styles.onboardingIconBox}>
-                    <Image
-                      source={bodyStatsIconImg}
-                      style={{ width: moderateScale(20), height: moderateScale(20), tintColor: '#6C5CE7' }}
-                      resizeMode="contain"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.modalTitle}>Fitness Profile Setup</Text>
-                    <Text style={styles.modalSubtitle}>Quick stats to personalize your workouts</Text>
-                  </View>
-                </View>
-                <TouchableOpacity
-                  style={styles.modalCloseBtn}
-                  onPress={dismissOnboardingModal}
-                  activeOpacity={0.7}
-                >
-                  <Icon name="close" size={moderateScale(18)} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              {/* 1. Email Address Input */}
-              <View style={styles.emailInputCard}>
-                <View style={styles.statCardHeader}>
-                  <Icon name="mail-outline" size={moderateScale(14)} color="#6C5CE7" />
-                  <Text style={styles.statCardLabel}>EMAIL ADDRESS (OPTIONAL)</Text>
-                </View>
-                <View style={styles.emailInputWrapper}>
-                  <TextInput
-                    style={styles.emailTextInput}
-                    value={onboardingEmail}
-                    onChangeText={setOnboardingEmail}
-                    placeholder="e.g. member@fitcore.com"
-                    placeholderTextColor="#94A3B8"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-              </View>
-
-              {/* 2. Weight & Height Dual Input Row */}
-              <View style={styles.statsInputsRow}>
-                {/* Weight Input */}
-                <View style={styles.statInputCard}>
-                  <View style={styles.statCardHeader}>
-                    <Icon name="speedometer-outline" size={moderateScale(14)} color="#6C5CE7" />
-                    <Text style={styles.statCardLabel}>WEIGHT</Text>
-                  </View>
-                  <View style={styles.statInputWrapper}>
-                    <TextInput
-                      style={styles.statNumInput}
-                      value={onboardingWeight}
-                      onChangeText={setOnboardingWeight}
-                      placeholder="70"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="decimal-pad"
-                      maxLength={5}
-                    />
-                    <View style={styles.statUnitBadge}>
-                      <Text style={styles.statUnitText}>kg</Text>
-                    </View>
-                  </View>
-                </View>
-
-                {/* Height Input */}
-                <View style={styles.statInputCard}>
-                  <View style={styles.statCardHeader}>
-                    <Icon name="resize-outline" size={moderateScale(14)} color="#6C5CE7" />
-                    <Text style={styles.statCardLabel}>HEIGHT</Text>
-                  </View>
-                  <View style={styles.statInputWrapper}>
-                    <TextInput
-                      style={styles.statNumInput}
-                      value={onboardingHeight}
-                      onChangeText={setOnboardingHeight}
-                      placeholder="175"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="decimal-pad"
-                      maxLength={5}
-                    />
-                    <View style={styles.statUnitBadge}>
-                      <Text style={styles.statUnitText}>cm</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {/* Live BMI Banner if Calculated */}
-              {calculatedBMI ? (
-                <View style={styles.bmiPreviewBanner}>
-                  <Icon name="fitness-outline" size={moderateScale(15)} color="#10B981" />
-                  <Text style={styles.bmiPreviewText}>
-                    Calculated BMI: <Text style={{ fontWeight: '800', color: '#0F172A' }}>{calculatedBMI}</Text>
-                    {' • '}
-                    <Text style={{ color: calculatedBMI < 18.5 ? '#F59E0B' : calculatedBMI <= 24.9 ? '#10B981' : '#EF4444', fontWeight: '700' }}>
-                      {calculatedBMI < 18.5 ? 'Underweight' : calculatedBMI <= 24.9 ? 'Normal Weight' : 'Overweight'}
-                    </Text>
-                  </Text>
-                </View>
-              ) : null}
-
-              {/* 2. Fitness Goal Selector (2x2 Grid) */}
-              <View style={styles.goalSectionBox}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: moderateScale(8) }}>
-                  <Icon name="trophy-outline" size={moderateScale(14)} color="#6C5CE7" />
-                  <Text style={styles.goalSectionLabel}>PRIMARY FITNESS GOAL</Text>
-                </View>
-
-                <View style={styles.goalGrid}>
-                  {[
-                    { id: 'Weight Loss', label: 'Weight Loss', sub: 'Burn fat & lean', iconName: 'flame-outline' },
-                    { id: 'Weight Gain', label: 'Weight Gain', sub: 'Gain mass & bulk', iconName: 'trending-up-outline' },
-                    { id: 'Muscle Building', label: 'Muscle Gain', sub: 'Build pure muscle', iconName: 'barbell-outline' },
-                    { id: 'Stay Fit', label: 'Stay Fit', sub: 'Active & healthy', iconName: 'flash-outline' },
-                  ].map((item) => {
-                    const isSelected = onboardingGoal === item.id;
-                    return (
-                      <TouchableOpacity
-                        key={item.id}
-                        style={[styles.goalOptionCard, isSelected && styles.goalOptionCardActive]}
-                        onPress={() => setOnboardingGoal(item.id as any)}
-                        activeOpacity={0.8}
-                      >
-                        <View style={[styles.goalIconCircle, isSelected && styles.goalIconCircleActive]}>
-                          <Icon
-                            name={item.iconName}
-                            size={moderateScale(15)}
-                            color={isSelected ? '#6C5CE7' : '#64748B'}
-                          />
-                        </View>
-                        <Text style={[styles.goalOptionTitle, isSelected && styles.goalOptionTitleActive]}>
-                          {item.label}
-                        </Text>
-                        <Text style={styles.goalOptionSub} numberOfLines={1}>
-                          {item.sub}
-                        </Text>
-                        {isSelected && (
-                          <View style={styles.goalSelectedCheck}>
-                            <Icon name="checkmark-circle" size={moderateScale(13)} color="#6C5CE7" />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Save Button */}
-              <TouchableOpacity
-                style={[styles.confirmExpBtn, isOnboardingSaving && { opacity: 0.7 }]}
-                onPress={handleSaveFitnessProfile}
-                disabled={isOnboardingSaving}
-                activeOpacity={0.85}
-              >
-                {isOnboardingSaving ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.confirmExpBtnText}>Save & Continue  →</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
+        {/* ── MANDATORY FIRST-TIME MEMBER BASIC PROFILE SETUP MODAL ── */}
+        <InitialProfileSetupModal
+          visible={showInitialSetupModal}
+          member={(liveData as any)?.member || currentMember || currentUser}
+          onComplete={handleInitialSetupComplete}
+        />
 
         {/* ── HIGH-FIDELITY CHECK-IN & CHECK-OUT POPUP MODAL ── */}
         <CheckInOutModal
@@ -1454,21 +1234,27 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
+    position: 'relative',
   },
   notifBadge: {
     position: 'absolute',
-    top: moderateScale(4),
-    right: moderateScale(4),
-    width: moderateScale(15),
-    height: moderateScale(15),
-    borderRadius: moderateScale(7.5),
-    backgroundColor: '#FF3B30',
+    top: -moderateScale(3),
+    right: -moderateScale(3),
+    minWidth: moderateScale(18),
+    height: moderateScale(18),
+    borderRadius: moderateScale(9),
+    backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: moderateScale(3),
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 99,
+    elevation: 4,
   },
   notifBadgeText: {
-    fontSize: fontScale(8.5),
-    fontWeight: '800',
+    fontSize: fontScale(9.5),
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   avatarBtn: {

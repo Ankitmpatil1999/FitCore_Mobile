@@ -14,7 +14,9 @@ import OwnerAnalytics from '../screens/owner/OwnerAnalytics';
 import MembershipPlansScreen from '../screens/owner/MembershipPlansScreen';
 import GymProfileScreen from '../screens/owner/GymProfileScreen';
 import OwnerWorkoutPlansScreen from '../screens/owner/OwnerWorkoutPlansScreen';
+import OwnerAttendanceScreen from '../screens/owner/OwnerAttendanceScreen';
 import NotificationsScreen from '../screens/member/NotificationsScreen';
+import PendingDuesScreen from '../screens/owner/PendingDuesScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -137,9 +139,13 @@ export default function OwnerNavigator() {
       <Stack.Screen name="Plans" component={MembershipPlansScreen} />
       <Stack.Screen name="Shop" component={ProductStoreScreen} />
       <Stack.Screen name="Analytics" component={OwnerAnalytics} />
+      <Stack.Screen name="Attendance" component={OwnerAttendanceScreen} />
+      <Stack.Screen name="Turnstile" component={OwnerAttendanceScreen} />
       <Stack.Screen name="GymProfile" component={GymProfileScreen} />
       <Stack.Screen name="WorkoutPlans" component={OwnerWorkoutPlansScreen} />
       <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="PendingDues" component={PendingDuesScreen} />
+      <Stack.Screen name="DuesAndRenewals" component={PendingDuesScreen} />
     </Stack.Navigator>
   );
 }

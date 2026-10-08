@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '../services/api';
 import { useAppContext } from './AppContext';
 import { navigate } from '../navigation/navigationRef';
+import nativeBadgeService from '../services/nativeBadgeService';
 
 export interface InAppBannerData {
   id: string;
@@ -36,13 +37,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [activeBanner, setActiveBanner] = useState<InAppBannerData | null>(null);
 
   const isInitialLoadRef = useRef<boolean>(true);
+  const hasTriggeredInitialBannerRef = useRef<boolean>(false);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const bannerTimerRef = useRef<any>(null);
 
-  // Load seen IDs cache on startup
+  // Request Android System Notification Permission & Load Seen IDs on startup
   useEffect(() => {
     (async () => {
       try {
+        nativeBadgeService.requestNotificationPermission().catch(() => {});
         const stored = await AsyncStorage.getItem(SEEN_NOTIFS_KEY);
         if (stored) {
           const arr = JSON.parse(stored);
@@ -64,7 +67,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     const bannerObj: InAppBannerData = {
       id: banner.id || `banner_${Date.now()}`,
-      title: banner.title || 'New Notification',
+      title: banner.title || 'New Gym Notification',
       message: banner.message || '',
       type: banner.type || 'info',
       date: banner.date || 'Just now',
@@ -74,10 +77,10 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     setActiveBanner(bannerObj);
 
-    // Auto dismiss after 4.5 seconds
+    // Auto dismiss after 5 seconds
     bannerTimerRef.current = setTimeout(() => {
       setActiveBanner(null);
-    }, 4500);
+    }, 5000);
   }, []);
 
   const refreshNotifications = useCallback(async () => {
@@ -95,30 +98,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
       const userRole = role || 'member';
 
-      const notifKeys = [
-        'fitcore_read_notifs_all',
-        `fitcore_read_notifs_${targetUserId}`,
-        (currentMember as any)?.id ? `fitcore_read_notifs_${(currentMember as any).id}` : null,
-        (currentMember as any)?._id ? `fitcore_read_notifs_${(currentMember as any)._id}` : null,
-        (currentMember as any)?.userId ? `fitcore_read_notifs_${(currentMember as any).userId}` : null,
-        currentUser?.id ? `fitcore_read_notifs_${currentUser.id}` : null,
-        currentUser?.phone ? `fitcore_read_notifs_${currentUser.phone}` : null,
-        (currentMember as any)?.phone ? `fitcore_read_notifs_${(currentMember as any).phone}` : null,
-      ].filter(Boolean) as string[];
-
-      const storedResults = await Promise.all(notifKeys.map(k => AsyncStorage.getItem(k).catch(() => null)));
-      const allReadTimeStr = await AsyncStorage.getItem('fitcore_all_notifs_read_timestamp').catch(() => null);
-      const allReadTime = allReadTimeStr ? Number(allReadTimeStr) : 0;
-
+      // Load specific user's read notification IDs
+      const userReadStorageKey = `fitcore_read_notifs_${targetUserId}`;
+      const userReadData = await AsyncStorage.getItem(userReadStorageKey).catch(() => null);
       const locallyReadIds = new Set<string>();
-      storedResults.forEach(res => {
-        if (res) {
-          try {
-            const arr = JSON.parse(res);
-            if (Array.isArray(arr)) arr.forEach(i => locallyReadIds.add(String(i)));
-          } catch (e) {}
-        }
-      });
+
+      if (userReadData) {
+        try {
+          const arr = JSON.parse(userReadData);
+          if (Array.isArray(arr)) arr.forEach((i: any) => locallyReadIds.add(String(i)));
+        } catch (e) {}
+      }
 
       const res: any = await apiService.getNotifications(userRole, targetGymId, targetUserId);
 
@@ -127,53 +117,84 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         setNotifications(list);
 
         let unread = 0;
-        let latestNewUnread: any = null;
+        let latestUnreadNotif: any = null;
 
         for (const notif of list) {
           const nId = String(notif.id || notif._id || '');
-          const createdAtTime = notif.createdAt ? new Date(notif.createdAt).getTime() : 0;
           const isRead = Boolean(
             notif.isRead ||
             notif.read ||
-            locallyReadIds.has(nId) ||
-            (allReadTime > 0 && createdAtTime > 0 && createdAtTime <= allReadTime)
+            locallyReadIds.has(nId)
           );
 
           if (!isRead) {
             unread += 1;
-            // Check if this is a newly arrived unread notification we haven't seen in this session
-            if (!isInitialLoadRef.current && !seenIdsRef.current.has(nId) && !latestNewUnread) {
-              latestNewUnread = notif;
+            if (!latestUnreadNotif) {
+              latestUnreadNotif = notif;
             }
-          }
-          if (nId) {
-            seenIdsRef.current.add(nId);
           }
         }
 
         setUnreadCount(unread);
 
-        // Save seen IDs cache to AsyncStorage
+        // Update Android App Launcher Icon Badge Number on phone home screen!
+        nativeBadgeService.setBadgeCount(unread).catch(() => {});
+
+        // If this is app startup and there are unread notifications, trigger in-app banner & system notification!
+        if (latestUnreadNotif && !hasTriggeredInitialBannerRef.current) {
+          hasTriggeredInitialBannerRef.current = true;
+          const notifTitle = latestUnreadNotif.title || 'Gym Notification';
+          const notifBody = latestUnreadNotif.message || latestUnreadNotif.body || 'You have new unread updates from FitCore.';
+
+          // 1. Post Android System Heads-Up Notification (Notification Tray)
+          nativeBadgeService.postNotification(notifTitle, notifBody, unread).catch(() => {});
+
+          // 2. Show In-App Luxury Banner
+          setTimeout(() => {
+            showInAppNotification({
+              id: String(latestUnreadNotif.id || latestUnreadNotif._id),
+              title: notifTitle,
+              message: notifBody,
+              type: latestUnreadNotif.type || 'info',
+              date: latestUnreadNotif.date || 'Just now',
+              actionScreen: 'Notifications',
+            });
+          }, 600);
+        } else if (latestUnreadNotif && !isInitialLoadRef.current) {
+          const nId = String(latestUnreadNotif.id || latestUnreadNotif._id);
+          if (!seenIdsRef.current.has(nId)) {
+            seenIdsRef.current.add(nId);
+            const notifTitle = latestUnreadNotif.title || 'Gym Notification';
+            const notifBody = latestUnreadNotif.message || latestUnreadNotif.body || 'You have received a new update from FitCore.';
+
+            // Post System Notification & In-App Banner
+            nativeBadgeService.postNotification(notifTitle, notifBody, unread).catch(() => {});
+            showInAppNotification({
+              id: nId,
+              title: notifTitle,
+              message: notifBody,
+              type: latestUnreadNotif.type || 'info',
+              date: latestUnreadNotif.date || 'Just now',
+              actionScreen: 'Notifications',
+            });
+          }
+        }
+
+        for (const notif of list) {
+          const nId = String(notif.id || notif._id || '');
+          if (nId) seenIdsRef.current.add(nId);
+        }
+
+        // Save seen IDs cache
         const seenArr = Array.from(seenIdsRef.current).slice(-100);
         AsyncStorage.setItem(SEEN_NOTIFS_KEY, JSON.stringify(seenArr)).catch(() => {});
-
-        // If a new unread notification arrived in real-time, show animated top banner!
-        if (latestNewUnread && !isInitialLoadRef.current) {
-          showInAppNotification({
-            id: String(latestNewUnread.id || latestNewUnread._id),
-            title: latestNewUnread.title || 'Gym Notification',
-            message: latestNewUnread.message || latestNewUnread.body || 'You have received a new update from FitCore.',
-            type: latestNewUnread.type || 'info',
-            date: latestNewUnread.date || 'Just now',
-            actionScreen: 'Notifications',
-          });
-        }
       } else {
         setNotifications([]);
         setUnreadCount(0);
+        nativeBadgeService.clearBadge().catch(() => {});
       }
     } catch (e) {
-      // Quiet fail if network temporarily unavailable
+      // Network fail safe
     } finally {
       if (isInitialLoadRef.current) {
         isInitialLoadRef.current = false;
@@ -181,18 +202,20 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [isLoggedIn, currentGym?.id, currentMember, currentUser, role, showInAppNotification]);
 
-  // Initial fetch and 10s background live polling
+  // Initial fetch and 8s background live polling
   useEffect(() => {
     if (!isLoggedIn) {
       setNotifications([]);
       setUnreadCount(0);
+      hasTriggeredInitialBannerRef.current = false;
+      nativeBadgeService.clearBadge().catch(() => {});
       return;
     }
 
     refreshNotifications();
     const interval = setInterval(() => {
       refreshNotifications();
-    }, 10000);
+    }, 8000);
 
     return () => clearInterval(interval);
   }, [isLoggedIn, refreshNotifications]);
@@ -216,7 +239,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         await AsyncStorage.setItem(storageKey, JSON.stringify(parsed));
       }
 
-      setUnreadCount(prev => Math.max(0, prev - 1));
+      setUnreadCount(prev => {
+        const nextCount = Math.max(0, prev - 1);
+        nativeBadgeService.setBadgeCount(nextCount).catch(() => {});
+        return nextCount;
+      });
+
       setNotifications(prev =>
         prev.map(n => (String(n.id || n._id) === idStr ? { ...n, read: true, isRead: true } : n))
       );
@@ -241,10 +269,9 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       const allIds = notifications.map(n => String(n.id || n._id));
       const storageKey = `fitcore_read_notifs_${targetUserId}`;
       await AsyncStorage.setItem(storageKey, JSON.stringify(allIds));
-      await AsyncStorage.setItem('fitcore_read_notifs_all', JSON.stringify(allIds));
-      await AsyncStorage.setItem('fitcore_all_notifs_read_timestamp', String(Date.now()));
 
       setUnreadCount(0);
+      nativeBadgeService.clearBadge().catch(() => {});
       setNotifications(prev => prev.map(n => ({ ...n, read: true, isRead: true })));
 
       await apiService.markAllNotificationsRead(targetUserId, targetGymId);

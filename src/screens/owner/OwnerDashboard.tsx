@@ -27,6 +27,8 @@ import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
 import { useNotifications } from '../../context/NotificationContext';
 import apiService from '../../services/api';
+import EnrollAthleteModal from '../../components/common/EnrollAthleteModal';
+import VoiceInputButton from '../../components/common/VoiceInputButton';
 
 // ── Asset Icons ──
 const bellNotifImg = require('../../assets/Icons2/bell_clean.png');
@@ -104,16 +106,19 @@ export default function OwnerDashboard({ navigation }: any) {
     pendingCount: 0,
   });
 
-  // ── 7-Day Footfall Trends ──
+  // ── 7-Day Footfall Trends (100% Live API) ──
   const [weekFootfall, setWeekFootfall] = useState<{ day: string; count: number }[]>([
-    { day: 'Mon', count: 2 },
-    { day: 'Tue', count: 27 },
-    { day: 'Wed', count: 10 },
-    { day: 'Thu', count: 26 },
-    { day: 'Fri', count: 4 },
+    { day: 'Mon', count: 0 },
+    { day: 'Tue', count: 0 },
+    { day: 'Wed', count: 0 },
+    { day: 'Thu', count: 0 },
+    { day: 'Fri', count: 0 },
     { day: 'Sat', count: 0 },
-    { day: 'Sun', count: 1 },
+    { day: 'Sun', count: 0 },
   ]);
+  const [chartTab, setChartTab] = useState<'checkin' | 'trends'>('checkin');
+  const [hourlyFootfall, setHourlyFootfall] = useState<any[]>([]);
+  const [peakHourText, setPeakHourText] = useState<string>('N/A');
 
   // ── Top Performing Trainers ──
   const [trainersList, setTrainersList] = useState<any[]>([
@@ -153,6 +158,7 @@ export default function OwnerDashboard({ navigation }: any) {
   // Notice Form State
   const [noticeTitle, setNoticeTitle] = useState('');
   const [noticeMessage, setNoticeMessage] = useState('');
+  const [noticeVoiceLang, setNoticeVoiceLang] = useState<'hi-IN' | 'en-IN'>('hi-IN');
   const [isSubmittingNotice, setIsSubmittingNotice] = useState(false);
 
   // Expense Form State
@@ -276,28 +282,27 @@ export default function OwnerDashboard({ navigation }: any) {
         pendingCount: pendingMCount,
       });
 
-      // Weekly trends
-      if (attendanceStatsRes.success && (attendanceStatsRes.data as any)?.dailyFootfall) {
-        const liveFootfall = (attendanceStatsRes.data as any).dailyFootfall;
-        const week = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => {
-          const match = liveFootfall.find((f: any) => f.dayName === day);
-          return {
-            day,
-            count: match ? match.count : 0,
-          };
-        });
-        setWeekFootfall(week);
-      } else {
-        setWeekFootfall([
-          { day: 'Mon', count: 2 },
-          { day: 'Tue', count: 27 },
-          { day: 'Wed', count: 10 },
-          { day: 'Thu', count: 26 },
-          { day: 'Fri', count: 4 },
-          { day: 'Sat', count: 0 },
-          { day: 'Sun', count: todayCount || 1 },
-        ]);
-      }
+      // Weekly trends (100% Dynamic from Backend API)
+      const attData = (attendanceStatsRes.data as any) || (attendanceStatsRes as any)?.stats || {};
+      const liveFootfall = Array.isArray(attData?.dailyFootfall) ? attData.dailyFootfall : [];
+      const daysOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const week = daysOrder.map((day) => {
+        const match = liveFootfall.find((f: any) => f.dayName === day || f.day === day);
+        return {
+          day,
+          count: match ? Number(match.count || 0) : 0,
+        };
+      });
+      setWeekFootfall(week);
+
+      // Hourly Distribution & Peak Hour for Live Trends
+      const liveHourly = Array.isArray(attData?.hourlyDistribution)
+        ? attData.hourlyDistribution
+        : Array.isArray(attData?.hourlyFootfall)
+        ? attData.hourlyFootfall
+        : [];
+      setHourlyFootfall(liveHourly);
+      setPeakHourText(attData?.peakHour || 'N/A');
 
       // Top Trainers
       if (trainersRes.success && Array.isArray(trainersRes.data) && trainersRes.data.length > 0) {
@@ -391,7 +396,8 @@ export default function OwnerDashboard({ navigation }: any) {
     fetchDashboardData();
   };
 
-  const maxFootfall = Math.max(...weekFootfall.map((w) => w.count), 1);
+  const maxFootfall = Math.max(...weekFootfall.map((w) => Number(w.count || 0)), 1);
+  const maxHourly = Math.max(...hourlyFootfall.map((item) => Number(item.count || item.value || 0)), 1);
 
   // ── Handler: 1-Click In-App Fee / Renewal Reminder ──
   const handleSendInAppReminder = async (member: any) => {
@@ -631,101 +637,210 @@ export default function OwnerDashboard({ navigation }: any) {
         }
       >
         <Animated.View style={{ opacity: fadeAnim, transform: [{ translateY: slideAnim }] }}>
-          {/* ── 2X2 METRIC CARDS (EXACT MATCH TO DESIGN SYSTEM) ── */}
-          <View style={styles.metrics2x2Grid}>
-            {/* Card 1: Total Members */}
-            <AnimatedPressable
-              style={styles.metricCard}
-              onPress={() => navigation.navigate('Members')}
-            >
-              <View style={[styles.cardIconBox, { backgroundColor: '#EEF2FF', marginBottom: 8 }]}>
-                <AppIcon name="members" size={16} color="#6366F1" />
-              </View>
-              <Text style={styles.cardMainNum}>{stats.totalMembers}</Text>
-              <Text style={styles.cardTitle}>Total Members</Text>
-            </AnimatedPressable>
+          {/* ── 2X2 METRIC CARDS (STRICT 2 CARDS PER ROW: ICON & VALUE IN ONE ROW, LABEL BELOW) ── */}
+          <View style={styles.metricsContainer}>
+            {/* Row 1 */}
+            <View style={styles.metricRow}>
+              {/* Card 1: Total Members */}
+              <AnimatedPressable
+                style={styles.metricCard}
+                onPress={() => navigation.navigate('Members')}
+              >
+                <View style={styles.metricCardHeaderRow}>
+                  <View style={[styles.cardIconBox, { backgroundColor: '#EEF2FF', borderColor: '#E0E7FF' }]}>
+                    <AppIcon name="members" size={15} color="#6366F1" />
+                  </View>
+                  <Text style={styles.cardMainNum} numberOfLines={1}>
+                    {stats.totalMembers}
+                  </Text>
+                </View>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  Total Members
+                </Text>
+              </AnimatedPressable>
 
-            {/* Card 2: Today Check-Ins */}
-            <AnimatedPressable
-              style={styles.metricCard}
-              onPress={() => navigation.navigate('Reports')}
-            >
-              <View style={[styles.cardIconBox, { backgroundColor: '#ECFDF5', marginBottom: 8 }]}>
-                <AppIcon name="flash" size={16} color="#10B981" />
-              </View>
-              <Text style={styles.cardMainNum}>{stats.todayCheckIns}</Text>
-              <Text style={styles.cardTitle}>Today Check-Ins</Text>
-            </AnimatedPressable>
+              {/* Card 2: Today Check-Ins */}
+              <AnimatedPressable
+                style={styles.metricCard}
+                onPress={() => navigation.navigate('Attendance')}
+              >
+                <View style={styles.metricCardHeaderRow}>
+                  <View style={[styles.cardIconBox, { backgroundColor: '#ECFDF5', borderColor: '#D1FAE5' }]}>
+                    <AppIcon name="flash" size={15} color="#10B981" />
+                  </View>
+                  <Text style={styles.cardMainNum} numberOfLines={1}>
+                    {stats.todayCheckIns}
+                  </Text>
+                </View>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  Today Check-Ins
+                </Text>
+              </AnimatedPressable>
+            </View>
 
-            {/* Card 3: Collections */}
-            <AnimatedPressable
-              style={styles.metricCard}
-              onPress={() => navigation.navigate('Finance')}
-            >
-              <View style={[styles.cardIconBox, { backgroundColor: '#FDF2F8', marginBottom: 8 }]}>
-                <AppIcon name="wallet" size={16} color="#EC4899" />
-              </View>
-              <Text style={styles.cardMainNum}>
-                ₹{stats.collectionsThisMonth.toLocaleString('en-IN')}
-              </Text>
-              <Text style={styles.cardTitle}>Total Collections</Text>
-            </AnimatedPressable>
+            {/* Row 2 */}
+            <View style={styles.metricRow}>
+              {/* Card 3: Collections */}
+              <AnimatedPressable
+                style={styles.metricCard}
+                onPress={() => navigation.navigate('Finance')}
+              >
+                <View style={styles.metricCardHeaderRow}>
+                  <View style={[styles.cardIconBox, { backgroundColor: '#FDF2F8', borderColor: '#FCE7F3' }]}>
+                    <AppIcon name="wallet" size={15} color="#EC4899" />
+                  </View>
+                  <Text style={styles.cardMainNum} numberOfLines={1}>
+                    ₹{stats.collectionsThisMonth.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  Total Collections
+                </Text>
+              </AnimatedPressable>
 
-            {/* Card 4: Pending Dues */}
-            <AnimatedPressable
-              style={styles.metricCard}
-              onPress={() => navigation.navigate('Finance')}
-            >
-              <View style={[styles.cardIconBox, { backgroundColor: '#FFF7ED', marginBottom: 8 }]}>
-                <AppIcon name="receipt" size={16} color="#F97316" />
-              </View>
-              <Text style={styles.cardMainNum}>
-                ₹{stats.pendingDues.toLocaleString('en-IN')}
-              </Text>
-              <Text style={styles.cardTitle}>Pending Dues</Text>
-            </AnimatedPressable>
+              {/* Card 4: Pending Dues */}
+              <AnimatedPressable
+                style={styles.metricCard}
+                onPress={() => navigation.navigate('PendingDues')}
+              >
+                <View style={styles.metricCardHeaderRow}>
+                  <View style={[styles.cardIconBox, { backgroundColor: '#FFF7ED', borderColor: '#FFEDD5' }]}>
+                    <AppIcon name="receipt" size={15} color="#F97316" />
+                  </View>
+                  <Text style={styles.cardMainNum} numberOfLines={1}>
+                    ₹{stats.pendingDues.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+                <Text style={styles.cardTitle} numberOfLines={1}>
+                  Pending Dues
+                </Text>
+              </AnimatedPressable>
+            </View>
           </View>
 
-          {/* ── 3. CHECK-IN OVERVIEW & BAR CHART (EXACT MATCH) ── */}
+          {/* ── 3. CHECK-IN OVERVIEW & LIVE TRENDS (100% REAL-TIME API) ── */}
           <View style={styles.chartCard}>
             <View style={styles.chartToggleHeader}>
-              <View style={styles.chartToggleActive}>
-                <Text style={styles.chartToggleActiveText}>Check-in Overview</Text>
-              </View>
               <TouchableOpacity
-                style={styles.chartToggleInactive}
-                onPress={() => navigation.navigate('Reports')}
+                style={chartTab === 'checkin' ? styles.chartToggleActive : styles.chartToggleInactive}
+                onPress={() => setChartTab('checkin')}
+                activeOpacity={0.7}
               >
-                <Text style={styles.chartToggleInactiveText}>Live Trends</Text>
+                <Text style={chartTab === 'checkin' ? styles.chartToggleActiveText : styles.chartToggleInactiveText}>
+                  Check-in Overview
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={chartTab === 'trends' ? styles.chartToggleActive : styles.chartToggleInactive}
+                onPress={() => setChartTab('trends')}
+                activeOpacity={0.7}
+              >
+                <Text style={chartTab === 'trends' ? styles.chartToggleActiveText : styles.chartToggleInactiveText}>
+                  Live Trends
+                </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Bar Chart Columns */}
-            <View style={styles.barChartWrap}>
-              {weekFootfall.map((item, idx) => {
-                const heightRatio = Math.max(0.12, item.count / maxFootfall);
-                const barHeight = Math.round(heightRatio * 85);
-                const isHighlight = item.count >= 20;
+            {chartTab === 'checkin' ? (
+              <>
+                {/* Bar Chart Columns (Mon - Sun) */}
+                <View style={styles.barChartWrap}>
+                  {weekFootfall.map((item, idx) => {
+                    const heightRatio = maxFootfall > 0 ? Math.max(0.12, item.count / maxFootfall) : 0.12;
+                    const barHeight = Math.round(heightRatio * 85);
+                    const isHighlight = item.count > 0 && item.count === maxFootfall;
 
-                return (
-                  <View key={idx} style={styles.barColumn}>
-                    <Text style={[styles.barValueText, isHighlight && styles.barValueHighlight]}>
-                      {item.count}
-                    </Text>
-                    <View style={styles.barTrack}>
-                      <View
-                        style={[
-                          styles.barFill,
-                          { height: barHeight },
-                          isHighlight && styles.barFillHighlight,
-                        ]}
-                      />
-                    </View>
-                    <Text style={styles.barDayText}>{item.day}</Text>
+                    return (
+                      <View key={idx} style={styles.barColumn}>
+                        <Text style={[styles.barValueText, isHighlight && styles.barValueHighlight]}>
+                          {item.count}
+                        </Text>
+                        <View style={styles.barTrack}>
+                          <View
+                            style={[
+                              styles.barFill,
+                              { height: barHeight },
+                              isHighlight && styles.barFillHighlight,
+                            ]}
+                          />
+                        </View>
+                        <Text style={styles.barDayText}>{item.day}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                {/* Turnstile Sync status row */}
+                <View style={styles.chartFooterRow}>
+                  <View style={styles.liveBadgeRow}>
+                    <View style={styles.livePulseDot} />
+                    <Text style={styles.liveBadgeText}>Live Turnstile Synced</Text>
                   </View>
-                );
-              })}
-            </View>
+                  <Text style={styles.chartSubInfoText}>
+                    Peak: <Text style={{ color: '#4F46E5', fontWeight: '800' }}>{peakHourText}</Text>
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                {/* Live Trends Hourly Traffic Breakdown */}
+                <View style={styles.trendsContainer}>
+                  <View style={styles.trendsHeaderRow}>
+                    <View>
+                      <Text style={styles.trendsHeaderTitle}>Floor Density Today</Text>
+                      <Text style={styles.trendsHeaderSub}>Turnstile check-ins by hour</Text>
+                    </View>
+                    <View style={styles.peakHourPill}>
+                      <AppIcon name="flame" size={13} color="#EA580C" />
+                      <Text style={styles.peakHourPillText}>Peak: {peakHourText}</Text>
+                    </View>
+                  </View>
+
+                  {/* Hourly Horizontal Scroll Bars */}
+                  {hourlyFootfall.length > 0 ? (
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hourlyScrollWrap}>
+                      {hourlyFootfall.map((slot: any, idx: number) => {
+                        const count = Number(slot.count || slot.value || 0);
+                        const ratio = maxHourly > 0 ? Math.max(0.12, count / maxHourly) : 0.12;
+                        const barHeight = Math.round(ratio * 70);
+                        const isSlotPeak = slot.isPeak || (count > 0 && count === maxHourly);
+
+                        return (
+                          <View key={idx} style={styles.hourlySlotCol}>
+                            <Text style={[styles.hourlySlotVal, isSlotPeak && styles.barValueHighlight]}>
+                              {count}
+                            </Text>
+                            <View style={styles.hourlyBarTrack}>
+                              <View
+                                style={[
+                                  styles.hourlyBarFill,
+                                  { height: barHeight },
+                                  isSlotPeak && styles.hourlyBarFillPeak,
+                                ]}
+                              />
+                            </View>
+                            <Text style={styles.hourlySlotLabel}>{slot.label || `${slot.hour}:00`}</Text>
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  ) : (
+                    <View style={styles.emptyTrendsWrap}>
+                      <Text style={styles.emptyTrendsText}>No check-ins recorded yet today.</Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.fullAnalyticsLinkBtn}
+                    onPress={() => navigation.navigate('Reports')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.fullAnalyticsLinkText}>Open Full Analytics & Reports</Text>
+                    <AppIcon name="chevron-forward" size={14} color="#4F46E5" />
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
 
           {/* ── 4. QUICK ACTIONS TOOLBAR (2 PER ROW GRID) ── */}
@@ -734,78 +849,87 @@ export default function OwnerDashboard({ navigation }: any) {
               <Text style={styles.sectionHeading}>Quick Actions</Text>
             </View>
 
-            <View style={styles.quickActionsGridContainer}>
-              {/* Tile 1: Add Member (Purple) */}
-              <AnimatedPressable
-                style={styles.actionCard2Col}
-                onPress={() => setShowAddMemberModal(true)}
-              >
-                <View style={[styles.actionIconBox2Col, { backgroundColor: '#EEF2FF' }]}>
-                  <AppIcon name="person-add" size={20} color="#6366F1" />
-                </View>
-                <Text style={styles.actionTitle2Col}>Add Member</Text>
-                <Text style={styles.actionSub2Col}>Register new client</Text>
-              </AnimatedPressable>
+            <View style={styles.quickActionsContainer}>
+              {/* Row 1 */}
+              <View style={styles.quickActionRow}>
+                {/* Tile 1: Add Member (Purple) */}
+                <AnimatedPressable
+                  style={styles.actionCard2Col}
+                  onPress={() => setShowAddMemberModal(true)}
+                >
+                  <View style={[styles.actionIconBox2Col, { backgroundColor: '#EEF2FF' }]}>
+                    <AppIcon name="person-add" size={20} color="#6366F1" />
+                  </View>
+                  <Text style={styles.actionTitle2Col}>Add Member</Text>
+                  <Text style={styles.actionSub2Col}>Register new client</Text>
+                </AnimatedPressable>
 
-              {/* Tile 2: Packages (Orange) */}
-              <AnimatedPressable
-                style={styles.actionCard2Col}
-                onPress={() => navigation.navigate('Packages')}
-              >
-                <View style={[styles.actionIconBox2Col, { backgroundColor: '#FFEDD5' }]}>
-                  <AppIcon name="plan" size={20} color="#EA580C" />
-                </View>
-                <Text style={styles.actionTitle2Col}>Packages</Text>
-                <Text style={styles.actionSub2Col}>Manage gym plans</Text>
-              </AnimatedPressable>
+                {/* Tile 2: Packages (Orange) */}
+                <AnimatedPressable
+                  style={styles.actionCard2Col}
+                  onPress={() => navigation.navigate('Packages')}
+                >
+                  <View style={[styles.actionIconBox2Col, { backgroundColor: '#FFEDD5' }]}>
+                    <AppIcon name="plan" size={20} color="#EA580C" />
+                  </View>
+                  <Text style={styles.actionTitle2Col}>Packages</Text>
+                  <Text style={styles.actionSub2Col}>Manage gym plans</Text>
+                </AnimatedPressable>
+              </View>
 
-              {/* Tile 3: Add Expense (Pink) */}
-              <AnimatedPressable
-                style={styles.actionCard2Col}
-                onPress={() => setShowAddExpenseModal(true)}
-              >
-                <View style={[styles.actionIconBox2Col, { backgroundColor: '#FCE7F3' }]}>
-                  <AppIcon name="pay" size={20} color="#DB2777" />
-                </View>
-                <Text style={styles.actionTitle2Col}>Add Expense</Text>
-                <Text style={styles.actionSub2Col}>Log daily spend</Text>
-              </AnimatedPressable>
+              {/* Row 2 */}
+              <View style={styles.quickActionRow}>
+                {/* Tile 3: Add Expense (Pink) */}
+                <AnimatedPressable
+                  style={styles.actionCard2Col}
+                  onPress={() => setShowAddExpenseModal(true)}
+                >
+                  <View style={[styles.actionIconBox2Col, { backgroundColor: '#FCE7F3' }]}>
+                    <AppIcon name="pay" size={20} color="#DB2777" />
+                  </View>
+                  <Text style={styles.actionTitle2Col}>Add Expense</Text>
+                  <Text style={styles.actionSub2Col}>Log daily spend</Text>
+                </AnimatedPressable>
 
-              {/* Tile 4: Create Broadcast (Blue) */}
-              <AnimatedPressable
-                style={styles.actionCard2Col}
-                onPress={() => setShowNoticeModal(true)}
-              >
-                <View style={[styles.actionIconBox2Col, { backgroundColor: '#DBEAFE' }]}>
-                  <AppIcon name="notifications" size={20} color="#2563EB" />
-                </View>
-                <Text style={styles.actionTitle2Col}>Create Broadcast</Text>
-                <Text style={styles.actionSub2Col}>Send app notice</Text>
-              </AnimatedPressable>
+                {/* Tile 4: Create Broadcast (Blue) */}
+                <AnimatedPressable
+                  style={styles.actionCard2Col}
+                  onPress={() => setShowNoticeModal(true)}
+                >
+                  <View style={[styles.actionIconBox2Col, { backgroundColor: '#DBEAFE' }]}>
+                    <AppIcon name="notifications" size={20} color="#2563EB" />
+                  </View>
+                  <Text style={styles.actionTitle2Col}>Create Broadcast</Text>
+                  <Text style={styles.actionSub2Col}>Send app notice</Text>
+                </AnimatedPressable>
+              </View>
 
-              {/* Tile 5: Master Workout Split (Indigo) */}
-              <AnimatedPressable
-                style={styles.actionCard2Col}
-                onPress={() => navigation.navigate('WorkoutPlans')}
-              >
-                <View style={[styles.actionIconBox2Col, { backgroundColor: '#EEF2FF' }]}>
-                  <AppIcon name="gym" size={20} color="#4F46E5" />
-                </View>
-                <Text style={styles.actionTitle2Col}>Master Workout</Text>
-                <Text style={styles.actionSub2Col}>Workout splits</Text>
-              </AnimatedPressable>
+              {/* Row 3 */}
+              <View style={styles.quickActionRow}>
+                {/* Tile 5: Master Workout Split (Indigo) */}
+                <AnimatedPressable
+                  style={styles.actionCard2Col}
+                  onPress={() => navigation.navigate('WorkoutPlans')}
+                >
+                  <View style={[styles.actionIconBox2Col, { backgroundColor: '#EEF2FF' }]}>
+                    <AppIcon name="gym" size={20} color="#4F46E5" />
+                  </View>
+                  <Text style={styles.actionTitle2Col}>Master Workout</Text>
+                  <Text style={styles.actionSub2Col}>Workout splits</Text>
+                </AnimatedPressable>
 
-              {/* Tile 6: View Reports (Violet) */}
-              <AnimatedPressable
-                style={styles.actionCard2Col}
-                onPress={() => navigation.navigate('Reports')}
-              >
-                <View style={[styles.actionIconBox2Col, { backgroundColor: '#F3E8FF' }]}>
-                  <AppIcon name="chart" size={20} color="#8B5CF6" />
-                </View>
-                <Text style={styles.actionTitle2Col}>View Reports</Text>
-                <Text style={styles.actionSub2Col}>Analytics & trends</Text>
-              </AnimatedPressable>
+                {/* Tile 6: View Reports (Violet) */}
+                <AnimatedPressable
+                  style={styles.actionCard2Col}
+                  onPress={() => navigation.navigate('Reports')}
+                >
+                  <View style={[styles.actionIconBox2Col, { backgroundColor: '#F3E8FF' }]}>
+                    <AppIcon name="chart" size={20} color="#8B5CF6" />
+                  </View>
+                  <Text style={styles.actionTitle2Col}>View Reports</Text>
+                  <Text style={styles.actionSub2Col}>Analytics & trends</Text>
+                </AnimatedPressable>
+              </View>
             </View>
           </View>
 
@@ -813,87 +937,18 @@ export default function OwnerDashboard({ navigation }: any) {
         </Animated.View>
       </ScrollView>
 
-      {/* ── 1. MODAL: ENROLL MEMBER ── */}
-      <Modal
+      {/* ── 1. MODAL: ENROLL ATHLETE (EXACT 4-SECTION WEB PARITY) ── */}
+      <EnrollAthleteModal
         visible={showAddMemberModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAddMemberModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>Enroll New Member</Text>
-                <Text style={styles.modalSub}>{gymName}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.modalCloseBtn}
-                onPress={() => setShowAddMemberModal(false)}
-              >
-                <AppIcon name="close" size={20} color="#64748B" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Full Name *</Text>
-              <TextInput
-                style={styles.inputField}
-                placeholder="e.g. Rahul Sharma"
-                placeholderTextColor="#94A3B8"
-                value={memberName}
-                onChangeText={setMemberName}
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Mobile Phone (10 digits) *</Text>
-              <TextInput
-                style={styles.inputField}
-                placeholder="e.g. 9876543210"
-                placeholderTextColor="#94A3B8"
-                keyboardType="phone-pad"
-                maxLength={10}
-                value={memberPhone}
-                onChangeText={setMemberPhone}
-              />
-            </View>
-
-            <View style={styles.inputRow}>
-              <View style={[styles.inputGroup, { flex: 1, marginRight: wp(2) }]}>
-                <Text style={styles.inputLabel}>Plan Type</Text>
-                <TextInput
-                  style={styles.inputField}
-                  value={memberPlan}
-                  onChangeText={setMemberPlan}
-                />
-              </View>
-              <View style={[styles.inputGroup, { flex: 1, marginLeft: wp(2) }]}>
-                <Text style={styles.inputLabel}>Amount (₹)</Text>
-                <TextInput
-                  style={styles.inputField}
-                  keyboardType="numeric"
-                  value={memberAmount}
-                  onChangeText={setMemberAmount}
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.submitBtn}
-              onPress={handleAddMember}
-              disabled={isSubmittingMember}
-              activeOpacity={0.8}
-            >
-              {isSubmittingMember ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.submitBtnText}>ENROLL MEMBER</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        gymId={gymId}
+        gymName={gymName}
+        trainers={trainersList}
+        onClose={() => setShowAddMemberModal(false)}
+        onSuccess={(newMember) => {
+          setShowAddMemberModal(false);
+          fetchDashboardData();
+        }}
+      />
 
       {/* ── 2. MODAL: ADD EXPENSE ── */}
       <Modal
@@ -1017,15 +1072,81 @@ export default function OwnerDashboard({ navigation }: any) {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Message *</Text>
-              <TextInput
-                style={[styles.inputField, { height: 80, textAlignVertical: 'top' }]}
-                placeholder="Type your message for members..."
-                placeholderTextColor="#94A3B8"
-                multiline
-                numberOfLines={3}
-                value={noticeMessage}
-                onChangeText={setNoticeMessage}
+              <View style={styles.messageHeaderRow}>
+                <Text style={styles.inputLabel}>Message *</Text>
+                
+                {/* 🎙️ Clean Compact Language Switcher */}
+                <View style={styles.voiceLangToggle}>
+                  <TouchableOpacity
+                    onPress={() => setNoticeVoiceLang('hi-IN')}
+                    style={[
+                      styles.voiceLangBtn,
+                      noticeVoiceLang === 'hi-IN' && styles.voiceLangBtnActive,
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.voiceLangBtnText,
+                        noticeVoiceLang === 'hi-IN' && styles.voiceLangBtnTextActive,
+                      ]}
+                    >
+                      हिन्दी
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setNoticeVoiceLang('en-IN')}
+                    style={[
+                      styles.voiceLangBtn,
+                      noticeVoiceLang === 'en-IN' && styles.voiceLangBtnActive,
+                    ]}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.voiceLangBtnText,
+                        noticeVoiceLang === 'en-IN' && styles.voiceLangBtnTextActive,
+                      ]}
+                    >
+                      EN
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.messageInputWrapper}>
+                <TextInput
+                  style={[styles.inputField, styles.messageTextArea]}
+                  placeholder={
+                    noticeVoiceLang === 'hi-IN'
+                      ? 'माइक दबाकर बोलें या टाइप करें (उदा. कल सुबह 7 बजे...)'
+                      : 'Tap voice button below to speak or type message...'
+                  }
+                  placeholderTextColor="#94A3B8"
+                  multiline
+                  numberOfLines={4}
+                  value={noticeMessage}
+                  onChangeText={setNoticeMessage}
+                />
+                {Boolean(noticeMessage) && (
+                  <TouchableOpacity
+                    style={styles.clearTextBtn}
+                    onPress={() => setNoticeMessage('')}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.clearTextBtnText}>✕</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* 🎙️ Full-Width Responsive Continuous Voice Typing Bar */}
+              <VoiceInputButton
+                currentText={noticeMessage}
+                language={noticeVoiceLang}
+                onSpeechResult={(updatedText) => {
+                  setNoticeMessage(updatedText);
+                }}
               />
             </View>
 
@@ -1056,8 +1177,8 @@ const styles = StyleSheet.create({
 
   // ── 1. Hero Header & Top Bar ──
   heroHeaderContainer: {
-    backgroundColor: '#0F172A',
-    paddingBottom: hp(2.5),
+    backgroundColor: '#3730A3',
+    paddingBottom: hp(2.8),
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     overflow: 'hidden',
@@ -1071,7 +1192,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: '100%',
     height: '100%',
-    opacity: 1,
+    opacity: 0.38,
   },
   heroGradientOverlay: {
     position: 'absolute',
@@ -1079,7 +1200,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.35)',
+    backgroundColor: 'rgba(67, 56, 202, 0.55)',
   },
   topSafeArea: {
     paddingHorizontal: wp(5),
@@ -1117,18 +1238,23 @@ const styles = StyleSheet.create({
   },
   notiBadge: {
     position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
+    top: -moderateScale(2),
+    right: -moderateScale(2),
+    minWidth: moderateScale(18),
+    height: moderateScale(18),
+    borderRadius: moderateScale(9),
     backgroundColor: '#EF4444',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: moderateScale(3),
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+    zIndex: 99,
+    elevation: 4,
   },
   notiBadgeText: {
-    fontSize: fontScale(8),
-    fontWeight: '800',
+    fontSize: fontScale(9.5),
+    fontWeight: '900',
     color: '#FFFFFF',
   },
   headerAvatarBtn: {
@@ -1235,30 +1361,39 @@ const styles = StyleSheet.create({
 
   // ── 2. Scrollable Body & 2x2 Metric Grid ──
   scrollContent: {
-    paddingHorizontal: wp(5),
+    paddingHorizontal: wp(4.5),
     paddingTop: hp(2),
   },
-  metrics2x2Grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: wp(3),
+  metricsContainer: {
     marginBottom: hp(1.8),
   },
+  metricRow: {
+    flexDirection: 'row',
+    gap: moderateScale(10),
+    marginBottom: moderateScale(10),
+  },
   metricCard: {
-    width: (wp(90) - wp(3)) / 2,
+    flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: moderateScale(14),
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 15,
+    paddingVertical: moderateScale(10),
+    paddingHorizontal: moderateScale(11),
     borderWidth: 1,
     borderColor: '#EEF2F6',
     elevation: 2,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
+    shadowOpacity: 0.04,
     shadowRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricCardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: moderateScale(6),
+    marginBottom: moderateScale(2),
   },
 
   // ── Daily P&L Cashflow Card ──
@@ -1434,25 +1569,25 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   cardTitle: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(11),
     fontWeight: '700',
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 1,
     textAlign: 'center',
   },
   cardIconBox: {
-    width: moderateScale(28),
-    height: moderateScale(28),
+    width: moderateScale(26),
+    height: moderateScale(26),
     borderRadius: moderateScale(8),
     alignItems: 'center',
     justifyContent: 'center',
   },
   cardMainNum: {
-    fontSize: fontScale(22),
+    fontSize: fontScale(17.5),
     fontWeight: '900',
     color: '#0F172A',
-    letterSpacing: -0.5,
-    textAlign: 'center',
+    letterSpacing: -0.4,
+    flexShrink: 1,
   },
   checkedInNumRow: {
     flexDirection: 'row',
@@ -1593,6 +1728,135 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 6,
   },
+  chartFooterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: moderateScale(14),
+    paddingTop: moderateScale(10),
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  liveBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  livePulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  liveBadgeText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '700',
+    color: '#10B981',
+  },
+  chartSubInfoText: {
+    fontSize: fontScale(10.5),
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  trendsContainer: {
+    paddingTop: 4,
+  },
+  trendsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: moderateScale(12),
+  },
+  trendsHeaderTitle: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  trendsHeaderSub: {
+    fontSize: fontScale(10.5),
+    color: '#64748B',
+    marginTop: 1,
+  },
+  peakHourPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FFEDD5',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: 8,
+    gap: 4,
+  },
+  peakHourPillText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '800',
+    color: '#EA580C',
+  },
+  hourlyScrollWrap: {
+    paddingVertical: moderateScale(8),
+    paddingHorizontal: 2,
+    gap: moderateScale(10),
+    alignItems: 'flex-end',
+    height: 120,
+  },
+  hourlySlotCol: {
+    alignItems: 'center',
+    width: moderateScale(36),
+  },
+  hourlySlotVal: {
+    fontSize: fontScale(9.5),
+    fontWeight: '700',
+    color: '#64748B',
+    marginBottom: 4,
+  },
+  hourlyBarTrack: {
+    width: 18,
+    height: 70,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 4,
+  },
+  hourlyBarFill: {
+    width: '100%',
+    backgroundColor: '#A5B4FC',
+    borderRadius: 4,
+  },
+  hourlyBarFillPeak: {
+    backgroundColor: '#EA580C',
+  },
+  hourlySlotLabel: {
+    fontSize: fontScale(9),
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 6,
+  },
+  emptyTrendsWrap: {
+    paddingVertical: moderateScale(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTrendsText: {
+    fontSize: fontScale(11.5),
+    color: '#94A3B8',
+    fontWeight: '600',
+  },
+  fullAnalyticsLinkBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: moderateScale(14),
+    paddingTop: moderateScale(10),
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    gap: 4,
+  },
+  fullAnalyticsLinkText: {
+    fontSize: fontScale(11.5),
+    fontWeight: '800',
+    color: '#4F46E5',
+  },
 
   // ── 4. Quick Actions Section (2-Columns Luxury Cards Grid) ──
   quickActionsSection: {
@@ -1606,14 +1870,16 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0F172A',
   },
-  quickActionsGridContainer: {
+  quickActionsContainer: {
+    marginBottom: hp(1),
+  },
+  quickActionRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: wp(3),
+    gap: moderateScale(10),
+    marginBottom: moderateScale(10),
   },
   actionCard2Col: {
-    width: (wp(90) - wp(3)) / 2,
+    flex: 1,
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: moderateScale(14),
@@ -1799,6 +2065,65 @@ const styles = StyleSheet.create({
   },
   categoryPillTextActive: {
     color: '#DB2777',
+  },
+  messageHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  voiceControlRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  voiceLangToggle: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  voiceLangBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  voiceLangBtnActive: {
+    backgroundColor: '#3730A3',
+  },
+  voiceLangBtnText: {
+    fontSize: fontScale(10),
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  voiceLangBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  messageInputWrapper: {
+    position: 'relative',
+  },
+  messageTextArea: {
+    height: hp(12),
+    textAlignVertical: 'top',
+    paddingRight: 36,
+  },
+  clearTextBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clearTextBtnText: {
+    fontSize: fontScale(11),
+    fontWeight: '800',
+    color: '#64748B',
   },
   submitBtn: {
     backgroundColor: '#4F46E5',

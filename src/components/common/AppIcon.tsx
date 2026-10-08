@@ -89,6 +89,10 @@ const ICONS = {
   'help-circle': require('../../assets/Icons/Aleart.png'),
   'help-circle-outline': require('../../assets/Icons/Aleart.png'),
   'image-outline': require('../../assets/Icons/image.png'),
+  eye: require('../../assets/Icons/show.png'),
+  view: require('../../assets/Icons/show.png'),
+  show: require('../../assets/Icons/show.png'),
+  hide: require('../../assets/Icons/hide.png'),
 };
 
 export type AppIconName = keyof typeof ICONS | string;
@@ -153,13 +157,29 @@ export default function AppIcon({ name, size = 20, color, style }: AppIconProps)
     );
   }
 
-  if (name === 'call' || name === 'call-outline') {
+  if (name === 'refresh' || name === 'reload' || name === 'sync') {
     return (
       <View style={[styles.symbolContainer, { width: size, height: size }]}>
-        <Text style={{ fontSize: size * 0.85, color: color || '#3B82F6', fontWeight: '700', lineHeight: size }}>
-          📞
+        <Text style={{ fontSize: size * 0.95, color: color || '#4F46E5', fontWeight: '800', lineHeight: size }}>
+          ↻
         </Text>
       </View>
+    );
+  }
+
+  if (name === 'call' || name === 'call-outline' || name === 'phone') {
+    return (
+      <View style={[styles.symbolContainer, { width: size, height: size }]}>
+        <Text style={{ fontSize: size * 0.9, color: color || '#4F46E5', fontWeight: '700', lineHeight: size }}>
+          ✆
+        </Text>
+      </View>
+    );
+  }
+
+  if (name === 'mic' || name === 'microphone' || name === 'mic-outline') {
+    return (
+      <VectorIcon name="mic" size={size} color={color || '#4F46E5'} />
     );
   }
 

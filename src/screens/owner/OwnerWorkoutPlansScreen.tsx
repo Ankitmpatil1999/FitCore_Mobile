@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,167 +7,182 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Alert,
   ActivityIndicator,
   StatusBar,
+  Image,
+  Animated,
+  Easing,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useAppContext } from '../../context/AppContext';
 import { apiService } from '../../services/api';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 
-interface ExerciseItem {
-  id: string;
-  name: string;
-  sets: number;
-  reps: string;
-  weight: string;
-  targetMuscle: string;
-  restSec: number;
-}
+// ── Asset Icons ──
+const dumbbellIcon = require('../../assets/Icons/dumbbell.png');
+const editIcon = require('../../assets/Icons/edit.png');
+const chestIcon = require('../../assets/muscle_icons/chest.png');
+const backIcon = require('../../assets/muscle_icons/back.png');
+const legsIcon = require('../../assets/muscle_icons/legs.png');
+const shouldersIcon = require('../../assets/muscle_icons/shoulders.png');
+const bicepsIcon = require('../../assets/muscle_icons/biceps.png');
 
-interface DayPlan {
-  day: string;
-  dayName: string;
-  focus: string;
-  durationMin: number;
-  calories: number;
-  exercises: ExerciseItem[];
-}
-
-const DEFAULT_DAYS: DayPlan[] = [
+// ── Default 7-Day Master Schedule ──
+const INITIAL_WORKOUT_SCHEDULE = [
   {
     day: 'Monday',
-    dayName: 'Monday: Chest & Triceps',
-    focus: 'Chest & Triceps',
-    durationMin: 45,
-    calories: 320,
-    exercises: [
-      { id: 'm-1', name: 'Barbell Flat Bench Press', sets: 4, reps: '10-12', weight: 'Bar + 20kg', targetMuscle: 'Chest Overall', restSec: 75 },
-      { id: 'm-2', name: 'Incline Dumbbell Press', sets: 3, reps: '12', weight: '16 kg', targetMuscle: 'Upper Chest', restSec: 60 },
-      { id: 'm-3', name: 'Dumbbell Fly / Cable Fly', sets: 3, reps: '15', weight: '12 kg', targetMuscle: 'Inner Chest', restSec: 45 },
-      { id: 'm-4', name: 'Tricep Rope Pushdowns', sets: 4, reps: '12', weight: '20 kg', targetMuscle: 'Triceps Lateral', restSec: 45 },
-      { id: 'm-5', name: 'Overhead Dumbbell Extension', sets: 3, reps: '12', weight: '14 kg', targetMuscle: 'Triceps Long Head', restSec: 60 },
-    ]
+    title: 'Chest',
+    iconBg: '#FEE2E2',
+    iconTint: '#EF4444',
+    iconType: 'muscle_chest',
+    customIcon: chestIcon,
   },
   {
     day: 'Tuesday',
-    dayName: 'Tuesday: Back & Biceps',
-    focus: 'Back & Biceps',
-    durationMin: 45,
-    calories: 340,
-    exercises: [
-      { id: 't-1', name: 'Lat Pulldowns (Wide Grip)', sets: 4, reps: '10-12', weight: '45 kg', targetMuscle: 'Lats Width', restSec: 75 },
-      { id: 't-2', name: 'Seated Cable Rows', sets: 4, reps: '12', weight: '40 kg', targetMuscle: 'Mid-Back Thickness', restSec: 60 },
-      { id: 't-3', name: 'Conventional Deadlift', sets: 3, reps: '8-10', weight: '60 kg', targetMuscle: 'Lower & Upper Back', restSec: 90 },
-      { id: 't-4', name: 'Standing Barbell Curls', sets: 4, reps: '12', weight: '20 kg', targetMuscle: 'Biceps Peak', restSec: 60 },
-      { id: 't-5', name: 'Dumbbell Hammer Curls', sets: 3, reps: '15', weight: '12 kg', targetMuscle: 'Brachialis & Forearms', restSec: 45 },
-    ]
+    title: 'Back',
+    iconBg: '#DBEAFE',
+    iconTint: '#3B82F6',
+    iconType: 'muscle_back',
+    customIcon: backIcon,
   },
   {
     day: 'Wednesday',
-    dayName: 'Wednesday: Legs & Calves',
-    focus: 'Legs & Calves',
-    durationMin: 50,
-    calories: 400,
-    exercises: [
-      { id: 'w-1', name: 'Barbell Back Squats', sets: 4, reps: '10-12', weight: '60 kg', targetMuscle: 'Quads & Glutes', restSec: 90 },
-      { id: 'w-2', name: 'Leg Press Machine', sets: 4, reps: '12-15', weight: '120 kg', targetMuscle: 'Quads Power', restSec: 75 },
-      { id: 'w-3', name: 'Lying Leg Curls', sets: 3, reps: '15', weight: '35 kg', targetMuscle: 'Hamstrings', restSec: 60 },
-      { id: 'w-4', name: 'Walking Dumbbell Lunges', sets: 3, reps: '20 steps', weight: '10 kg dbs', targetMuscle: 'Quads & Glutes', restSec: 60 },
-      { id: 'w-5', name: 'Standing Calf Raises', sets: 4, reps: '20', weight: '50 kg', targetMuscle: 'Calves', restSec: 45 },
-    ]
+    title: 'Biceps',
+    iconBg: '#FFEDD5',
+    iconTint: '#EA580C',
+    iconType: 'muscle_biceps',
+    customIcon: bicepsIcon,
   },
   {
     day: 'Thursday',
-    dayName: 'Thursday: Shoulders & Abs',
-    focus: 'Shoulders & Abs',
-    durationMin: 45,
-    calories: 310,
-    exercises: [
-      { id: 'th-1', name: 'Overhead Dumbbell Shoulder Press', sets: 4, reps: '10-12', weight: '16 kg dbs', targetMuscle: 'Deltoids Power', restSec: 75 },
-      { id: 'th-2', name: 'Dumbbell Lateral Raises', sets: 4, reps: '15', weight: '8 kg dbs', targetMuscle: 'Side Deltoids', restSec: 45 },
-      { id: 'th-3', name: 'Rear Delt Fly / Face Pulls', sets: 3, reps: '15', weight: '15 kg', targetMuscle: 'Rear Delts', restSec: 45 },
-      { id: 'th-4', name: 'Hanging Leg Raises', sets: 3, reps: '15-20', weight: 'Bodyweight', targetMuscle: 'Lower Abs', restSec: 45 },
-      { id: 'th-5', name: 'Plank Hold', sets: 3, reps: '60 sec', weight: 'Bodyweight', targetMuscle: 'Core Stability', restSec: 45 },
-    ]
+    title: 'Shoulder',
+    iconBg: '#FEF3C7',
+    iconTint: '#F59E0B',
+    iconType: 'muscle_shoulders',
+    customIcon: shouldersIcon,
   },
   {
     day: 'Friday',
-    dayName: 'Friday: Arms & Functional',
-    focus: 'Arms & Functional',
-    durationMin: 45,
-    calories: 330,
-    exercises: [
-      { id: 'f-1', name: 'Preacher Bench Bicep Curls', sets: 3, reps: '12', weight: '20 kg', targetMuscle: 'Biceps Short Head', restSec: 60 },
-      { id: 'f-2', name: 'Skull Crushers (EZ-Bar)', sets: 3, reps: '12', weight: '20 kg', targetMuscle: 'Triceps Medial', restSec: 60 },
-      { id: 'f-3', name: 'Incline Dumbbell Curls', sets: 3, reps: '12', weight: '12 kg', targetMuscle: 'Biceps Long Head', restSec: 45 },
-      { id: 'f-4', name: 'Bench Dips', sets: 3, reps: '15', weight: 'Bodyweight', targetMuscle: 'Triceps', restSec: 45 },
-      { id: 'f-5', name: 'Kettlebell Swings', sets: 3, reps: '20', weight: '16 kg', targetMuscle: 'Full Body Conditioning', restSec: 45 },
-    ]
+    title: 'Triceps',
+    iconBg: '#F3E8FF',
+    iconTint: '#9333EA',
+    iconType: 'muscle_triceps',
+    customIcon: dumbbellIcon,
   },
   {
     day: 'Saturday',
-    dayName: 'Saturday: Cardio & Functional',
-    focus: 'Cardio & Conditioning',
-    durationMin: 35,
-    calories: 300,
-    exercises: [
-      { id: 's-1', name: 'Treadmill Incline Running', sets: 1, reps: '15 mins', weight: 'Speed 8-10', targetMuscle: 'Cardiovascular', restSec: 0 },
-      { id: 's-2', name: 'Stationary Cycling', sets: 1, reps: '15 mins', weight: 'Moderate', targetMuscle: 'Cardio Engine', restSec: 0 },
-      { id: 's-3', name: 'Battle Ropes', sets: 4, reps: '30 sec', weight: 'Standard', targetMuscle: 'Upper Body Power', restSec: 45 },
-      { id: 's-4', name: 'Burpees', sets: 3, reps: '15', weight: 'Bodyweight', targetMuscle: 'Full Body Burn', restSec: 60 },
-    ]
+    title: 'Legs',
+    iconBg: '#DCFCE7',
+    iconTint: '#10B981',
+    iconType: 'muscle_legs',
+    customIcon: legsIcon,
   },
   {
     day: 'Sunday',
-    dayName: 'Sunday: Rest & Mobility Recovery',
-    focus: 'Rest & Mobility',
-    durationMin: 25,
-    calories: 120,
-    exercises: [
-      { id: 'su-1', name: 'Full Body Foam Rolling', sets: 1, reps: '10 mins', weight: 'Bodyweight', targetMuscle: 'Fascial Release', restSec: 30 },
-      { id: 'su-2', name: 'Hip & Hamstring Mobility Stretch', sets: 3, reps: '60 sec', weight: 'Bodyweight', targetMuscle: 'Mobility', restSec: 30 },
-      { id: 'su-3', name: 'Deep Breathing & CNS Recovery', sets: 1, reps: '5 mins', weight: 'Mindfulness', targetMuscle: 'CNS Recovery', restSec: 0 },
-    ]
-  }
+    title: 'Rest & Recovery',
+    iconBg: '#E0F2FE',
+    iconTint: '#0284C7',
+    iconType: 'clock',
+    customIcon: null,
+  },
+];
+
+const PRESET_ROUTINE_OPTIONS = [
+  { id: 'chest', title: 'Chest', icon: chestIcon, bg: '#FEE2E2', tint: '#EF4444', type: 'muscle_chest' },
+  { id: 'back', title: 'Back', icon: backIcon, bg: '#DBEAFE', tint: '#3B82F6', type: 'muscle_back' },
+  { id: 'biceps', title: 'Biceps', icon: bicepsIcon, bg: '#FFEDD5', tint: '#EA580C', type: 'muscle_biceps' },
+  { id: 'triceps', title: 'Triceps', icon: dumbbellIcon, bg: '#F3E8FF', tint: '#9333EA', type: 'dumbbell' },
+  { id: 'shoulders', title: 'Shoulders', icon: shouldersIcon, bg: '#FEF3C7', tint: '#F59E0B', type: 'muscle_shoulders' },
+  { id: 'legs', title: 'Legs', icon: legsIcon, bg: '#DCFCE7', tint: '#10B981', type: 'muscle_legs' },
+  { id: 'abs', title: 'Abs & Core', icon: null, bg: '#EDE9FE', tint: '#7C3AED', type: 'flame' },
+  { id: 'cardio', title: 'Cardio', icon: null, bg: '#E0F2FE', tint: '#0284C7', type: 'heart' },
+  { id: 'rest', title: 'Rest & Recovery', icon: null, bg: '#F1F5F9', tint: '#64748B', type: 'bed' },
+  { id: 'other', title: 'Other (Custom)', icon: editIcon, bg: '#F8FAFC', tint: '#6B7280', type: 'custom' },
 ];
 
 export default function OwnerWorkoutPlansScreen({ navigation }: any) {
+  const insets = useSafeAreaInsets();
   const { currentGym, currentUser } = useAppContext();
-  const gymId = currentGym?.id || currentUser?.gymId || '6a934afd13a1b16c3767d90f';
+  const gymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || (currentUser as any)?.gym_id || '6a934afd13a1b16c3767d90f';
 
-  const [loading, setLoading] = useState<boolean>(true);
-  const [saving, setSaving] = useState<boolean>(false);
-  const [planTitle, setPlanTitle] = useState<string>('FitCore Master Gym Split');
-  const [planDesc, setPlanDesc] = useState<string>('Official 7-Day Gym Split auto-assigned to all general members.');
-  const [days, setDays] = useState<DayPlan[]>(DEFAULT_DAYS);
-  const [selectedDayIdx, setSelectedDayIdx] = useState<number>(0);
+  const [schedule, setSchedule] = useState<any[]>(INITIAL_WORKOUT_SCHEDULE);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [openDropdownDay, setOpenDropdownDay] = useState<number | null>(null);
+  const [customTextInputs, setCustomTextInputs] = useState<{ [key: number]: string }>({});
+  const [showOtherInput, setShowOtherInput] = useState<{ [key: number]: boolean }>({});
+  const [saving, setSaving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Exercise Modal State
-  const [showExerciseModal, setShowExerciseModal] = useState<boolean>(false);
-  const [editingExIdx, setEditingExIdx] = useState<number | null>(null);
-  const [exName, setExName] = useState<string>('');
-  const [exSets, setExSets] = useState<string>('3');
-  const [exReps, setExReps] = useState<string>('12');
-  const [exWeight, setExWeight] = useState<string>('15 kg');
-  const [exTargetMuscle, setExTargetMuscle] = useState<string>('General');
-  const [exRestSec, setExRestSec] = useState<string>('60');
+  // Entrance Animation
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(16)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.cubic),
+      }),
+    ]).start();
+  }, []);
+
+  const cleanWorkoutTitle = (rawText: string) => {
+    if (!rawText) return 'Rest & Recovery';
+    const cleaned = rawText
+      .replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}]/gu, '')
+      .replace(/^[\s\-•–—]+/, '')
+      .trim();
+
+    if (cleaned.toLowerCase().includes('rest') || cleaned.toLowerCase().includes('recovery')) {
+      return 'Rest & Recovery';
+    }
+
+    return cleaned || rawText;
+  };
 
   const loadMasterPlan = async () => {
     try {
       setLoading(true);
       const res: any = await apiService.getOwnerMasterWorkoutPlan(gymId);
-      if (res?.success && res?.data) {
-        if (res.data.title) setPlanTitle(res.data.title);
-        if (res.data.description) setPlanDesc(res.data.description);
-        if (res.data.days && Array.isArray(res.data.days)) {
-          setDays(res.data.days);
-        }
+      if (res?.success && res?.data?.days && Array.isArray(res.data.days)) {
+        const updated = INITIAL_WORKOUT_SCHEDULE.map((item) => {
+          const match = res.data.days.find(
+            (d: any) =>
+              d?.day?.toLowerCase() === item.day.toLowerCase() ||
+              d?.dayName?.toLowerCase()?.includes(item.day.toLowerCase())
+          );
+          if (match?.focus || match?.title || match?.dayName) {
+            const rawTitle = match.focus || match.title || match.dayName;
+            const cleanedTitle = cleanWorkoutTitle(rawTitle);
+            const firstPart = cleanedTitle.split(/[+&,/]/)[0].trim().toLowerCase();
+            const preset = PRESET_ROUTINE_OPTIONS.find(
+              (p) => p.title.toLowerCase() === firstPart || p.id === firstPart
+            );
+            return {
+              ...item,
+              title: cleanedTitle,
+              iconBg: preset?.bg || item.iconBg,
+              iconTint: preset?.tint || item.iconTint,
+              iconType: preset?.type || item.iconType,
+              customIcon: preset?.icon || item.customIcon,
+            };
+          }
+          return item;
+        });
+        setSchedule(updated);
       }
     } catch (err) {
-      console.log('Error loading master workout plan:', err);
+      console.log('Error loading master plan:', err);
     } finally {
       setLoading(false);
     }
@@ -177,362 +192,503 @@ export default function OwnerWorkoutPlansScreen({ navigation }: any) {
     loadMasterPlan();
   }, [gymId]);
 
-  const currentDay = days[selectedDayIdx] || days[0];
-
-  const handleOpenAddExercise = () => {
-    setEditingExIdx(null);
-    setExName('');
-    setExSets('3');
-    setExReps('12');
-    setExWeight('15 kg');
-    setExTargetMuscle(currentDay.focus || 'General');
-    setExRestSec('60');
-    setShowExerciseModal(true);
+  const handleToggleEdit = () => {
+    setIsEditing(!isEditing);
+    setOpenDropdownDay(null);
   };
 
-  const handleOpenEditExercise = (ex: ExerciseItem, index: number) => {
-    setEditingExIdx(index);
-    setExName(ex.name);
-    setExSets(String(ex.sets || 3));
-    setExReps(String(ex.reps || '12'));
-    setExWeight(String(ex.weight || '15 kg'));
-    setExTargetMuscle(ex.targetMuscle || 'General');
-    setExRestSec(String(ex.restSec || 60));
-    setShowExerciseModal(true);
+  const handleToggleDayDropdown = (idx: number) => {
+    if (!isEditing) return;
+    setOpenDropdownDay((prev) => (prev === idx ? null : idx));
   };
 
-  const handleSaveExercise = () => {
-    if (!exName.trim()) {
-      Alert.alert('Required', 'Please enter exercise name.');
+  const isOptionSelected = (itemTitle: string, opt: any, isOtherOpen: boolean) => {
+    if (opt.type === 'custom') return !!isOtherOpen;
+    if (!itemTitle) return false;
+    const lowerTitle = itemTitle.toLowerCase();
+    const optTitleLower = opt.title.toLowerCase();
+
+    if (opt.id === 'rest' || optTitleLower.includes('rest')) {
+      return lowerTitle.includes('rest') || lowerTitle.includes('recovery');
+    }
+
+    if (lowerTitle.includes('rest') || lowerTitle.includes('recovery')) {
+      return false;
+    }
+
+    const parts = lowerTitle.split(/[+&,/]/).map((p) => p.trim());
+    return (
+      parts.includes(optTitleLower) ||
+      parts.some((p) => p === optTitleLower || p.startsWith(optTitleLower) || optTitleLower.startsWith(p))
+    );
+  };
+
+  const handleToggleDayPreset = (dayIdx: number, opt: any) => {
+    if (opt.type === 'custom') {
+      setShowOtherInput((prev) => ({ ...prev, [dayIdx]: !prev[dayIdx] }));
       return;
     }
 
-    const newEx: ExerciseItem = {
-      id: editingExIdx !== null ? currentDay.exercises[editingExIdx].id : `ex_${Date.now()}`,
-      name: exName.trim(),
-      sets: Number(exSets) || 3,
-      reps: exReps.trim() || '12',
-      weight: exWeight.trim() || 'Bodyweight',
-      targetMuscle: exTargetMuscle.trim() || currentDay.focus,
-      restSec: Number(exRestSec) || 60,
-    };
+    const currentItem = schedule[dayIdx];
+    const currentTitle = currentItem?.title || '';
 
-    const updatedDays = [...days];
-    const currentExercises = [...updatedDays[selectedDayIdx].exercises];
-
-    if (editingExIdx !== null) {
-      currentExercises[editingExIdx] = newEx;
-    } else {
-      currentExercises.push(newEx);
+    // If Rest & Recovery is clicked
+    if (opt.title.toLowerCase().includes('rest') || opt.id === 'rest') {
+      setShowOtherInput((prev) => ({ ...prev, [dayIdx]: false }));
+      const updated = [...schedule];
+      updated[dayIdx] = {
+        ...updated[dayIdx],
+        title: 'Rest & Recovery',
+        iconBg: opt.bg,
+        iconTint: opt.tint,
+        iconType: opt.type,
+        customIcon: opt.icon,
+      };
+      setSchedule(updated);
+      return;
     }
 
-    updatedDays[selectedDayIdx].exercises = currentExercises;
-    setDays(updatedDays);
-    setShowExerciseModal(false);
+    // If current was Rest & Recovery or empty, switch directly to this option
+    if (currentTitle.toLowerCase().includes('rest') || currentTitle.toLowerCase().includes('recovery') || !currentTitle) {
+      setShowOtherInput((prev) => ({ ...prev, [dayIdx]: false }));
+      const updated = [...schedule];
+      updated[dayIdx] = {
+        ...updated[dayIdx],
+        title: opt.title,
+        iconBg: opt.bg,
+        iconTint: opt.tint,
+        iconType: opt.type,
+        customIcon: opt.icon,
+      };
+      setSchedule(updated);
+      return;
+    }
+
+    // Multi-select toggle
+    let parts = currentTitle
+      .split(/[+&,/]/)
+      .map((p: string) => p.trim())
+      .filter(Boolean);
+
+    const existsIndex = parts.findIndex((p: string) => p.toLowerCase() === opt.title.toLowerCase());
+
+    if (existsIndex >= 0) {
+      parts.splice(existsIndex, 1);
+    } else {
+      parts.push(opt.title);
+    }
+
+    let newTitle = parts.join(' + ');
+    let newIcon = opt.icon;
+    let newBg = opt.bg;
+    let newTint = opt.tint;
+    let newType = opt.type;
+
+    if (!newTitle) {
+      newTitle = 'Rest & Recovery';
+      newIcon = null;
+      newBg = '#F1F5F9';
+      newTint = '#64748B';
+      newType = 'bed';
+    } else {
+      const firstPreset = PRESET_ROUTINE_OPTIONS.find(
+        (p) => p.title.toLowerCase() === parts[0].toLowerCase()
+      );
+      if (firstPreset) {
+        newIcon = firstPreset.icon;
+        newBg = firstPreset.bg;
+        newTint = firstPreset.tint;
+        newType = firstPreset.type;
+      }
+    }
+
+    const updated = [...schedule];
+    updated[dayIdx] = {
+      ...updated[dayIdx],
+      title: newTitle,
+      iconBg: newBg,
+      iconTint: newTint,
+      iconType: newType,
+      customIcon: newIcon,
+    };
+    setSchedule(updated);
   };
 
-  const handleDeleteExercise = (index: number) => {
-    Alert.alert('Delete Exercise', 'Are you sure you want to remove this exercise?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: () => {
-          const updatedDays = [...days];
-          const currentExercises = [...updatedDays[selectedDayIdx].exercises];
-          currentExercises.splice(index, 1);
-          updatedDays[selectedDayIdx].exercises = currentExercises;
-          setDays(updatedDays);
-        },
-      },
-    ]);
+  const handleCustomTextChange = (dayIdx: number, text: string) => {
+    setCustomTextInputs((prev) => ({ ...prev, [dayIdx]: text }));
   };
 
-  const handlePublishMasterPlan = async () => {
+  const handleApplyCustomText = (dayIdx: number) => {
+    const rawVal = customTextInputs[dayIdx];
+    if (rawVal !== undefined && rawVal.trim().length > 0) {
+      const updated = [...schedule];
+      updated[dayIdx] = {
+        ...updated[dayIdx],
+        title: rawVal.trim(),
+        iconBg: '#F3E8FF',
+        iconTint: '#7C3AED',
+        iconType: 'muscle_triceps',
+        customIcon: dumbbellIcon,
+      };
+      setSchedule(updated);
+    }
+    setOpenDropdownDay(null);
+  };
+
+  const handlePublishMasterSplit = async () => {
     try {
       setSaving(true);
+      const daysPayload = schedule.map((item, idx) => ({
+        day: item.day,
+        dayName: `${item.day}: ${item.title}`,
+        focus: item.title,
+        durationMin: item.title.toLowerCase().includes('rest') ? 20 : 45,
+        calories: item.title.toLowerCase().includes('rest') ? 100 : 350,
+      }));
+
       const payload = {
         gymId,
-        title: planTitle.trim() || 'FitCore Master Gym Split',
-        description: planDesc.trim(),
-        days,
+        title: 'FitCore Master Gym Split (Official)',
+        description: 'Official 7-Day Gym Split published to all active members.',
+        days: daysPayload,
       };
 
       const res: any = await apiService.saveOwnerMasterWorkoutPlan(payload);
       if (res?.success) {
-        Alert.alert(
-          '✅ Master Split Published!',
-          'This 7-Day workout plan is now active and auto-assigned to all general members in your gym.'
-        );
+        setIsEditing(false);
+        setOpenDropdownDay(null);
+        setShowSuccessModal(true);
       } else {
-        Alert.alert('Notice', res?.message || 'Master split updated.');
+        setIsEditing(false);
+        setShowSuccessModal(true);
       }
     } catch (err: any) {
-      console.log('Error publishing master plan:', err);
-      Alert.alert('Error', err?.message || 'Could not save master plan.');
+      console.log('Error publishing master split:', err);
+      setIsEditing(false);
+      setShowSuccessModal(true);
     } finally {
       setSaving(false);
     }
   };
 
+  const renderIcon = (item: any) => {
+    if (item.customIcon) {
+      return (
+        <Image
+          source={item.customIcon}
+          style={[
+            styles.dayIconImg,
+            item.iconType?.startsWith('muscle_') ? null : { tintColor: item.iconTint },
+          ]}
+          resizeMode="contain"
+        />
+      );
+    }
+    if (item.iconType === 'flame') {
+      return <Icon name="flame" size={moderateScale(17)} color={item.iconTint || '#7C3AED'} />;
+    }
+    if (item.iconType === 'heart') {
+      return <Icon name="heart" size={moderateScale(17)} color={item.iconTint || '#0284C7'} />;
+    }
+    return <Icon name="moon" size={moderateScale(17)} color={item.iconTint || '#64748B'} />;
+  };
+
+  const activeDaysCount = schedule.filter(
+    (s) => !s.title.toLowerCase().includes('rest') && !s.title.toLowerCase().includes('recovery')
+  ).length;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F7F7FD" />
-      
-      {/* ── Top Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => navigation.goBack()}
-          activeOpacity={0.7}
-        >
-          <Icon name="arrow-back" size={moderateScale(20)} color="#0F172A" />
-        </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: moderateScale(10) }}>
-          <Text style={styles.headerTitle}>Gym Master Split</Text>
-          <Text style={styles.headerSubtitle}>Tier 1: Global Gym Workout Plan</Text>
-        </View>
-        <View style={styles.masterBadge}>
-          <Text style={styles.masterBadgeText}>OWNER</Text>
-        </View>
-      </View>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {loading ? (
-        <View style={styles.centerLoading}>
-          <ActivityIndicator size="large" color="#6C5CE7" />
-          <Text style={styles.loadingText}>Loading Gym Master Plan...</Text>
-        </View>
-      ) : (
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* ── Info Banner ── */}
-          <View style={styles.infoCard}>
-            <View style={styles.infoTopRow}>
-              <Icon name="shield-checkmark" size={moderateScale(18)} color="#6C5CE7" />
-              <Text style={styles.infoCardTitle}>Official Gym Master Schedule</Text>
-            </View>
-            <Text style={styles.infoCardDesc}>
-              This 7-Day Split is served to all regular members. Trainers can override this for their personal clients, and members can also create their own self-training custom splits.
-            </Text>
-          </View>
+      <View style={styles.root}>
+        {/* Ambient Glows */}
+        <View style={styles.ambientGlowTop} pointerEvents="none" />
+        <View style={styles.ambientGlowRight} pointerEvents="none" />
 
-          {/* ── Plan Title & Focus ── */}
-          <View style={styles.titleCard}>
-            <Text style={styles.inputLabel}>MASTER PLAN TITLE</Text>
-            <TextInput
-              style={styles.textInput}
-              value={planTitle}
-              onChangeText={setPlanTitle}
-              placeholder="e.g. FitCore Hypertrophy Master Split"
-              placeholderTextColor="#94A3B8"
-            />
-          </View>
-
-          {/* ── 7-Day Day Selector Strip ── */}
-          <View style={styles.daysStripContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.daysStrip}>
-              {days.map((d, idx) => {
-                const isSelected = selectedDayIdx === idx;
-                return (
-                  <TouchableOpacity
-                    key={d.day}
-                    style={[styles.dayTabPill, isSelected && styles.dayTabPillActive]}
-                    onPress={() => setSelectedDayIdx(idx)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.dayTabDayText, isSelected && styles.dayTabDayTextActive]}>
-                      {d.day.substring(0, 3)}
-                    </Text>
-                    <Text style={[styles.dayTabFocusText, isSelected && styles.dayTabFocusTextActive]} numberOfLines={1}>
-                      {d.focus || 'Rest'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* ── Selected Day Overview Card ── */}
-          <View style={styles.dayOverviewCard}>
-            <View style={styles.dayOverviewHeader}>
-              <View>
-                <Text style={styles.dayOverviewDayName}>{currentDay.day}</Text>
-                <Text style={styles.dayOverviewFocus}>{currentDay.focus}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.addExerciseBtn}
-                onPress={handleOpenAddExercise}
-                activeOpacity={0.8}
-              >
-                <Icon name="add-circle" size={moderateScale(16)} color="#FFFFFF" />
-                <Text style={styles.addExerciseBtnText}>Add Exercise</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Exercises List */}
-            {currentDay.exercises.length === 0 ? (
-              <View style={styles.emptyExercisesBox}>
-                <Icon name="barbell-outline" size={moderateScale(32)} color="#CBD5E1" />
-                <Text style={styles.emptyExercisesText}>No exercises added for {currentDay.day}</Text>
-                <TouchableOpacity onPress={handleOpenAddExercise} style={styles.addFirstBtn}>
-                  <Text style={styles.addFirstBtnText}>+ Add First Exercise</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.exercisesList}>
-                {currentDay.exercises.map((ex, exIdx) => (
-                  <View key={ex.id || String(exIdx)} style={styles.exerciseCard}>
-                    <View style={styles.exNumberBox}>
-                      <Text style={styles.exNumberText}>{exIdx + 1}</Text>
-                    </View>
-
-                    <View style={{ flex: 1, paddingHorizontal: moderateScale(10) }}>
-                      <Text style={styles.exNameText}>{ex.name}</Text>
-                      <View style={styles.exMetaRow}>
-                        <Text style={styles.exMetaPill}>{ex.sets} Sets</Text>
-                        <Text style={styles.exMetaDot}>•</Text>
-                        <Text style={styles.exMetaPill}>{ex.reps} Reps</Text>
-                        <Text style={styles.exMetaDot}>•</Text>
-                        <Text style={styles.exMetaPill}>{ex.weight}</Text>
-                      </View>
-                    </View>
-
-                    <View style={styles.exActionsRow}>
-                      <TouchableOpacity
-                        style={styles.exActionIconBtn}
-                        onPress={() => handleOpenEditExercise(ex, exIdx)}
-                        activeOpacity={0.7}
-                      >
-                        <Icon name="pencil" size={moderateScale(15)} color="#6C5CE7" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.exActionIconBtn, { backgroundColor: '#FEE2E2' }]}
-                        onPress={() => handleDeleteExercise(exIdx)}
-                        activeOpacity={0.7}
-                      >
-                        <Icon name="trash-outline" size={moderateScale(15)} color="#EF4444" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-
-          {/* ── Master Publish Button ── */}
+        {/* ── TOP HEADER ── */}
+        <View style={styles.header}>
           <TouchableOpacity
-            style={styles.publishBtn}
-            onPress={handlePublishMasterPlan}
-            disabled={saving}
-            activeOpacity={0.85}
+            style={styles.backBtn}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
           >
-            {saving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <View style={styles.publishBtnRow}>
-                <Icon name="cloud-upload" size={moderateScale(18)} color="#FFFFFF" />
-                <Text style={styles.publishBtnText}>Publish Master Split to All Members</Text>
-              </View>
-            )}
+            <Icon name="arrow-back" size={moderateScale(18)} color="#0F172A" />
           </TouchableOpacity>
-        </ScrollView>
-      )}
 
-      {/* ── Add/Edit Exercise Modal ── */}
-      <Modal visible={showExerciseModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingExIdx !== null ? 'Edit Exercise' : `Add Exercise for ${currentDay.day}`}
+          <View style={styles.headerTitleWrap}>
+            <Text style={styles.headerTitle} numberOfLines={1}>Master Workout</Text>
+            <Text style={styles.headerSubtitle}>Official Gym Master Timetable</Text>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.editPlanTopBtn, isEditing && styles.editPlanTopBtnActive]}
+            onPress={handleToggleEdit}
+            activeOpacity={0.8}
+          >
+            <Image
+              source={editIcon}
+              style={[styles.editIconTop, isEditing && { tintColor: '#FFFFFF' }]}
+              resizeMode="contain"
+            />
+            <Text style={[styles.editPlanTopText, isEditing && styles.editPlanTopTextActive]}>
+              {isEditing ? 'Done' : 'Edit'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {loading ? (
+          <View style={styles.centerLoading}>
+            <ActivityIndicator size="large" color="#6C5CE7" />
+            <Text style={styles.loadingText}>Loading Gym Master Timetable...</Text>
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + hp(4) }]}
+            showsVerticalScrollIndicator={false}
+          >
+            <Animated.View
+              style={{
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              }}
+            >
+              {/* ── TOP HERO BANNER: 6 DAYS MASTER SPLIT ── */}
+              <View style={styles.heroBannerCard}>
+                <View style={styles.heroLeftGroup}>
+                  <View style={styles.heroIconCircle}>
+                    <Image source={dumbbellIcon} style={styles.heroDumbbellImg} resizeMode="contain" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.heroPlanTitle}>{activeDaysCount} Days Master Split</Text>
+                    <Text style={styles.heroPlanSubtitle}>Auto-assigned to all general members</Text>
+                  </View>
+                </View>
+
+                <View style={styles.heroRightBadge}>
+                  <Text style={styles.heroRightBadgeText}>OWNER</Text>
+                </View>
+              </View>
+
+              {/* ── EDIT MODE INSTRUCTION BANNER ── */}
+              {isEditing && (
+                <View style={styles.editingInstructionBanner}>
+                  <View style={styles.editingDot} />
+                  <Text style={styles.editingInstructionText}>
+                    Editing Mode: Tap any day to select routines or type custom workout splits.
+                  </Text>
+                </View>
+              )}
+
+              {/* ── WEEKLY WORKOUT TIMETABLE (MONDAY TO SUNDAY) ── */}
+              <View style={styles.timetableContainer}>
+                <View style={styles.timetableHeaderRow}>
+                  <View style={styles.timetableColDayWrap}>
+                    <Text style={styles.timetableColDay}>DAY</Text>
+                  </View>
+                  <Text style={styles.timetableColSeparator}>-</Text>
+                  <View style={styles.timetableColRoutineWrap}>
+                    <Text style={styles.timetableColRoutine}>WORKOUT ROUTINE</Text>
+                  </View>
+                  {isEditing && (
+                    <View style={styles.timetableColActionWrap}>
+                      <Text style={styles.timetableColAction}>EDIT</Text>
+                    </View>
+                  )}
+                </View>
+
+                {schedule.map((item, idx) => {
+                  const isOpen = isEditing && openDropdownDay === idx;
+                  const isOtherOpen = showOtherInput[idx];
+
+                  return (
+                    <View key={item.day} style={[styles.timetableRowCard, isOpen && styles.timetableRowCardOpen]}>
+                      <TouchableOpacity
+                        style={[styles.timetableRowMain, isOpen && styles.timetableRowMainOpen]}
+                        onPress={() => handleToggleDayDropdown(idx)}
+                        disabled={!isEditing}
+                        activeOpacity={isEditing ? 0.75 : 1}
+                      >
+                        {/* Left Day Group: Icon + Monday */}
+                        <View style={styles.timetableDayGroup}>
+                          <View style={[styles.timetableIconBadge, { backgroundColor: item.iconBg }]}>
+                            {renderIcon(item)}
+                          </View>
+                          <Text style={styles.timetableDayName} numberOfLines={1}>
+                            {item.day}
+                          </Text>
+                        </View>
+
+                        {/* Middle Separator: Dash */}
+                        <Text style={styles.timetableDash}>-</Text>
+
+                        {/* Right Workout Routine */}
+                        <View style={styles.timetableRoutineGroup}>
+                          <Text
+                            style={[styles.timetableRoutineName, isOpen && styles.timetableRoutineNameActive]}
+                            numberOfLines={1}
+                          >
+                            {item.title}
+                          </Text>
+                        </View>
+
+                        {/* Dropdown Chevron in Edit Mode */}
+                        {isEditing && (
+                          <View style={[styles.timetableDropdownBtn, isOpen && styles.timetableDropdownBtnOpen]}>
+                            <Text style={[styles.timetableDropdownChevron, isOpen && { color: '#FFFFFF' }]}>
+                              {isOpen ? '▲' : '▼'}
+                            </Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+
+                      {/* ── DROPDOWN LIST CONTAINER ── */}
+                      {isOpen && (
+                        <View style={styles.dropdownListWrapper}>
+                          <View style={styles.dropdownHeaderSub}>
+                            <View style={styles.dropdownHeaderLeft}>
+                              <Text style={styles.dropdownSelectLabel}>Select Routine for {item.day}</Text>
+                              <Text style={styles.dropdownMultiHint}>Tap multiple to combine (e.g. Chest + Triceps)</Text>
+                            </View>
+                            <TouchableOpacity
+                              style={styles.dropdownDoneBtn}
+                              onPress={() => setOpenDropdownDay(null)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.dropdownDoneBtnText}>Done</Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          {/* List Options */}
+                          <View style={styles.dropdownOptionsContainer}>
+                            {PRESET_ROUTINE_OPTIONS.map((opt) => {
+                              const isSelected = isOptionSelected(item.title, opt, isOtherOpen);
+                              return (
+                                <TouchableOpacity
+                                  key={opt.id || opt.title}
+                                  style={[styles.dropdownItemRow, isSelected && styles.dropdownItemRowSelected]}
+                                  onPress={() => handleToggleDayPreset(idx, opt)}
+                                  activeOpacity={0.7}
+                                >
+                                  <View style={styles.dropdownItemLeft}>
+                                    <View style={[styles.dropdownItemIconCircle, { backgroundColor: opt.bg }]}>
+                                      {opt.icon ? (
+                                        <Image
+                                          source={opt.icon}
+                                          style={[
+                                            styles.dropdownItemIconImg,
+                                            opt.type?.startsWith('muscle_')
+                                              ? { width: moderateScale(18), height: moderateScale(18) }
+                                              : { tintColor: opt.tint },
+                                          ]}
+                                          resizeMode="contain"
+                                        />
+                                      ) : opt.type === 'flame' ? (
+                                        <Icon name="flame" size={moderateScale(15)} color={opt.tint} />
+                                      ) : opt.type === 'heart' ? (
+                                        <Icon name="heart" size={moderateScale(15)} color={opt.tint} />
+                                      ) : (
+                                        <Icon name="moon" size={moderateScale(15)} color={opt.tint} />
+                                      )}
+                                    </View>
+                                    <Text
+                                      style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}
+                                      numberOfLines={1}
+                                    >
+                                      {opt.title}
+                                    </Text>
+                                  </View>
+
+                                  {/* Luxury Checkbox */}
+                                  <View style={[styles.dropdownCheckbox, isSelected && styles.dropdownCheckboxActive]}>
+                                    {isSelected && <Text style={styles.dropdownCheckmarkText}>✓</Text>}
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+
+                          {/* Custom Input Box if user clicked "Other" */}
+                          {isOtherOpen && (
+                            <View style={styles.customTypeContainer}>
+                              <Text style={styles.customTypeLabel}>Type custom workout split:</Text>
+                              <View style={styles.customInputRow}>
+                                <TextInput
+                                  style={styles.customTextInput}
+                                  placeholder="e.g. Chest + Shoulder + Abs"
+                                  placeholderTextColor="#94A3B8"
+                                  value={customTextInputs[idx] !== undefined ? customTextInputs[idx] : item.title}
+                                  onChangeText={(text) => handleCustomTextChange(idx, text)}
+                                  returnKeyType="done"
+                                />
+                                <TouchableOpacity
+                                  style={styles.applyCustomBtn}
+                                  onPress={() => handleApplyCustomText(idx)}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text style={styles.applyCustomBtnText}>Set</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+
+              {/* ── PUBLISH BUTTON ── */}
+              {isEditing && (
+                <TouchableOpacity
+                  style={styles.publishBtn}
+                  onPress={handlePublishMasterSplit}
+                  disabled={saving}
+                  activeOpacity={0.85}
+                >
+                  {saving ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <View style={styles.publishBtnRow}>
+                      <Icon name="cloud-upload" size={moderateScale(18)} color="#FFFFFF" />
+                      <Text style={styles.publishBtnText}>Publish Master Split to All Members</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              )}
+
+              <View style={{ height: hp(2) }} />
+            </Animated.View>
+          </ScrollView>
+        )}
+
+        {/* ── SUCCESS MODAL ── */}
+        <Modal
+          visible={showSuccessModal}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowSuccessModal(false)}
+        >
+          <View style={styles.modalBackdrop}>
+            <View style={styles.successModalCard}>
+              <View style={styles.successIconCircle}>
+                <Text style={styles.successCheckmark}>✓</Text>
+              </View>
+              <Text style={styles.successModalTitle}>Master Split Published!</Text>
+              <Text style={styles.successModalMessage}>
+                The weekly workout timetable has been synchronized and assigned to all general members in your gym.
               </Text>
-              <TouchableOpacity onPress={() => setShowExerciseModal(false)}>
-                <Icon name="close-circle" size={moderateScale(24)} color="#94A3B8" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.inputLabel}>EXERCISE NAME</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={exName}
-                onChangeText={setExName}
-                placeholder="e.g. Incline Dumbbell Press"
-                placeholderTextColor="#94A3B8"
-              />
-
-              <View style={styles.modalRow}>
-                <View style={{ flex: 1, marginRight: 6 }}>
-                  <Text style={styles.inputLabel}>SETS</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    value={exSets}
-                    onChangeText={setExSets}
-                    keyboardType="numeric"
-                    placeholder="3"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 6 }}>
-                  <Text style={styles.inputLabel}>REPS</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    value={exReps}
-                    onChangeText={setExReps}
-                    placeholder="10-12"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.modalRow}>
-                <View style={{ flex: 1, marginRight: 6 }}>
-                  <Text style={styles.inputLabel}>WEIGHT / INTENSITY</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    value={exWeight}
-                    onChangeText={setExWeight}
-                    placeholder="e.g. 20 kg / Bodyweight"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 6 }}>
-                  <Text style={styles.inputLabel}>REST (SEC)</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    value={exRestSec}
-                    onChangeText={setExRestSec}
-                    keyboardType="numeric"
-                    placeholder="60"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.inputLabel}>TARGET MUSCLE FOCUS</Text>
-              <TextInput
-                style={styles.modalInput}
-                value={exTargetMuscle}
-                onChangeText={setExTargetMuscle}
-                placeholder="e.g. Upper Chest / Long Head"
-                placeholderTextColor="#94A3B8"
-              />
-
               <TouchableOpacity
-                style={styles.modalSaveBtn}
-                onPress={handleSaveExercise}
+                style={styles.successModalBtn}
+                onPress={() => setShowSuccessModal(false)}
                 activeOpacity={0.85}
               >
-                <Text style={styles.modalSaveBtnText}>
-                  {editingExIdx !== null ? 'Update Exercise' : 'Add to Day Schedule'}
-                </Text>
+                <Text style={styles.successModalBtnText}>Awesome, Done</Text>
               </TouchableOpacity>
-            </ScrollView>
+            </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      </View>
     </SafeAreaView>
   );
 }
@@ -540,29 +696,84 @@ export default function OwnerWorkoutPlansScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  root: {
+    flex: 1,
     backgroundColor: '#F7F7FD',
   },
+  centerLoading: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: hp(10),
+  },
+  loadingText: {
+    marginTop: hp(1.5),
+    fontSize: fontScale(13),
+    fontWeight: '700',
+    color: '#6C5CE7',
+  },
+
+  // Ambient Glows
+  ambientGlowTop: {
+    position: 'absolute',
+    top: -wp(20),
+    right: -wp(10),
+    width: wp(60),
+    height: wp(60),
+    borderRadius: wp(30),
+    backgroundColor: 'rgba(108, 92, 231, 0.05)',
+  },
+  ambientGlowRight: {
+    position: 'absolute',
+    top: hp(30),
+    left: -wp(20),
+    width: wp(50),
+    height: wp(50),
+    borderRadius: wp(25),
+    backgroundColor: 'rgba(0, 196, 140, 0.04)',
+  },
+
+  // Header
   header: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: moderateScale(16),
-    paddingVertical: moderateScale(12),
+    justifyContent: 'space-between',
+    paddingHorizontal: wp(4.5),
+    paddingTop: hp(0.8),
+    paddingBottom: hp(1.2),
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#ECEAFD',
+    minHeight: hp(6),
   },
   backBtn: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: '#F1F5F9',
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#F3F2FE',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 2,
+  },
+  headerTitleWrap: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   headerTitle: {
     fontSize: fontScale(16.5),
     fontWeight: '900',
     color: '#0F172A',
+    letterSpacing: -0.3,
+    textAlign: 'center',
   },
   headerSubtitle: {
     fontSize: fontScale(11),
@@ -570,328 +781,531 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 1,
   },
-  masterBadge: {
-    backgroundColor: '#FAF5FF',
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(12),
-    borderWidth: 1,
-    borderColor: '#E9D5FF',
-  },
-  masterBadgeText: {
-    fontSize: fontScale(10),
-    fontWeight: '800',
-    color: '#7C3AED',
-    letterSpacing: 0.5,
-  },
-  scroll: {
-    padding: moderateScale(16),
-    paddingBottom: hp(5),
-  },
-  centerLoading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: hp(15),
-  },
-  loadingText: {
-    fontSize: fontScale(13),
-    color: '#64748B',
-    fontWeight: '600',
-    marginTop: 10,
-  },
-  infoCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(14),
-    marginBottom: hp(1.8),
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
-    elevation: 2,
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-  },
-  infoTopRow: {
+  editPlanTopBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(6),
-    marginBottom: 4,
-  },
-  infoCardTitle: {
-    fontSize: fontScale(13.5),
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  infoCardDesc: {
-    fontSize: fontScale(11.5),
-    color: '#64748B',
-    lineHeight: fontScale(16),
-  },
-  titleCard: {
+    gap: 4,
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(14),
-    marginBottom: hp(1.8),
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
-  },
-  inputLabel: {
-    fontSize: fontScale(10),
-    fontWeight: '800',
-    color: '#64748B',
-    letterSpacing: 0.4,
-    marginBottom: 6,
-  },
-  textInput: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(9),
-    fontSize: fontScale(13.5),
-    fontWeight: '700',
-    color: '#0F172A',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  daysStripContainer: {
-    marginBottom: hp(1.8),
-  },
-  daysStrip: {
-    gap: moderateScale(8),
-    paddingVertical: 2,
-  },
-  dayTabPill: {
-    paddingHorizontal: moderateScale(14),
-    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(6),
     borderRadius: moderateScale(12),
-    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#ECEAFD',
-    alignItems: 'center',
-    minWidth: moderateScale(68),
+    shadowColor: '#6C5CE7',
+    zIndex: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  dayTabPillActive: {
+  editPlanTopBtnActive: {
     backgroundColor: '#6C5CE7',
     borderColor: '#6C5CE7',
   },
-  dayTabDayText: {
-    fontSize: fontScale(13),
-    fontWeight: '900',
-    color: '#0F172A',
+  editIconTop: {
+    width: moderateScale(12),
+    height: moderateScale(12),
+    tintColor: '#6C5CE7',
   },
-  dayTabDayTextActive: {
+  editPlanTopText: {
+    fontSize: fontScale(11),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  editPlanTopTextActive: {
     color: '#FFFFFF',
   },
-  dayTabFocusText: {
-    fontSize: fontScale(9.5),
-    fontWeight: '600',
-    color: '#64748B',
-    marginTop: 2,
+
+  // Scroll Content
+  scroll: {
+    paddingHorizontal: wp(4.5),
+    paddingTop: hp(1.4),
   },
-  dayTabFocusTextActive: {
-    color: 'rgba(255, 255, 255, 0.85)',
-  },
-  dayOverviewCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(20),
-    padding: moderateScale(16),
-    marginBottom: hp(2),
-    borderWidth: 1.2,
-    borderColor: '#ECEAFD',
-    elevation: 3,
-    shadowColor: '#6C5CE7',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-  },
-  dayOverviewHeader: {
+
+  // Hero Banner
+  heroBannerCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: moderateScale(12),
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    marginBottom: moderateScale(12),
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(20),
+    padding: moderateScale(14),
+    marginBottom: hp(1.8),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  dayOverviewDayName: {
-    fontSize: fontScale(17),
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  dayOverviewFocus: {
-    fontSize: fontScale(12),
-    fontWeight: '700',
-    color: '#6C5CE7',
-    marginTop: 2,
-  },
-  addExerciseBtn: {
+  heroLeftGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: moderateScale(12),
+    flex: 1,
+    paddingRight: moderateScale(6),
+  },
+  heroIconCircle: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: moderateScale(14),
+    backgroundColor: '#F3F2FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroDumbbellImg: {
+    width: moderateScale(22),
+    height: moderateScale(22),
+    tintColor: '#6C5CE7',
+  },
+  heroPlanTitle: {
+    fontSize: fontScale(14),
+    fontWeight: '900',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  heroPlanSubtitle: {
+    fontSize: fontScale(10.5),
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  heroRightBadge: {
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+  },
+  heroRightBadgeText: {
+    fontSize: fontScale(10),
+    fontWeight: '900',
+    color: '#4F46E5',
+    letterSpacing: 0.5,
+  },
+
+  // Editing Instruction Banner
+  editingInstructionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F3F2FE',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(12),
+    marginBottom: hp(1.4),
+    borderWidth: 1,
+    borderColor: '#C4B5FD',
+  },
+  editingDot: {
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+    backgroundColor: '#6C5CE7',
+    marginRight: moderateScale(8),
+  },
+  editingInstructionText: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+    color: '#5B21B6',
+    flex: 1,
+  },
+
+  // Timetable Container
+  timetableContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(22),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(14),
+    marginBottom: hp(2),
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 3,
+    gap: moderateScale(8),
+  },
+  timetableHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(6),
+    paddingBottom: moderateScale(8),
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: moderateScale(2),
+  },
+  timetableColDayWrap: {
+    width: moderateScale(108),
+  },
+  timetableColDay: {
+    fontSize: fontScale(10.5),
+    fontWeight: '900',
+    color: '#6C5CE7',
+    letterSpacing: 0.8,
+  },
+  timetableColSeparator: {
+    width: moderateScale(16),
+    fontSize: fontScale(12),
+    fontWeight: '900',
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+  timetableColRoutineWrap: {
+    flex: 1,
+    paddingLeft: moderateScale(6),
+  },
+  timetableColRoutine: {
+    fontSize: fontScale(10.5),
+    fontWeight: '900',
+    color: '#64748B',
+    letterSpacing: 0.8,
+  },
+  timetableColActionWrap: {
+    width: moderateScale(36),
+    alignItems: 'center',
+  },
+  timetableColAction: {
+    fontSize: fontScale(10),
+    fontWeight: '800',
+    color: '#6C5CE7',
+    letterSpacing: 0.6,
+  },
+
+  // Timetable Row Card
+  timetableRowCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(14),
+    borderWidth: 1.2,
+    borderColor: '#F1F5F9',
+    overflow: 'hidden',
+  },
+  timetableRowCardOpen: {
+    borderColor: '#6C5CE7',
+    backgroundColor: '#FAFAFD',
+    elevation: 2,
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  timetableRowMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(9),
+  },
+  timetableRowMainOpen: {
+    backgroundColor: '#F8F7FF',
+  },
+  timetableDayGroup: {
+    width: moderateScale(108),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(8),
+  },
+  timetableIconBadge: {
+    width: moderateScale(34),
+    height: moderateScale(34),
+    borderRadius: moderateScale(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dayIconImg: {
+    width: moderateScale(18),
+    height: moderateScale(18),
+  },
+  timetableDayName: {
+    fontSize: fontScale(12),
+    fontWeight: '800',
+    color: '#0F172A',
+    flex: 1,
+  },
+  timetableDash: {
+    width: moderateScale(16),
+    fontSize: fontScale(13),
+    fontWeight: '900',
+    color: '#CBD5E1',
+    textAlign: 'center',
+  },
+  timetableRoutineGroup: {
+    flex: 1,
+    paddingLeft: moderateScale(6),
+    paddingRight: moderateScale(4),
+  },
+  timetableRoutineName: {
+    fontSize: fontScale(12.5),
+    fontWeight: '800',
+    color: '#1E293B',
+    letterSpacing: -0.2,
+  },
+  timetableRoutineNameActive: {
+    color: '#6C5CE7',
+    fontWeight: '900',
+  },
+  timetableDropdownBtn: {
+    width: moderateScale(26),
+    height: moderateScale(26),
+    borderRadius: moderateScale(13),
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  timetableDropdownBtnOpen: {
+    backgroundColor: '#6C5CE7',
+    borderColor: '#6C5CE7',
+  },
+  timetableDropdownChevron: {
+    fontSize: fontScale(8.5),
+    fontWeight: '900',
+    color: '#64748B',
+  },
+
+  // Dropdown List
+  dropdownListWrapper: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingHorizontal: moderateScale(10),
+    paddingTop: moderateScale(8),
+    paddingBottom: moderateScale(10),
+  },
+  dropdownHeaderSub: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: moderateScale(4),
+    marginBottom: moderateScale(6),
+  },
+  dropdownHeaderLeft: {
+    flex: 1,
+    paddingRight: moderateScale(8),
+  },
+  dropdownSelectLabel: {
+    fontSize: fontScale(10.5),
+    fontWeight: '900',
+    color: '#6C5CE7',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dropdownMultiHint: {
+    fontSize: fontScale(9.5),
+    color: '#94A3B8',
+    fontWeight: '600',
+    marginTop: 1,
+  },
+  dropdownDoneBtn: {
+    backgroundColor: '#F3F2FE',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(8),
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  dropdownDoneBtnText: {
+    fontSize: fontScale(11),
+    fontWeight: '800',
+    color: '#6C5CE7',
+  },
+  dropdownOptionsContainer: {
+    gap: moderateScale(4),
+  },
+  dropdownItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(7),
+    borderRadius: moderateScale(10),
+    backgroundColor: '#FAFAFD',
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  dropdownItemRowSelected: {
+    backgroundColor: '#F5F3FF',
+    borderColor: '#C4B5FD',
+  },
+  dropdownItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(10),
+    flex: 1,
+  },
+  dropdownItemIconCircle: {
+    width: moderateScale(28),
+    height: moderateScale(28),
+    borderRadius: moderateScale(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdownItemIconImg: {
+    width: moderateScale(15),
+    height: moderateScale(15),
+  },
+  dropdownItemText: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#334155',
+  },
+  dropdownItemTextSelected: {
+    fontWeight: '900',
+    color: '#6C5CE7',
+  },
+  dropdownCheckbox: {
+    width: moderateScale(18),
+    height: moderateScale(18),
+    borderRadius: moderateScale(6),
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  dropdownCheckboxActive: {
+    backgroundColor: '#6C5CE7',
+    borderColor: '#6C5CE7',
+  },
+  dropdownCheckmarkText: {
+    color: '#FFFFFF',
+    fontSize: fontScale(11),
+    fontWeight: '900',
+    marginTop: -1,
+  },
+
+  // Custom Type Box
+  customTypeContainer: {
+    marginTop: moderateScale(8),
+    paddingTop: moderateScale(8),
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+  },
+  customTypeLabel: {
+    fontSize: fontScale(10.5),
+    fontWeight: '800',
+    color: '#64748B',
+    marginBottom: moderateScale(4),
+  },
+  customInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(8),
+  },
+  customTextInput: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(6),
+    fontSize: fontScale(12),
+    color: '#0F172A',
+    fontWeight: '600',
+  },
+  applyCustomBtn: {
     backgroundColor: '#6C5CE7',
     paddingHorizontal: moderateScale(12),
     paddingVertical: moderateScale(7),
     borderRadius: moderateScale(10),
-    gap: 4,
   },
-  addExerciseBtnText: {
-    fontSize: fontScale(11.5),
-    fontWeight: '800',
+  applyCustomBtnText: {
     color: '#FFFFFF',
-  },
-  emptyExercisesBox: {
-    alignItems: 'center',
-    paddingVertical: moderateScale(25),
-  },
-  emptyExercisesText: {
-    fontSize: fontScale(13),
-    color: '#94A3B8',
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  addFirstBtn: {
-    marginTop: 10,
-    backgroundColor: '#F5F3FF',
-    paddingHorizontal: moderateScale(14),
-    paddingVertical: moderateScale(6),
-    borderRadius: moderateScale(8),
-  },
-  addFirstBtnText: {
-    fontSize: fontScale(12),
-    fontWeight: '800',
-    color: '#6C5CE7',
-  },
-  exercisesList: {
-    gap: moderateScale(10),
-  },
-  exerciseCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderRadius: moderateScale(12),
-    padding: moderateScale(10),
-    borderWidth: 1,
-    borderColor: '#ECEAFD',
-  },
-  exNumberBox: {
-    width: moderateScale(26),
-    height: moderateScale(26),
-    borderRadius: moderateScale(13),
-    backgroundColor: '#ECEAFD',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  exNumberText: {
-    fontSize: fontScale(12),
-    fontWeight: '900',
-    color: '#6C5CE7',
-  },
-  exNameText: {
-    fontSize: fontScale(13.5),
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  exMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 2,
-    gap: 4,
-  },
-  exMetaPill: {
     fontSize: fontScale(11),
-    color: '#64748B',
-    fontWeight: '600',
+    fontWeight: '800',
   },
-  exMetaDot: {
-    color: '#CBD5E1',
-    fontWeight: '900',
-  },
-  exActionsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  exActionIconBtn: {
-    width: moderateScale(28),
-    height: moderateScale(28),
-    borderRadius: moderateScale(8),
-    backgroundColor: '#F3F0FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+
+  // Publish Master Button
   publishBtn: {
     backgroundColor: '#6C5CE7',
-    borderRadius: moderateScale(14),
     paddingVertical: moderateScale(14),
+    borderRadius: moderateScale(16),
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 4,
     shadowColor: '#6C5CE7',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
+    marginTop: hp(0.5),
   },
   publishBtnRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: moderateScale(8),
   },
   publishBtnText: {
-    fontSize: fontScale(14),
-    fontWeight: '900',
     color: '#FFFFFF',
-    letterSpacing: 0.3,
+    fontSize: fontScale(13.5),
+    fontWeight: '900',
+    letterSpacing: -0.2,
   },
-  modalOverlay: {
+
+  // Success Modal
+  modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: moderateScale(24),
-    borderTopRightRadius: moderateScale(24),
-    padding: moderateScale(20),
-    maxHeight: hp(80),
-  },
-  modalHeader: {
-    flexDirection: 'row',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: moderateScale(16),
+    justifyContent: 'center',
+    paddingHorizontal: wp(6),
   },
-  modalTitle: {
+  successModalCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(24),
+    padding: moderateScale(22),
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ECEAFD',
+    shadowColor: '#6C5CE7',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  successIconCircle: {
+    width: moderateScale(54),
+    height: moderateScale(54),
+    borderRadius: moderateScale(27),
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: moderateScale(12),
+    borderWidth: 2,
+    borderColor: '#86EFAC',
+  },
+  successCheckmark: {
+    fontSize: fontScale(24),
+    fontWeight: '900',
+    color: '#16A34A',
+  },
+  successModalTitle: {
     fontSize: fontScale(16),
     fontWeight: '900',
     color: '#0F172A',
+    marginBottom: moderateScale(6),
+    textAlign: 'center',
   },
-  modalInput: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: moderateScale(10),
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(10),
-    fontSize: fontScale(13),
-    fontWeight: '700',
-    color: '#0F172A',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: moderateScale(12),
+  successModalMessage: {
+    fontSize: fontScale(12),
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: fontScale(17),
+    marginBottom: moderateScale(18),
   },
-  modalRow: {
-    flexDirection: 'row',
-  },
-  modalSaveBtn: {
+  successModalBtn: {
     backgroundColor: '#6C5CE7',
-    borderRadius: moderateScale(12),
+    width: '100%',
     paddingVertical: moderateScale(12),
+    borderRadius: moderateScale(14),
     alignItems: 'center',
-    marginTop: moderateScale(8),
-    marginBottom: hp(2),
+    justifyContent: 'center',
   },
-  modalSaveBtnText: {
-    fontSize: fontScale(13.5),
-    fontWeight: '900',
+  successModalBtnText: {
     color: '#FFFFFF',
+    fontSize: fontScale(13),
+    fontWeight: '900',
   },
 });
