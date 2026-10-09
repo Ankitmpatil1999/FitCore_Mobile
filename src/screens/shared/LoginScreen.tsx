@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import Video from 'react-native-video';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getAuth, signInWithPhoneNumber, type ConfirmationResult } from '@react-native-firebase/auth';
 import { useAppContext } from '../../context/AppContext';
 import apiService from '../../services/api';
 
@@ -39,6 +40,7 @@ export default function LoginScreen() {
   const [mode, setMode] = useState<ScreenMode>('login');
   const [loginStep, setLoginStep] = useState<LoginStep>('enter_phone');
   const [otpStep, setOtpStep] = useState<OtpStep>('enter_phone');
+  const [confirmResult, setConfirmResult] = useState<ConfirmationResult | null>(null);
 
   // Input states
   const [mobileNumber, setMobileNumber] = useState('');
@@ -221,7 +223,7 @@ export default function LoginScreen() {
     }
   };
 
-  // ─── STEP 1: SEND OTP ───
+  // ─── STEP 1: SEND OTP (Firebase 10k Free SMS + Server Fallback) ───
   const handleSendOtp = async (overrideMode?: ScreenMode, overridePhone?: string) => {
     setError('');
     setSuccessMessage('');
@@ -236,22 +238,40 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      let res: any;
-      if (targetMode === 'first_time_otp') {
-        res = await apiService.sendFirstTimeOtp(cleanPhone);
-      } else {
-        res = await apiService.forgotPassword(cleanPhone);
+      let fbSuccess = false;
+
+      // 1. Send via Firebase Phone Auth (Google 10,000 Free SMS Quota)
+      try {
+        const confirmation = await signInWithPhoneNumber(getAuth(), '+91' + cleanPhone);
+        if (confirmation) {
+          setConfirmResult(confirmation);
+          fbSuccess = true;
+        }
+      } catch (fbErr: any) {
+        console.log('Firebase Phone Auth attempt:', fbErr?.message || fbErr);
       }
 
-      if (res.success) {
-        if (res.userName) {
+      // 2. Fetch User Name & trigger backend sync / fallback
+      let res: any = null;
+      try {
+        if (targetMode === 'first_time_otp') {
+          res = await apiService.sendFirstTimeOtp(cleanPhone);
+        } else {
+          res = await apiService.forgotPassword(cleanPhone);
+        }
+      } catch (srvErr) {
+        console.log('Server SMS sync fallback info:', srvErr);
+      }
+
+      if (fbSuccess || res?.success) {
+        if (res?.userName) {
           setDiscoveredUserName(res.userName);
         }
         setSuccessMessage(`Verification code sent to +91 ${cleanPhone}`);
         setOtpStep('enter_otp');
         setResendTimer(60);
       } else {
-        setError(res.error || res.message || 'Failed to send OTP. Check if number is registered.');
+        setError(res?.error || res?.message || 'Failed to send OTP. Check if number is registered.');
       }
     } catch (err: any) {
       setError(err.message || 'Network error while sending OTP.');
@@ -275,12 +295,31 @@ export default function LoginScreen() {
     setIsLoading(true);
 
     try {
-      const res = await apiService.verifyOtp(cleanPhone, cleanOtp);
-      if (res.success) {
+      let isVerified = false;
+
+      // 1. Check Firebase Confirmation first
+      if (confirmResult) {
+        try {
+          await confirmResult.confirm(cleanOtp);
+          isVerified = true;
+        } catch (fbErr: any) {
+          console.log('Firebase OTP verify fallback:', fbErr?.message);
+        }
+      }
+
+      // 2. Check Backend OTP verify
+      if (!isVerified) {
+        const res = await apiService.verifyOtp(cleanPhone, cleanOtp);
+        if (res.success) {
+          isVerified = true;
+        }
+      }
+
+      if (isVerified) {
         setSuccessMessage('Code verified! Set your password now.');
         setOtpStep('set_password');
       } else {
-        setError(res.error || res.message || 'Invalid or expired OTP. Please try again.');
+        setError('Invalid or expired OTP. Please check the code received on your phone.');
       }
     } catch (err: any) {
       setError(err.message || 'Failed to verify OTP.');
