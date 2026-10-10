@@ -212,11 +212,15 @@ class ApiService {
     });
   }
 
-  async setupFirstTimePassword(phone: string, tokenOrOtp: string, password: string) {
+  async setupFirstTimePassword(phone: string, tokenOrOtp: string, password: string, otpFallback?: string) {
     const isIdToken = tokenOrOtp && tokenOrOtp.length > 25;
-    const payload = isIdToken
-      ? { phone, idToken: tokenOrOtp, password }
-      : { phone, otp: tokenOrOtp, password };
+    const payload: any = { phone, password };
+    if (isIdToken) {
+      payload.idToken = tokenOrOtp;
+      if (otpFallback) payload.otp = otpFallback;
+    } else {
+      payload.otp = tokenOrOtp;
+    }
     const res = await this.request<any>('/auth/setup-first-time-password', {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -234,11 +238,15 @@ class ApiService {
     });
   }
 
-  async resetPassword(phone: string, tokenOrOtp: string, password: string) {
+  async resetPassword(phone: string, tokenOrOtp: string, password: string, otpFallback?: string) {
     const isIdToken = tokenOrOtp && tokenOrOtp.length > 25;
-    const payload = isIdToken
-      ? { phone, idToken: tokenOrOtp, password }
-      : { phone, otp: tokenOrOtp, password };
+    const payload: any = { phone, password };
+    if (isIdToken) {
+      payload.idToken = tokenOrOtp;
+      if (otpFallback) payload.otp = otpFallback;
+    } else {
+      payload.otp = tokenOrOtp;
+    }
     return this.request<any>('/auth/reset-password', {
       method: 'POST',
       body: JSON.stringify(payload),

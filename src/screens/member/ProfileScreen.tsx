@@ -18,6 +18,7 @@ import {
   KeyboardAvoidingView,
   TouchableWithoutFeedback,
   Keyboard,
+  Share,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useIsFocused } from '@react-navigation/native';
@@ -59,6 +60,8 @@ export default function ProfileScreen({ navigation }: any) {
   const [showPersonalInfoModal, setShowPersonalInfoModal] = useState(false);
   const [showTrainerModal, setShowTrainerModal] = useState(false);
   const [showPaymentHistoryModal, setShowPaymentHistoryModal] = useState(false);
+  const [selectedSlip, setSelectedSlip] = useState<any | null>(null);
+  const [showSlipModal, setShowSlipModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showAvatarPickerModal, setShowAvatarPickerModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -233,6 +236,37 @@ export default function ProfileScreen({ navigation }: any) {
     } catch (err) {
       console.log('Using cached profile', err);
       setLiveSessionsDone(0);
+    }
+  };
+
+  const handleShareSlip = async (slip: any) => {
+    try {
+      const gName = slip?.gymName || currentMember?.gymName || 'FitCore Fitness Club';
+      const rNo = slip?.receiptNo || slip?.id || slip?.invoiceNumber || 'REC-OFFICIAL';
+      const mName = memberName || currentMember?.name || 'Valued Member';
+      const sDate = slip?.startDate || slip?.joinedDate || currentMember?.startDate || slip?.date || 'N/A';
+      const eDate = slip?.expiryDate || currentMember?.expiryDate || 'N/A';
+      const amt = slip?.amountPaid ? `₹${Number(slip.amountPaid).toLocaleString()}` : (slip?.amount || 'Paid');
+      const pMode = slip?.paymentMode || 'Cash / Online';
+
+      const msg = `🧾 *OFFICIAL GYM PAYMENT SLIP / RECEIPT*\n` +
+        `----------------------------------------\n` +
+        `🏢 *Gym / Branch:* ${gName}\n` +
+        `📋 *Receipt No:* ${rNo}\n` +
+        `👤 *Member Name:* ${mName}\n` +
+        `📅 *Joint Date (Start):* ${sDate}\n` +
+        `⏳ *End Date (Expiry):* ${eDate}\n` +
+        `💳 *Amount Paid:* ${amt} (${pMode})\n` +
+        `✅ *Status:* PAID & VERIFIED\n` +
+        `----------------------------------------\n` +
+        `Thank you for training with ${gName}!`;
+
+      await Share.share({
+        message: msg,
+        title: `${gName} - Payment Slip ${rNo}`,
+      });
+    } catch (err) {
+      console.log('Error sharing receipt:', err);
     }
   };
 
@@ -950,14 +984,25 @@ export default function ProfileScreen({ navigation }: any) {
                   }
 
                   return displayPayments.map((inv: any, idx: number) => (
-                    <View key={inv.id || `inv-${idx}`} style={styles.receiptCardModern}>
+                    <TouchableOpacity
+                      key={inv.id || `inv-${idx}`}
+                      style={styles.receiptCardModern}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        setSelectedSlip(inv);
+                        setShowSlipModal(true);
+                      }}
+                    >
                       <View style={styles.receiptIconBoxModern}>
                         <Image source={payIcon} style={styles.receiptIconImg} resizeMode="contain" />
                       </View>
                       <View style={{ flex: 1, paddingHorizontal: moderateScale(12) }}>
                         <Text style={styles.receiptDescModern} numberOfLines={1}>{inv.desc || 'Gym Subscription Pass'}</Text>
                         <Text style={styles.receiptMetaModern}>
-                          {inv.date || 'Active'} • {inv.id || `INV-${new Date().getFullYear()}-01`}
+                          {inv.date || 'Active'} • {inv.receiptNo || inv.id || `INV-${new Date().getFullYear()}-01`}
+                        </Text>
+                        <Text style={{ fontSize: fontScale(10), color: '#3B82F6', fontWeight: '600', marginTop: 2 }}>
+                          Tap to view official slip & share →
                         </Text>
                       </View>
                       <View style={{ alignItems: 'flex-end' }}>
@@ -966,7 +1011,7 @@ export default function ProfileScreen({ navigation }: any) {
                           <Text style={styles.receiptPaidBadgeText}>{inv.status || 'PAID ✓'}</Text>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   ));
                 })()}
               </ScrollView>
@@ -978,6 +1023,102 @@ export default function ProfileScreen({ navigation }: any) {
               >
                 <Text style={styles.modernSaveBtnText}>CLOSE RECEIPTS</Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* ── MODAL 4B: OFFICIAL BRANDED GYM PAYMENT SLIP MODAL ── */}
+        <Modal visible={showSlipModal && !!selectedSlip} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modernModalCard, { padding: moderateScale(18), maxHeight: hp(85) }]}>
+              {/* Slip Header */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#F1F5F9', paddingBottom: moderateScale(12) }}>
+                <View>
+                  <Text style={{ fontSize: fontScale(16), fontWeight: '900', color: '#0F172A', letterSpacing: -0.3 }}>
+                    {selectedSlip?.gymName || currentMember?.gymName || 'FITCORE FITNESS CLUB'}
+                  </Text>
+                  <Text style={{ fontSize: fontScale(11), color: '#64748B', fontWeight: '600', marginTop: 2 }}>
+                    Official Member Payment Slip & Tax Invoice
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseBtnModern}
+                  onPress={() => setShowSlipModal(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalCloseX}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Receipt No & Status Banner */}
+              <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: moderateScale(12), marginVertical: moderateScale(12), borderWidth: 1, borderColor: '#E2E8F0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <View>
+                  <Text style={{ fontSize: fontScale(10), fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>Receipt Number</Text>
+                  <Text style={{ fontSize: fontScale(14), fontWeight: '800', color: '#0F172A', marginTop: 2 }}>
+                    {selectedSlip?.receiptNo || selectedSlip?.id || selectedSlip?.invoiceNumber || `REC-${Date.now().toString().slice(-6)}`}
+                  </Text>
+                </View>
+                <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1, borderColor: '#86EFAC' }}>
+                  <Text style={{ fontSize: fontScale(11), fontWeight: '800', color: '#15803D' }}>PAID & VERIFIED ✓</Text>
+                </View>
+              </View>
+
+              {/* Slip Details Grid */}
+              <View style={{ gap: moderateScale(8), marginBottom: moderateScale(14) }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' }}>
+                  <Text style={{ fontSize: fontScale(12), color: '#64748B', fontWeight: '600' }}>Member Name:</Text>
+                  <Text style={{ fontSize: fontScale(12), color: '#0F172A', fontWeight: '700' }}>{memberName || currentMember?.name || 'Valued Member'}</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' }}>
+                  <Text style={{ fontSize: fontScale(12), color: '#64748B', fontWeight: '600' }}>Plan / Description:</Text>
+                  <Text style={{ fontSize: fontScale(12), color: '#0F172A', fontWeight: '700' }}>{selectedSlip?.desc || 'Gym Subscription Pass'}</Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' }}>
+                  <Text style={{ fontSize: fontScale(12), color: '#64748B', fontWeight: '600' }}>Joint Date (Start):</Text>
+                  <Text style={{ fontSize: fontScale(12), color: '#0F172A', fontWeight: '700' }}>
+                    {selectedSlip?.startDate || selectedSlip?.joinedDate || currentMember?.startDate || currentMember?.joinDate || selectedSlip?.date || 'Active'}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' }}>
+                  <Text style={{ fontSize: fontScale(12), color: '#64748B', fontWeight: '600' }}>End Date (Expiry):</Text>
+                  <Text style={{ fontSize: fontScale(12), color: '#E11D48', fontWeight: '700' }}>
+                    {selectedSlip?.expiryDate || currentMember?.expiryDate || 'Active'}
+                  </Text>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderBottomWidth: 1, borderBottomColor: '#F8FAFC' }}>
+                  <Text style={{ fontSize: fontScale(12), color: '#64748B', fontWeight: '600' }}>Payment Mode:</Text>
+                  <Text style={{ fontSize: fontScale(12), color: '#0F172A', fontWeight: '700' }}>{selectedSlip?.paymentMode || 'Cash / Online UPI'}</Text>
+                </View>
+              </View>
+
+              {/* Total Paid Highlight */}
+              <View style={{ backgroundColor: '#0F172A', borderRadius: 12, padding: moderateScale(12), flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: moderateScale(14) }}>
+                <Text style={{ fontSize: fontScale(13), fontWeight: '700', color: '#94A3B8' }}>Total Amount Paid</Text>
+                <Text style={{ fontSize: fontScale(18), fontWeight: '900', color: '#38BDF8' }}>{selectedSlip?.amount}</Text>
+              </View>
+
+              {/* Action Buttons */}
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: '#2563EB', paddingVertical: moderateScale(12), borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+                  onPress={() => handleShareSlip(selectedSlip)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ color: '#FFFFFF', fontSize: fontScale(12), fontWeight: '800' }}>SHARE SLIP</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={{ flex: 1, backgroundColor: '#F1F5F9', paddingVertical: moderateScale(12), borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}
+                  onPress={() => setShowSlipModal(false)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ color: '#475569', fontSize: fontScale(12), fontWeight: '800' }}>CLOSE</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>

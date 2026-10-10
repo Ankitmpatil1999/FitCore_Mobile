@@ -55,7 +55,11 @@ export default function LoginScreen() {
   const [discoveredUserName, setDiscoveredUserName] = useState('');
 
   // Control states
-  const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingPhone, setIsCheckingPhone] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -161,9 +165,11 @@ export default function LoginScreen() {
       setError('Please enter a valid 10-digit mobile number.');
       return;
     }
-    setIsLoading(true);
+    console.log(`📱 [FitCore Auth] Checking eligibility for phone: +91 ******${cleanPhone.slice(-4)}`);
+    setIsCheckingPhone(true);
     try {
       const res = await apiService.checkPhone(cleanPhone);
+      console.log('📱 [FitCore Auth] checkPhone response:', res);
       if (!res.success) {
         setError(res.error || 'Unable to check number. Please try again.');
         return;
@@ -176,16 +182,21 @@ export default function LoginScreen() {
         setDiscoveredUserName(res.data.userName);
       }
       if (res.data?.status === 'needs_otp') {
+        console.log('📱 [FitCore Auth] First-time member detected -> Transitioning to OTP verification');
         setMode('first_time_otp');
         setOtpStep('enter_otp');
-        await handleSendOtp('first_time_otp', cleanPhone);
+        setIsCheckingPhone(false);
+        // Dispatch OTP send smoothly in background without freezing UI
+        handleSendOtp('first_time_otp', cleanPhone);
       } else {
+        console.log('📱 [FitCore Auth] Returning member detected -> Navigating to password step');
         setLoginStep('enter_password');
       }
     } catch (err: any) {
+      console.error('❌ [FitCore Auth] checkPhone error:', err);
       setError(err.message || 'Network error. Please check your connection.');
     } finally {
-      setIsLoading(false);
+      setIsCheckingPhone(false);
     }
   };
 
@@ -204,7 +215,8 @@ export default function LoginScreen() {
       return;
     }
 
-    setIsLoading(true);
+    console.log(`🔐 [FitCore Auth] Submitting login for +91 ******${cleanPhone.slice(-4)}`);
+    setIsLoggingIn(true);
     try {
       if (rememberMe) {
         await AsyncStorage.setItem('user_phone', cleanPhone);
@@ -216,39 +228,47 @@ export default function LoginScreen() {
       }
 
       const res = await login(cleanPhone, password);
+      console.log('🔐 [FitCore Auth] Login result:', res?.success ? 'SUCCESS' : res?.error);
       if (!res.success) {
         setError(res.error || 'Invalid mobile number or password.');
       }
     } catch (err: any) {
+      console.error('❌ [FitCore Auth] Login error:', err);
       setError(err.message || 'Login failed. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsLoggingIn(false);
     }
   };
 
   // ─── STEP 1: SEND OTP (Firebase Phone Authentication Only) ───
   const handleSendOtp = async (overrideMode?: ScreenMode, overridePhone?: string) => {
     setError('');
-    setSuccessMessage('');
 
     const targetMode = overrideMode || mode;
     const rawTargetPhone = overridePhone || mobileNumber;
     const cleanPhone = rawTargetPhone.trim().replace(/[^0-9]/g, '').slice(-10);
     if (!cleanPhone || cleanPhone.length !== 10) {
       setError('Please enter a valid 10-digit mobile number.');
-      return;
+      return false;
     }
 
-    setIsLoading(true);
+    const fullPhoneNumber = `+91${cleanPhone}`;
+    console.log(`🔥 [Firebase OTP] Initiating signInWithPhoneNumber for ${fullPhoneNumber} (mode: ${targetMode})`);
+    setIsSendingOtp(true);
+    setSuccessMessage(`Sending SMS code to +91 ${cleanPhone}...`);
     try {
-      // 1. Send SMS OTP strictly via Firebase Phone Auth
-      const confirmation = await signInWithPhoneNumber(getAuth(), '+91' + cleanPhone);
+      const confirmation = await signInWithPhoneNumber(getAuth(), fullPhoneNumber);
+      console.log('✅ [Firebase OTP] signInWithPhoneNumber success! Confirmation object created:', !!confirmation);
       setConfirmResult(confirmation);
       setSuccessMessage(`Verification code sent via SMS to +91 ${cleanPhone}`);
       setOtpStep('enter_otp');
       setResendTimer(60);
+      return true;
     } catch (fbErr: any) {
       const code = fbErr?.code || '';
+      const rawMessage = fbErr?.message || String(fbErr);
+      console.error(`❌ [Firebase OTP Error] Code: ${code} | Message: ${rawMessage}`);
+
       let userMsg = 'Failed to send verification SMS. Please try again.';
       if (code === 'auth/invalid-phone-number') {
         userMsg = 'Invalid phone number format. Please enter a valid 10-digit number.';
@@ -258,58 +278,69 @@ export default function LoginScreen() {
         userMsg = 'SMS service quota exceeded. Please contact your gym administrator.';
       } else if (code === 'auth/app-not-authorized' || code === 'auth/captcha-check-failed') {
         userMsg = 'Device integrity verification failed. Please check your internet connection.';
-      } else if (fbErr?.message) {
-        userMsg = fbErr.message.replace(/\[.*?\]\s*/, '');
+      } else if (rawMessage) {
+        userMsg = rawMessage.replace(/\[.*?\]\s*/, '');
       }
       setError(userMsg);
+      setSuccessMessage('');
+      return false;
     } finally {
-      setIsLoading(false);
+      setIsSendingOtp(false);
     }
   };
 
   // ─── STEP 2: VERIFY OTP (Firebase Phone Authentication Only) ───
-  const handleVerifyOtp = async () => {
+  const handleVerifyOtp = async (codeToVerify?: string) => {
     setError('');
     setSuccessMessage('');
 
-    const cleanOtp = otpCode.trim();
+    const cleanOtp = (codeToVerify || otpCode).trim();
     if (!cleanOtp || cleanOtp.length < 6) {
       setError('Please enter the 6-digit verification code received via SMS.');
       return;
     }
 
     if (!confirmResult) {
-      setError('No pending OTP request found. Please tap Resend Code.');
+      console.warn('⚠️ [Firebase OTP Verify] No confirmResult in state yet.');
+      if (isSendingOtp) {
+        setError('SMS session initializing, please wait a moment...');
+      } else {
+        setError('No pending OTP session. Please tap Resend Code.');
+      }
       return;
     }
 
-    setIsLoading(true);
+    console.log(`🔥 [Firebase OTP] Confirming 6-digit OTP code...`);
+    setIsVerifyingOtp(true);
     try {
-      // 1. Confirm OTP with Firebase Auth
       const userCredential = await confirmResult.confirm(cleanOtp);
+      console.log('✅ [Firebase OTP] OTP confirmed successfully! User UID:', userCredential?.user?.uid);
       if (!userCredential?.user) {
         throw new Error('Firebase authentication failed. Please try again.');
       }
 
-      // 2. Extract Firebase ID Token for backend verification
       const idToken = await userCredential.user.getIdToken();
+      console.log('✅ [Firebase OTP] Acquired Firebase ID Token (length:', idToken?.length || 0, ')');
       setFirebaseIdToken(idToken);
 
       setSuccessMessage('Phone number verified! Please set your new password.');
       setOtpStep('set_password');
     } catch (fbErr: any) {
       const code = fbErr?.code || '';
+      const rawMessage = fbErr?.message || String(fbErr);
+      console.error(`❌ [Firebase OTP Verify Error] Code: ${code} | Message: ${rawMessage}`);
+
       let userMsg = 'Invalid or expired OTP code. Please check the SMS received on your phone.';
       if (code === 'auth/invalid-verification-code') {
         userMsg = 'Incorrect OTP code. Please enter the 6-digit code sent to your phone.';
       } else if (code === 'auth/session-expired') {
         userMsg = 'Verification session expired. Please tap Resend Code to receive a new OTP.';
-      } else if (fbErr?.message) {
-        userMsg = fbErr.message.replace(/\[.*?\]\s*/, '');
+      } else if (rawMessage) {
+        userMsg = rawMessage.replace(/\[.*?\]\s*/, '');
       }
       setError(userMsg);
     } finally {
-      setIsLoading(false);
+      setIsVerifyingOtp(false);
     }
   };
 
@@ -330,14 +361,16 @@ export default function LoginScreen() {
     const cleanPhone = mobileNumber.trim().replace(/[^0-9]/g, '').slice(-10);
     const tokenPayload = firebaseIdToken || otpCode.trim();
 
-    setIsLoading(true);
+    console.log(`🚀 [FitCore Auth] Submitting password setup for +91 ******${cleanPhone.slice(-4)} with Firebase ID Token`);
+    setIsSavingPassword(true);
     try {
       let res: any;
       if (mode === 'first_time_otp') {
-        res = await apiService.setupFirstTimePassword(cleanPhone, tokenPayload, newPassword);
+        res = await apiService.setupFirstTimePassword(cleanPhone, tokenPayload, newPassword, otpCode.trim());
       } else {
-        res = await apiService.resetPassword(cleanPhone, tokenPayload, newPassword);
+        res = await apiService.resetPassword(cleanPhone, tokenPayload, newPassword, otpCode.trim());
       }
+      console.log('🚀 [FitCore Auth] Password setup response:', res);
 
       if (res.success) {
         await AsyncStorage.setItem('user_phone', cleanPhone);
@@ -349,6 +382,7 @@ export default function LoginScreen() {
 
         setTimeout(async () => {
           const loginRes = await login(cleanPhone, newPassword);
+          console.log('🚀 [FitCore Auth] Auto-login result:', loginRes?.success);
           if (!loginRes.success) {
             handleModeChange('login');
             Alert.alert('Success', 'Password saved! Please sign in with your new password.');
@@ -358,9 +392,10 @@ export default function LoginScreen() {
         setError(res.error || res.message || 'Failed to set password.');
       }
     } catch (err: any) {
+      console.error('❌ [FitCore Auth] Password setup error:', err);
       setError(err.message || 'Failed to save password.');
     } finally {
-      setIsLoading(false);
+      setIsSavingPassword(false);
     }
   };
 
@@ -473,12 +508,12 @@ export default function LoginScreen() {
 
                       {/* Submit Button */}
                       <TouchableOpacity
-                        style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+                        style={[styles.primaryButton, isCheckingPhone && styles.buttonDisabled]}
                         onPress={handleCheckPhone}
-                        disabled={isLoading}
+                        disabled={isCheckingPhone}
                         activeOpacity={0.88}
                       >
-                        {isLoading ? (
+                        {isCheckingPhone ? (
                           <ActivityIndicator color="#0b0f19" size="small" />
                         ) : (
                           <Text style={styles.primaryButtonText}>Continue  →</Text>
@@ -567,12 +602,12 @@ export default function LoginScreen() {
 
                       {/* Sign In Button */}
                       <TouchableOpacity
-                        style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+                        style={[styles.primaryButton, isLoggingIn && styles.buttonDisabled]}
                         onPress={handleLogin}
-                        disabled={isLoading}
+                        disabled={isLoggingIn}
                         activeOpacity={0.88}
                       >
-                        {isLoading ? (
+                        {isLoggingIn ? (
                           <ActivityIndicator color="#0b0f19" size="small" />
                         ) : (
                           <Text style={styles.primaryButtonText}>Sign In</Text>
@@ -670,12 +705,12 @@ export default function LoginScreen() {
                       </View>
 
                       <TouchableOpacity
-                        style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+                        style={[styles.primaryButton, isSendingOtp && styles.buttonDisabled]}
                         onPress={() => handleSendOtp()}
-                        disabled={isLoading}
+                        disabled={isSendingOtp}
                         activeOpacity={0.88}
                       >
-                        {isLoading ? (
+                        {isSendingOtp ? (
                           <ActivityIndicator color="#0b0f19" size="small" />
                         ) : (
                           <Text style={styles.primaryButtonText}>Send Code  →</Text>
@@ -689,10 +724,18 @@ export default function LoginScreen() {
                     <>
                       <Text style={styles.cardHeading}>Enter Verification Code</Text>
                       <Text style={styles.cardSubheading}>
-                        Sent to{' '}
-                        <Text style={{ color: '#f59e0b', fontWeight: '700' }}>
-                          +91 {mobileNumber}
-                        </Text>
+                        {isSendingOtp ? (
+                          <Text style={{ color: '#38BDF8', fontWeight: '700' }}>
+                            Sending SMS verification code to +91 {mobileNumber}...
+                          </Text>
+                        ) : (
+                          <>
+                            Sent to{' '}
+                            <Text style={{ color: '#f59e0b', fontWeight: '700' }}>
+                              +91 {mobileNumber}
+                            </Text>
+                          </>
+                        )}
                       </Text>
 
                       <View
@@ -704,7 +747,12 @@ export default function LoginScreen() {
                         <TextInput
                           style={[styles.simpleTextInput, styles.otpCenterInput]}
                           value={otpCode}
-                          onChangeText={setOtpCode}
+                          onChangeText={(val) => {
+                            setOtpCode(val);
+                            if (val.trim().length === 6 && confirmResult) {
+                              handleVerifyOtp(val.trim());
+                            }
+                          }}
                           placeholder="• • • • • •"
                           placeholderTextColor="rgba(255, 255, 255, 0.3)"
                           keyboardType="numeric"
@@ -712,7 +760,7 @@ export default function LoginScreen() {
                           onFocus={() => handleFieldFocus('otpCode')}
                           onBlur={() => setFocusedField(null)}
                           returnKeyType="done"
-                          onSubmitEditing={handleVerifyOtp}
+                          onSubmitEditing={() => handleVerifyOtp()}
                         />
                       </View>
 
@@ -722,8 +770,10 @@ export default function LoginScreen() {
                             Resend code in {resendTimer}s
                           </Text>
                         ) : (
-                          <TouchableOpacity onPress={() => handleSendOtp()} disabled={isLoading}>
-                            <Text style={styles.resendActiveText}>Resend Code</Text>
+                          <TouchableOpacity onPress={() => handleSendOtp()} disabled={isSendingOtp}>
+                            <Text style={styles.resendActiveText}>
+                              {isSendingOtp ? 'Sending...' : 'Resend Code'}
+                            </Text>
                           </TouchableOpacity>
                         )}
                         <TouchableOpacity onPress={() => setOtpStep('enter_phone')}>
@@ -732,12 +782,12 @@ export default function LoginScreen() {
                       </View>
 
                       <TouchableOpacity
-                        style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
-                        onPress={handleVerifyOtp}
-                        disabled={isLoading}
+                        style={[styles.primaryButton, isVerifyingOtp && styles.buttonDisabled]}
+                        onPress={() => handleVerifyOtp()}
+                        disabled={isVerifyingOtp}
                         activeOpacity={0.88}
                       >
-                        {isLoading ? (
+                        {isVerifyingOtp ? (
                           <ActivityIndicator color="#0b0f19" size="small" />
                         ) : (
                           <Text style={styles.primaryButtonText}>Verify & Continue</Text>
@@ -813,12 +863,12 @@ export default function LoginScreen() {
                       </View>
 
                       <TouchableOpacity
-                        style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+                        style={[styles.primaryButton, isSavingPassword && styles.buttonDisabled]}
                         onPress={handleSetPasswordAndLogin}
-                        disabled={isLoading}
+                        disabled={isSavingPassword}
                         activeOpacity={0.88}
                       >
-                        {isLoading ? (
+                        {isSavingPassword ? (
                           <ActivityIndicator color="#0b0f19" size="small" />
                         ) : (
                           <Text style={styles.primaryButtonText}>Save & Enter App</Text>
