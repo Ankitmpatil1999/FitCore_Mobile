@@ -936,7 +936,9 @@ export default function OwnerAttendanceScreen() {
                       </Text>
                       <Text style={styles.modalMetaDot}>•</Text>
                       <Text style={styles.modalPlanHighlight}>
-                        {selectedMember.planName || selectedMember.plan || 'Standard Pass'}
+                        {typeof (selectedMember.planName || selectedMember.plan) === 'object' && (selectedMember.planName || selectedMember.plan) !== null
+                          ? ((selectedMember.planName || selectedMember.plan).name || 'Standard Pass')
+                          : (selectedMember.planName || selectedMember.plan || 'Standard Pass')}
                       </Text>
                     </View>
                   </View>
@@ -1220,7 +1222,9 @@ export default function OwnerAttendanceScreen() {
                     <View style={styles.profileItemRow}>
                       <Text style={styles.profileItemLabel}>Membership Plan</Text>
                       <Text style={[styles.profileItemValue, { color: '#4F46E5', fontWeight: '800' }]}>
-                        {selectedMember.plan || selectedMember.planName || 'Standard Pass'}
+                        {typeof (selectedMember.plan || selectedMember.planName) === 'object' && (selectedMember.plan || selectedMember.planName) !== null
+                          ? ((selectedMember.plan || selectedMember.planName).name || 'Standard Pass')
+                          : (selectedMember.plan || selectedMember.planName || 'Standard Pass')}
                       </Text>
                     </View>
 

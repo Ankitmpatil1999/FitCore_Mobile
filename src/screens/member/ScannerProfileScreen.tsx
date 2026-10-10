@@ -343,7 +343,11 @@ export default function CheckInScreen({ navigation }: any) {
                 <View style={styles.passHeader}>
                   <View>
                     <Text style={styles.passGymTitle}>{currentGym?.name || currentMember?.gymName || 'FitCore Gym'}</Text>
-                    <Text style={styles.passPlanText}>{currentMember?.planName || 'Active Membership'} Member</Text>
+                    <Text style={styles.passPlanText}>
+                      {typeof currentMember?.planName === 'object' && currentMember?.planName !== null
+                        ? ((currentMember.planName as any).name || 'Active Membership')
+                        : (currentMember?.planName || 'Active Membership')} Member
+                    </Text>
                   </View>
                   <View style={styles.passStatusBadge}>
                     <Text style={styles.passStatusText}>ACTIVE PASS</Text>

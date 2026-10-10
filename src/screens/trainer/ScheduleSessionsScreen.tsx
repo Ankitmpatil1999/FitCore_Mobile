@@ -648,7 +648,7 @@ export default function ScheduleSessionsScreen({ navigation }: any) {
                                       {m.name}
                                     </Text>
                                     <Text style={styles.memberDropdownPhone} numberOfLines={1}>
-                                      {m.phone || 'Athlete'} {m.plan ? `• ${m.plan}` : ''}
+                                      {m.phone || 'Athlete'} {m.plan ? `• ${typeof m.plan === 'object' && m.plan !== null ? m.plan.name : m.plan}` : ''}
                                     </Text>
                                   </View>
                                 </View>

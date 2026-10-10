@@ -142,7 +142,7 @@ export default function PendingDuesScreen({ navigation }: any) {
               memberId: m.userId || `M-${idx + 101}`,
               name: m.name || 'Athlete Member',
               phone: m.phone || '',
-              planName: m.plan || m.planName || m.packageName || 'Quarterly Pass',
+              planName: (typeof m.plan === 'object' && m.plan !== null ? m.plan.name : m.plan) || m.planName || m.packageName || 'Quarterly Pass',
               pendingDues: dues,
               expiryDate: rawExpiry ? new Date(rawExpiry).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A',
               daysLeft: daysRemaining,

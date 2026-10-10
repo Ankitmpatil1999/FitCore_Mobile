@@ -167,7 +167,7 @@ export default function PaymentsScreen({ navigation }: any) {
           const amt = Number(m.amountPaid || m.planPrice || 0);
           const rawJoined = m.joinedDate || m.startDate || m.createdAt;
           const { formatted, isThisMonth, rawIso } = formatDisplayDate(rawJoined);
-          const planTitle = m.plan || m.planName || m.packageName || 'Standard Gym Pass';
+          const planTitle = (typeof m.plan === 'object' && m.plan !== null ? m.plan.name : m.plan) || m.planName || m.packageName || 'Standard Gym Pass';
           const billingCycle = getBillingCycle(m.durationMonths, m.durationDays, planTitle);
 
           let methodType: 'upi' | 'cash' | 'online' | 'card' = 'upi';

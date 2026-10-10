@@ -538,7 +538,8 @@ export default function DashboardScreen({ navigation }: any) {
 
   const firstName = liveData?.member?.name?.split(' ')[0] || currentMember?.name?.split(' ')[0] || currentUser?.name?.split(' ')[0] || 'Member';
   const gymName = liveData?.gym?.name || (currentMember as any)?.gymName || currentGym?.name || '';
-  const planName = liveData?.plan?.name || liveData?.member?.planName || (currentMember as any)?.planName || 'Active Pass';
+  const rawDashboardPlan = liveData?.plan?.name || liveData?.member?.planName || (currentMember as any)?.planName || 'Active Pass';
+  const planName = typeof rawDashboardPlan === 'object' && rawDashboardPlan !== null ? (rawDashboardPlan.name || 'Active Pass') : String(rawDashboardPlan || 'Active Pass');
 
   const userRoleLabel =
     (currentUser?.role || role) === 'trainer'

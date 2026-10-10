@@ -156,8 +156,10 @@ export default function ProfileScreen({ navigation }: any) {
       if (res?.success && res.data) {
         if (res.data.gym) setLiveGymData(res.data.gym);
         if (res.data.trainer) setLiveTrainerData(res.data.trainer);
-        if (res.data.plan?.name || res.data.member?.planName) {
-          setLivePlanName(res.data.plan?.name || res.data.member?.planName);
+        const rawPlanCand = res.data.plan?.name || res.data.member?.planName || res.data.member?.plan;
+        if (rawPlanCand) {
+          const safeTitle = typeof rawPlanCand === 'object' && rawPlanCand !== null ? (rawPlanCand.name || '') : String(rawPlanCand);
+          setLivePlanName(safeTitle);
         }
         if (res.data.payments) {
           setLivePayments(res.data.payments);
@@ -502,7 +504,7 @@ export default function ProfileScreen({ navigation }: any) {
                     {memberName || currentMember?.name || currentUser?.name || 'Member'}
                   </Text>
                   <Text style={styles.heroPlanName}>
-                    {livePlanName || currentMember?.planName || 'Active Membership'}
+                    {livePlanName || (typeof currentMember?.planName === 'object' && currentMember?.planName !== null ? (currentMember.planName as any).name : currentMember?.planName) || 'Active Membership'}
                   </Text>
                   {(liveGymData?.name || currentGym?.name) ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 }}>

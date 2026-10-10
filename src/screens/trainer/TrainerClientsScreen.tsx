@@ -108,7 +108,7 @@ export default function TrainerClientsScreen({ navigation }: any) {
             emergencyContact: m.emergencyContact || '',
             emergencyPhone: m.emergencyPhone || '',
             planId: m.planId || m.packageId || 'p1',
-            planName: m.plan || m.planName || m.packageName || 'Pro Pass',
+            planName: (typeof m.plan === 'object' && m.plan !== null ? m.plan.name : m.plan) || m.planName || m.packageName || 'Pro Pass',
             status: (m.status || 'active').toLowerCase() as any,
             joinDate: m.joinDate || m.joinedDate || new Date().toISOString().split('T')[0],
             startDate: m.startDate || m.joinedDate || new Date().toISOString().split('T')[0],

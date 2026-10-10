@@ -182,7 +182,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
               emergencyContact: m.emergencyContact || '',
               emergencyPhone: m.emergencyPhone || '',
               planId: m.planId || 'p1',
-              planName: m.plan || m.planName || '3 Months Pro Studio',
+              planName: (typeof m.plan === 'object' && m.plan !== null ? m.plan.name : m.plan) || (typeof m.planName === 'object' && m.planName !== null ? m.planName.name : m.planName) || '3 Months Pro Studio',
               status: 'active',
               joinDate: m.joinDate || m.startDate || '2026-09-01',
               startDate: m.startDate || m.joinedDate || '2026-09-01',

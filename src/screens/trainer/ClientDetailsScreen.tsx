@@ -108,24 +108,32 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
       // Fetch live member profile from backend (enriches data beyond nav params)
       const memberRes: any = await apiService.getMemberProfile(targetId);
       if (memberRes?.success && memberRes.data) {
-        const m = memberRes.data;
+        const mem = memberRes.data.member || memberRes.data;
+        const planData = memberRes.data.plan || mem.plan;
+        const safePlanName =
+          (typeof planData === 'object' && planData !== null ? planData.name : planData) ||
+          (typeof mem.planName === 'object' && mem.planName !== null ? mem.planName.name : mem.planName) ||
+          (typeof mem.plan === 'object' && mem.plan !== null ? mem.plan.name : mem.plan) ||
+          client?.planName ||
+          '';
+
         setClient((prev: any) => ({
           ...prev,
-          name: m.name || prev.name,
-          phone: m.phone || prev.phone,
-          email: m.email || prev.email,
-          weight: m.weight ?? prev.weight,
-          height: m.height ?? prev.height,
-          bmi: m.bmi ?? prev.bmi,
-          goal: m.goal || prev.goal,
-          medicalIssues: m.medicalIssues || prev.medicalIssues || 'None',
-          emergencyContact: m.emergencyContact || prev.emergencyContact || '',
-          emergencyPhone: m.emergencyPhone || prev.emergencyPhone || '',
-          planName: m.planName || m.plan || prev.planName || '',
-          expiryDate: m.expiryDate || prev.expiryDate || '',
-          joinDate: m.joinDate || m.startDate || prev.joinDate || '',
-          status: m.status || prev.status || 'active',
-          avatar: m.avatar || prev.avatar,
+          name: mem.name || prev.name,
+          phone: mem.phone || prev.phone,
+          email: mem.email || prev.email,
+          weight: mem.weight ?? prev.weight,
+          height: mem.height ?? prev.height,
+          bmi: mem.bmi ?? prev.bmi,
+          goal: mem.goal || prev.goal,
+          medicalIssues: mem.medicalIssues || prev.medicalIssues || 'None',
+          emergencyContact: mem.emergencyContact || prev.emergencyContact || '',
+          emergencyPhone: mem.emergencyPhone || prev.emergencyPhone || '',
+          planName: safePlanName,
+          expiryDate: mem.expiryDate || prev.expiryDate || '',
+          joinDate: mem.joinDate || mem.startDate || prev.joinDate || '',
+          status: mem.status || prev.status || 'active',
+          avatar: mem.avatar || prev.avatar,
         }));
       }
 
@@ -368,7 +376,11 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
                 {client.planName ? (
                   <View style={styles.infoItem}>
                     <Text style={styles.infoLabel}>Active Plan</Text>
-                    <Text style={styles.infoValue}>{client.planName}</Text>
+                    <Text style={styles.infoValue}>
+                      {typeof client.planName === 'object' && client.planName !== null
+                        ? (client.planName.name || 'Pro Studio Pass')
+                        : String(client.planName || 'Pro Studio Pass')}
+                    </Text>
                   </View>
                 ) : null}
                 {client.joinDate ? (

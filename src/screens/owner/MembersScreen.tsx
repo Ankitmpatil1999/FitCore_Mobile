@@ -579,7 +579,7 @@ export default function MembersScreen({ navigation }: any) {
                       <View style={styles.planPillRow}>
                         <View style={styles.planPill}>
                           <Text style={styles.planPillText}>
-                            {m.plan || m.planName || m.packageName || 'Pro Pass'}
+                            {(typeof (m.plan || m.planName) === 'object' && (m.plan || m.planName) !== null ? (m.plan || m.planName).name : (m.plan || m.planName || m.packageName)) || 'Pro Pass'}
                           </Text>
                         </View>
                         {m.assignedTrainerName ? (
@@ -696,7 +696,7 @@ export default function MembersScreen({ navigation }: any) {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.detailPlanLabel}>ACTIVE PACKAGE</Text>
                   <Text style={styles.detailPlanName}>
-                    {detailMember?.plan || detailMember?.planName || 'Pro Membership'}
+                    {(typeof (detailMember?.plan || detailMember?.planName) === 'object' && (detailMember?.plan || detailMember?.planName) !== null ? (detailMember?.plan || detailMember?.planName).name : (detailMember?.plan || detailMember?.planName)) || 'Pro Membership'}
                   </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>

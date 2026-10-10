@@ -102,11 +102,16 @@ export default function MembershipScreen({ navigation }: any) {
   const memberData = liveProfile?.member || currentMember;
   const gymData = liveProfile?.gym || currentGym;
 
-  const planName =
+  const rawPlanCandidate =
     liveProfile?.plan?.name ||
     memberData?.planName ||
     memberData?.plan ||
     'Pro Studio Pass';
+
+  const planName =
+    typeof rawPlanCandidate === 'object' && rawPlanCandidate !== null
+      ? (rawPlanCandidate.name || 'Pro Studio Pass')
+      : String(rawPlanCandidate || 'Pro Studio Pass');
 
   const planPrice =
     liveProfile?.plan?.price !== undefined
