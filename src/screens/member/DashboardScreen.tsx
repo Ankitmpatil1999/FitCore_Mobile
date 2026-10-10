@@ -453,10 +453,12 @@ export default function DashboardScreen({ navigation }: any) {
         const inGym = Boolean(todaySession?.isCheckedIn);
         setIsCheckedIn(inGym);
         if (inGym) {
-          // Resumes seamlessly from earlier checkout time on the same day
-          setElapsedSeconds(Number(todaySession?.todayTotalSeconds || todaySession?.currentSessionSeconds || 0));
+          // Resumes seamlessly from earlier checkout time on the same day (clamped to realistic max)
+          const rawSec = Number(todaySession?.todayTotalSeconds || todaySession?.currentSessionSeconds || 0);
+          setElapsedSeconds(rawSec > 0 && rawSec < 43200 ? rawSec : 0);
         } else {
-          setElapsedSeconds(Number(todaySession?.todayCompletedSeconds || 0));
+          const rawSec = Number(todaySession?.todayCompletedSeconds || 0);
+          setElapsedSeconds(rawSec > 0 && rawSec < 43200 ? rawSec : 0);
         }
         if (todaySession?.todayDurationFormatted) {
           setLastSessionDuration(todaySession.todayDurationFormatted);
