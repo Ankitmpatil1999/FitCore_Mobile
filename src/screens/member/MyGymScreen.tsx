@@ -50,23 +50,27 @@ export default function MyGymScreen() {
   }, [currentMember?.id, currentUser?.id, gymId]);
 
   const gym = liveGym || currentGym || {
-    name: 'FitCore Elite Fitness Club',
+    name: 'FitCore Fitness Club',
     tagline: 'Transform Your Body & Mind with State-of-the-Art Facilities',
     isOpen: true,
     rating: 4.9,
     openTime: '06:00 AM',
     closeTime: '10:00 PM',
-    address: 'Civil Lines',
-    city: 'Nagpur',
-    phone: '+91 98765 43210',
-    email: 'contact@fitcore.in',
+    address: '',
+    city: '',
+    phone: '',
+    email: '',
+    facilities: [],
   };
 
-  const gymFacilityIds = gym?.facilities?.map((f: any) =>
-    typeof f === 'string' ? f : f.id,
-  ) ?? ['fac_1', 'fac_2', 'fac_3', 'fac_4'];
-
-  const gymFacilities = FACILITIES.filter(f => gymFacilityIds.includes(f.id));
+  const rawFacilities = Array.isArray(gym?.facilities) ? gym.facilities : [];
+  const gymFacilities = rawFacilities.map((f: any, idx: number) => {
+    if (typeof f === 'string') {
+      const match = FACILITIES.find((item) => item.id === f || item.name.toLowerCase() === f.toLowerCase());
+      return match || { id: `fac_${idx}`, name: f, icon: 'fitness-outline', description: '' };
+    }
+    return { id: f.id || `fac_${idx}`, name: f.name || String(f), icon: f.icon || 'fitness-outline', description: f.description || '' };
+  });
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -114,7 +118,7 @@ export default function MyGymScreen() {
           {/* Facilities */}
           <Text style={styles.sectionTitle}>Facilities & Amenities</Text>
           <View style={styles.facilitiesGrid}>
-            {gymFacilities.map(f => (
+            {gymFacilities.map((f: any) => (
               <View key={f.id} style={styles.facilityChip}>
                 <Icon name="checkmark-circle" size={moderateScale(16)} color="#6C5CE7" />
                 <Text style={styles.facilityName}>{f.name}</Text>

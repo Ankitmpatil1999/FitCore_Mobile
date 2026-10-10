@@ -113,7 +113,7 @@ export default function HelpSupportScreen({ navigation }: any) {
 
     try {
       setSubmittingIssue(true);
-      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '');
       const memberName = currentUser?.name || currentMember?.name || 'Member';
       const memberPhone = currentMember?.phone || currentUser?.phone || '';
       const gymId = String(currentGym?.id || currentMember?.gymId || '');

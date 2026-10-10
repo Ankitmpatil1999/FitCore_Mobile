@@ -70,7 +70,7 @@ export default function ClientDetailsScreen({ route, navigation }: any) {
 
   // Use passed member object as initial state; will be enriched by live fetch
   const initialClient = member || {
-    id: memberId || 'm1',
+    id: memberId || '',
     name: 'Loading...',
     phone: '',
     avatar: '--',

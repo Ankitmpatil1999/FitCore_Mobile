@@ -87,7 +87,7 @@ const leftArrowImg = require('../../assets/Icons2/left-arrow.png');
 
 export default function PaymentsScreen({ navigation }: any) {
   const { currentGym, currentUser } = useAppContext();
-  const gymId = currentGym?.id || (currentUser as any)?.gymId || '6a934afd13a1b16c3767d90f';
+  const gymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || '';
 
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loading, setLoading] = useState(true);

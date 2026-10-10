@@ -46,10 +46,10 @@ interface BreakdownItem {
 
 export default function TrainerReviewsScreen({ navigation }: any) {
   const { currentTrainer, currentGym, currentUser } = useAppContext();
-  const trainerId = currentTrainer?.id || currentUser?.id || 't1';
-  const trainerName = currentTrainer?.name || currentUser?.name || 'Coach Kunal';
+  const trainerId = currentTrainer?.id || (currentTrainer as any)?._id || currentUser?.id || '';
+  const trainerName = currentTrainer?.name || currentUser?.name || 'Coach';
   const gymName = currentGym?.name || 'FitCore Gym';
-  const currentUserId = currentUser?.id || 'user_anon';
+  const currentUserId = currentUser?.id || '';
 
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
   const [avgRating, setAvgRating] = useState('5.0');

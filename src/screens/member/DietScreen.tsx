@@ -89,7 +89,7 @@ interface SupplementItem {
 
 const INITIAL_MEALS: MealItem[] = [
   {
-    id: 'm1',
+    id: 'meal_1',
     type: 'Breakfast',
     name: 'Oatmeal & Protein Power Bowl',
     items: ['60g Rolled Oats', '1 Scoop Whey Protein', '3 Boiled Eggs', 'Handful of Blueberries'],
@@ -101,7 +101,7 @@ const INITIAL_MEALS: MealItem[] = [
     isLogged: true,
   },
   {
-    id: 'm2',
+    id: 'meal_2',
     type: 'Lunch',
     name: 'Grilled Chicken & Jasmine Rice',
     items: ['200g Grilled Chicken Breast', '150g Cooked Rice', 'Steamed Broccoli & Olive Oil'],
@@ -113,7 +113,7 @@ const INITIAL_MEALS: MealItem[] = [
     isLogged: false,
   },
   {
-    id: 'm3',
+    id: 'meal_3',
     type: 'Snack',
     name: 'Pre-Workout Greek Yogurt & Banana',
     items: ['150g Greek Yogurt 0%', '1 Banana', '15g Raw Almonds', '1 tsp Honey'],
@@ -125,7 +125,7 @@ const INITIAL_MEALS: MealItem[] = [
     isLogged: false,
   },
   {
-    id: 'm4',
+    id: 'meal_4',
     type: 'Dinner',
     name: 'Tikka Paneer / Salmon Quinoa Bowl',
     items: ['180g Low-Fat Paneer / Salmon', '100g Quinoa', 'Mixed Greens & Avocado Slice'],
@@ -163,8 +163,9 @@ export default function DietScreen({ navigation }: any) {
   // ── Fetch Live Diet Plan from API ──
   useEffect(() => {
     const fetchDiet = async () => {
+      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '');
+      if (!memberId) return;
       try {
-        const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
         const res: any = await apiService.getMemberDiet(memberId);
         if (res.success && res.data) {
           const data = res.data;

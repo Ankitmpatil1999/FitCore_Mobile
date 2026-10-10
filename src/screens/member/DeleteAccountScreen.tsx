@@ -49,7 +49,13 @@ export default function DeleteAccountScreen({ navigation }: any) {
     setStep('processing');
 
     try {
-      const targetPhoneOrId = currentMember?.phone || currentUser?.phone || currentMember?.id || currentUser?.id || 'm1';
+      const targetPhoneOrId = currentMember?.phone || currentUser?.phone || currentMember?.id || currentUser?.id || '';
+      if (!targetPhoneOrId) {
+        setIsDeleting(false);
+        Alert.alert('Error', 'Unable to verify account identity. Please log in again.');
+        setStep('confirm');
+        return;
+      }
       const res: any = await apiService.deleteAccount(targetPhoneOrId, selectedReason);
       
       setIsDeleting(false);

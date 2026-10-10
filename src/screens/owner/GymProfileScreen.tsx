@@ -16,7 +16,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
-import { GYMS, FACILITIES } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 
 // ── Interactive Scale on Press Component ──
@@ -76,10 +75,10 @@ interface MenuSection {
 
 export default function GymProfileScreen({ navigation }: any) {
   const { logout, currentGym } = useAppContext();
-  const gym = currentGym || GYMS[0];
+  const gym = currentGym || { name: 'My Gym', isOpen: true, facilities: [], address: '' };
 
-  const [gymName, setGymName] = useState(gym.name);
-  const [isOpen, setIsOpen] = useState(gym.isOpen);
+  const [gymName, setGymName] = useState(gym.name || 'My Gym');
+  const [isOpen, setIsOpen] = useState(gym.isOpen ?? true);
 
   // ── Entrance Animation ──
   const fadeAnim = useRef(new Animated.Value(0)).current;

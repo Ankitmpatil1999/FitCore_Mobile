@@ -26,7 +26,7 @@ export default function OwnerAnalytics({ navigation }: any) {
     (currentGym as any)?._id ||
     (currentUser as any)?.gymId ||
     (currentUser as any)?.gym_id ||
-    '6a934afd13a1b16c3767d90f';
+    '';
 
   const [activeTab, setActiveTab] = useState<ReportTab>('revenue');
   const [loading, setLoading] = useState(true);

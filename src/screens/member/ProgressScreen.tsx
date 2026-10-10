@@ -77,7 +77,7 @@ export default function ProgressScreen({ navigation }: any) {
   const { currentMember, currentUser } = useAppContext();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
-  const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+  const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '');
 
   const [gender, setGender] = useState<string>(
     currentMember?.gender || currentUser?.gender || 'Male'

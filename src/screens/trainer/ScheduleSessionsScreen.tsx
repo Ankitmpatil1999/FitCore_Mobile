@@ -87,10 +87,10 @@ const FOCUS_OPTIONS = [
 
 export default function ScheduleSessionsScreen({ navigation }: any) {
   const { currentTrainer, currentGym, currentUser } = useAppContext();
-  const trainerId = currentTrainer?.id || currentUser?.id || 't1';
+  const trainerId = currentTrainer?.id || (currentTrainer as any)?._id || currentUser?.id || '';
   const trainerName = currentTrainer?.name || currentUser?.name || 'Trainer';
   const trainerPhone = currentTrainer?.phone || currentUser?.phone || '';
-  const gymId = currentGym?.id || currentTrainer?.gymId || 'gym_default';
+  const gymId = currentGym?.id || (currentGym as any)?._id || currentTrainer?.gymId || (currentUser as any)?.gymId || '';
 
   // Live state
   const [sessions, setSessions] = useState<any[]>([]);

@@ -146,8 +146,9 @@ export default function ProfileScreen({ navigation }: any) {
   // Fetch live member profile from backend API
   const loadLiveProfile = async () => {
     try {
-      const userId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1';
+      const userId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '';
       const phone = currentMember?.phone || currentUser?.phone;
+      if (!userId && !phone) return;
       const res: any = await apiService.getMemberProfile(userId || phone);
       if (res?.success && res.data) {
         if (res.data.gym) setLiveGymData(res.data.gym);
@@ -255,7 +256,7 @@ export default function ProfileScreen({ navigation }: any) {
   const handleSavePersonalInfo = async () => {
     try {
       setSavingProfile(true);
-      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '');
       const res: any = await apiService.savePersonalDetails({
         memberId,
         name: memberName || currentMember?.name || currentUser?.name || 'Member',
@@ -294,7 +295,7 @@ export default function ProfileScreen({ navigation }: any) {
   const handleSavePhotoDirectly = async (photoUri: string | null) => {
     try {
       setAvatarPhoto(photoUri);
-      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '');
       const phone = currentMember?.phone || currentUser?.phone || '';
 
       // Cache locally for instant offline/re-open persistence

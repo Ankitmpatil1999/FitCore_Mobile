@@ -73,7 +73,7 @@ export default function OwnerAttendanceScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
   const { currentUser, currentGym } = useAppContext();
-  const gymId = currentGym?.id || (currentUser as any)?.gymId || '6a934afd13a1b16c3767d90f';
+  const gymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || '';
 
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);

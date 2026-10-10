@@ -73,7 +73,7 @@ type FilterType = 'all' | 'active' | 'expiring' | 'expired';
 export default function MembersScreen({ navigation }: any) {
   const { currentGym, currentUser } = useAppContext();
   const { showInAppNotification } = useNotifications();
-  const gymId = currentGym?.id || (currentUser as any)?.gymId || '6a934afd13a1b16c3767d90f';
+  const gymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || '';
   const gymName = currentGym?.name || 'FitCore Gym';
 
   const [members, setMembers] = useState<any[]>([]);

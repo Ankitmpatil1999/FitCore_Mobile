@@ -19,7 +19,9 @@ import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 import { useAppContext } from '../../context/AppContext';
-import { PRODUCTS, Product, ProductCategory } from '../../data/mockData';
+import { Product, ProductCategory } from '../../data/mockData';
+import { apiService } from '../../services/api';
+import { ActivityIndicator } from 'react-native';
 
 // ── Interactive Scale on Press Component ──
 function AnimatedPressable({
@@ -68,13 +70,36 @@ const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 
 export default function ProductStoreScreen({ navigation }: any) {
   const { currentGym } = useAppContext();
-  const gymId = currentGym?.id || 'g1';
+  const gymId = currentGym?.id || (currentGym as any)?._id;
 
-  const [products, setProducts] = useState<Product[]>(() =>
-    PRODUCTS.filter((p) => p.gymId === gymId || !p.gymId || p.gymId === 'gym1')
-  );
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<'all' | ProductCategory>('all');
   const [addModal, setAddModal] = useState(false);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await apiService.getProducts(gymId ? { gymId } : undefined);
+      if (res?.data && Array.isArray(res.data)) {
+        setProducts(res.data);
+      } else if (Array.isArray(res)) {
+        setProducts(res);
+      } else {
+        setProducts([]);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load products from store.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, [gymId]);
 
   // Form
   const [fName, setFName] = useState('');
@@ -118,7 +143,7 @@ export default function ProductStoreScreen({ navigation }: any) {
     }
     const newProduct: Product = {
       id: `p${Date.now()}`,
-      gymId: gymId,
+      gymId: gymId || '',
       name: fName.trim(),
       brand: fBrand.trim() || 'FitCore Pro',
       category: fCategory,
@@ -194,39 +219,65 @@ export default function ProductStoreScreen({ navigation }: any) {
           </ScrollView>
 
           {/* ── PRODUCT CARDS ── */}
-          <View style={styles.grid}>
-            {filtered.map((item) => (
-              <AnimatedPressable key={item.id} style={styles.productCard}>
-                <View style={styles.emojiContainer}>
-                  <Text style={styles.emojiText}>{item.emoji || '⚡'}</Text>
-                </View>
+          {loading ? (
+            <View style={{ paddingVertical: hp(6), alignItems: 'center', justifyContent: 'center' }}>
+              <ActivityIndicator size="large" color="#6C5CE7" />
+              <Text style={{ marginTop: 12, color: Colors.textMuted, fontSize: fontScale(13) }}>Loading inventory...</Text>
+            </View>
+          ) : error ? (
+            <View style={{ padding: moderateScale(20), alignItems: 'center', backgroundColor: '#FEF2F2', borderRadius: Radii.lg, marginHorizontal: wp(5), marginTop: hp(2) }}>
+              <Text style={{ color: '#EF4444', fontSize: fontScale(14), fontWeight: '600', textAlign: 'center', marginBottom: 8 }}>{error}</Text>
+              <TouchableOpacity
+                onPress={fetchProducts}
+                style={{ backgroundColor: '#6C5CE7', paddingHorizontal: moderateScale(16), paddingVertical: moderateScale(8), borderRadius: Radii.md }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: fontScale(13) }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : filtered.length === 0 ? (
+            <View style={{ paddingVertical: hp(6), alignItems: 'center', marginHorizontal: wp(5) }}>
+              <Text style={{ fontSize: fontScale(15), fontWeight: '600', color: Colors.textSecondary, marginBottom: 4 }}>No products found</Text>
+              <Text style={{ fontSize: fontScale(13), color: Colors.textMuted, textAlign: 'center' }}>
+                {categoryFilter === 'all'
+                  ? 'No inventory items currently registered for this gym.'
+                  : `No products found under the "${categoryFilter.replace('_', ' ')}" category.`}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.grid}>
+              {filtered.map((item) => (
+                <AnimatedPressable key={item.id} style={styles.productCard}>
+                  <View style={styles.emojiContainer}>
+                    <Text style={styles.emojiText}>{item.emoji || '⚡'}</Text>
+                  </View>
 
-                <Text style={styles.brandText}>{item.brand}</Text>
-                <Text style={styles.productName} numberOfLines={2}>
-                  {item.name}
-                </Text>
+                  <Text style={styles.brandText}>{item.brand}</Text>
+                  <Text style={styles.productName} numberOfLines={2}>
+                    {item.name}
+                  </Text>
 
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceVal}>₹{item.price.toLocaleString()}</Text>
-                  <View
-                    style={[
-                      styles.stockBadge,
-                      { backgroundColor: item.stock > 5 ? 'rgba(0, 196, 140, 0.10)' : 'rgba(255, 77, 109, 0.10)' },
-                    ]}
-                  >
-                    <Text
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceVal}>₹{item.price.toLocaleString()}</Text>
+                    <View
                       style={[
-                        styles.stockText,
-                        { color: item.stock > 5 ? '#00C48C' : '#FF4D6D' },
+                        styles.stockBadge,
+                        { backgroundColor: item.stock > 5 ? 'rgba(0, 196, 140, 0.10)' : 'rgba(255, 77, 109, 0.10)' },
                       ]}
                     >
-                      {item.stock} left
-                    </Text>
+                      <Text
+                        style={[
+                          styles.stockText,
+                          { color: item.stock > 5 ? '#00C48C' : '#FF4D6D' },
+                        ]}
+                      >
+                        {item.stock} left
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              </AnimatedPressable>
-            ))}
-          </View>
+                </AnimatedPressable>
+              ))}
+            </View>
+          )}
 
           <View style={{ height: hp(12) }} />
         </ScrollView>

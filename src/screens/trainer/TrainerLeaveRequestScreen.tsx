@@ -25,8 +25,9 @@ const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 
 export default function TrainerLeaveRequestScreen({ navigation }: any) {
   const { currentTrainer, currentGym, currentUser } = useAppContext();
-  const trainerId = currentTrainer?.id || currentUser?.id || 't1';
-  const trainerName = currentTrainer?.name || currentUser?.name || 'Coach Kunal';
+  const trainerId = currentTrainer?.id || (currentTrainer as any)?._id || currentUser?.id || '';
+  const trainerName = currentTrainer?.name || currentUser?.name || 'Coach';
+  const gymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || '';
   const gymName = currentGym?.name || 'FitCore Gym';
 
   // ── Form State ──
@@ -60,13 +61,14 @@ export default function TrainerLeaveRequestScreen({ navigation }: any) {
         easing: Easing.out(Easing.cubic),
       }),
     ]).start();
-    fetchLeaveHistory();
-  }, [trainerId]);
+    if (trainerId) fetchLeaveHistory();
+  }, [trainerId, gymId]);
 
   const fetchLeaveHistory = async () => {
+    if (!trainerId) return;
     try {
       setLoadingHistory(true);
-      const res: any = await apiService.getTrainerLeaveRequests(currentGym?.id, trainerId);
+      const res: any = await apiService.getTrainerLeaveRequests(gymId, trainerId);
       if (res?.success && Array.isArray(res.data)) {
         setMyLeaveRequests(res.data);
       }
@@ -94,7 +96,7 @@ export default function TrainerLeaveRequestScreen({ navigation }: any) {
       const res: any = await apiService.createTrainerLeaveRequest({
         trainerId,
         trainerName,
-        gymId: currentGym?.id || 'gym1',
+        gymId,
         startDate,
         endDate,
         reason: formattedReason,

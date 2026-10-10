@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
-import { MEMBERSHIP_PLANS, MembershipPlan } from '../../data/mockData';
+import { MembershipPlan } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 import apiService from '../../services/api';
 
@@ -69,12 +69,11 @@ const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 
 export default function MembershipPlansScreen({ navigation }: any) {
   const { currentGym } = useAppContext();
-  const gymId = currentGym?.id || 'g1';
+  const gymId = currentGym?.id || (currentGym as any)?._id || '';
 
-  const [plans, setPlans] = useState<MembershipPlan[]>(() =>
-    MEMBERSHIP_PLANS.filter((p) => p.gymId === gymId || !p.gymId || p.gymId === 'gym1')
-  );
-  const [loading, setLoading] = useState(false);
+  const [plans, setPlans] = useState<MembershipPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [addModal, setAddModal] = useState(false);
   const [editPlan, setEditPlan] = useState<MembershipPlan | null>(null);
 
@@ -88,8 +87,13 @@ export default function MembershipPlansScreen({ navigation }: any) {
   const slideAnim = useRef(new Animated.Value(20)).current;
 
   const fetchPlans = async () => {
+    if (!gymId) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
+      setError(null);
       const res = await apiService.getOwnerPackages(gymId);
       if (res.success && Array.isArray(res.data)) {
         if (res.data.length === 0) {
@@ -111,9 +115,12 @@ export default function MembershipPlansScreen({ navigation }: any) {
           }));
           setPlans(mapped);
         }
+      } else {
+        setError(res.error || 'Failed to load membership plans.');
       }
     } catch (err) {
       console.log('Error fetching membership plans:', err);
+      setError('Unable to reach gym server. Please check your connection.');
     } finally {
       setLoading(false);
     }
@@ -228,47 +235,72 @@ export default function MembershipPlansScreen({ navigation }: any) {
         </View>
 
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          {plans.map((p) => (
-            <AnimatedPressable
-              key={p.id}
-              style={styles.planCard}
-              onPress={() => {
-                setEditPlan(p);
-                setFName(p.name);
-                setFDuration(p.duration.toString());
-                setFPrice(p.price.toString());
-                setAddModal(true);
-              }}
-            >
-              <View style={styles.planHeaderRow}>
-                <View>
-                  <Text style={styles.planNameText}>{p.name}</Text>
-                  <Text style={styles.planDurationText}>{p.duration} Months Validity</Text>
-                </View>
-                <View style={styles.tierBadge}>
-                  <Text style={styles.tierBadgeText}>{p.tier.toUpperCase()}</Text>
-                </View>
-              </View>
-
-              <View style={styles.priceRow}>
-                <Text style={styles.priceVal}>₹{p.price.toLocaleString()}</Text>
-                <Text style={styles.originalPrice}>₹{p.originalPrice.toLocaleString()}</Text>
-                <View style={styles.discountBadge}>
-                  <Text style={styles.discountText}>{p.discount}% OFF</Text>
-                </View>
-              </View>
-
-              {/* Features List */}
-              <View style={styles.featuresList}>
-                {p.features.map((feat, idx) => (
-                  <View key={idx} style={styles.featureItem}>
-                    <AppIcon name="checkmark-circle" size={moderateScale(15)} color="#00C48C" />
-                    <Text style={styles.featureText}>{feat}</Text>
+          {loading ? (
+            <View style={{ paddingVertical: hp(8), alignItems: 'center' }}>
+              <Text style={{ color: '#64748B', fontSize: fontScale(14), fontWeight: '600' }}>Loading membership plans...</Text>
+            </View>
+          ) : error ? (
+            <View style={{ padding: wp(6), alignItems: 'center', backgroundColor: '#FEF2F2', borderRadius: 16, marginVertical: hp(2) }}>
+              <AppIcon name="alert-circle-outline" size={moderateScale(32)} color="#EF4444" />
+              <Text style={{ color: '#991B1B', fontWeight: '700', fontSize: fontScale(15), marginTop: 8 }}>{error}</Text>
+              <TouchableOpacity onPress={fetchPlans} style={{ marginTop: 12, backgroundColor: '#EF4444', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: fontScale(13) }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : plans.length === 0 ? (
+            <View style={{ paddingVertical: hp(8), alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, marginVertical: hp(2), paddingHorizontal: wp(6) }}>
+              <AppIcon name="pricetags-outline" size={moderateScale(40)} color="#94A3B8" />
+              <Text style={{ fontSize: fontScale(16), fontWeight: '800', color: '#0F172A', marginTop: 12 }}>No Membership Plans</Text>
+              <Text style={{ fontSize: fontScale(13), color: '#64748B', textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+                You haven't created any membership plans for this gym branch yet.
+              </Text>
+              <TouchableOpacity onPress={openAdd} style={{ backgroundColor: '#6C5CE7', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 }}>
+                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: fontScale(13) }}>+ Add First Plan</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            plans.map((p) => (
+              <AnimatedPressable
+                key={p.id}
+                style={styles.planCard}
+                onPress={() => {
+                  setEditPlan(p);
+                  setFName(p.name);
+                  setFDuration(p.duration.toString());
+                  setFPrice(p.price.toString());
+                  setAddModal(true);
+                }}
+              >
+                <View style={styles.planHeaderRow}>
+                  <View>
+                    <Text style={styles.planNameText}>{p.name}</Text>
+                    <Text style={styles.planDurationText}>{p.duration} Months Validity</Text>
                   </View>
-                ))}
-              </View>
-            </AnimatedPressable>
-          ))}
+                  <View style={styles.tierBadge}>
+                    <Text style={styles.tierBadgeText}>{p.tier.toUpperCase()}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.priceRow}>
+                  <Text style={styles.priceVal}>₹{p.price.toLocaleString()}</Text>
+                  <Text style={styles.originalPrice}>₹{p.originalPrice.toLocaleString()}</Text>
+                  <View style={styles.discountBadge}>
+                    <Text style={styles.discountText}>{p.discount}% OFF</Text>
+                  </View>
+                </View>
+
+                {/* Features List */}
+                <View style={styles.featuresList}>
+                  {p.features.map((feat, idx) => (
+                    <View key={idx} style={styles.featureItem}>
+                      <AppIcon name="checkmark-circle" size={moderateScale(15)} color="#00C48C" />
+                      <Text style={styles.featureText}>{feat}</Text>
+                    </View>
+                  ))}
+                </View>
+              </AnimatedPressable>
+            ))
+          )}
 
           <View style={{ height: hp(12) }} />
         </ScrollView>

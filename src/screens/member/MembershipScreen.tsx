@@ -52,13 +52,13 @@ export default function MembershipScreen({ navigation }: any) {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
 
-  const gymId = currentGym?.id || (currentMember as any)?.gymId || 'gym1';
+  const gymId = currentGym?.id || (currentGym as any)?._id || (currentMember as any)?.gymId || (currentUser as any)?.gymId || '';
   const memberId = String(
     currentMember?.userId ||
     currentMember?.id ||
     currentUser?.id ||
     currentUser?.phone ||
-    'm1'
+    ''
   );
 
   const fetchMembershipData = useCallback(async () => {

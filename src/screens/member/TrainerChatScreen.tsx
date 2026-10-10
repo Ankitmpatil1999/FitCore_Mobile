@@ -40,29 +40,36 @@ export default function TrainerChatScreen({ navigation }: any) {
   const [isTyping, setIsTyping] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
-  const trainerId = String(liveTrainer?.id || liveTrainer?._id || currentMember?.trainerId || 't1');
+  const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '');
+  const trainerId = String(liveTrainer?.id || liveTrainer?._id || currentMember?.trainerId || '');
 
   const [isTrainerOnline, setIsTrainerOnline] = useState(false);
 
   // ── 1. Fetch Assigned Trainer & Chat History from Backend API ──
   const fetchChatData = async () => {
+    if (!memberId) return;
     try {
       // 1a. Load Live Assigned Trainer info
       const userId = currentMember?.id || currentUser?.id || currentMember?.phone;
       const profileRes: any = await apiService.getMemberProfile(userId);
+      let activeTrainerId = trainerId;
       if (profileRes?.success && profileRes?.data?.trainer) {
         setLiveTrainer(profileRes.data.trainer);
+        activeTrainerId = String(profileRes.data.trainer._id || profileRes.data.trainer.id || activeTrainerId);
       }
 
       // 1b. Load Real Message History from MongoDB
-      const chatRes: any = await apiService.getTrainerChatMessages(memberId, trainerId);
-      if (chatRes?.success && Array.isArray(chatRes.data)) {
-        setMessages(chatRes.data);
+      if (activeTrainerId) {
+        const chatRes: any = await apiService.getTrainerChatMessages(memberId, activeTrainerId);
+        if (chatRes?.success && Array.isArray(chatRes.data)) {
+          setMessages(chatRes.data);
+        }
       }
 
       // 1c. Mark Trainer Messages as Read
-      await apiService.markTrainerChatAsRead(memberId, trainerId, 'member');
+      if (activeTrainerId) {
+        await apiService.markTrainerChatAsRead(memberId, activeTrainerId, 'member');
+      }
 
       // 1d. Heartbeat Member online presence
       await apiService.sendPresenceHeartbeat(memberId, 'member', true);

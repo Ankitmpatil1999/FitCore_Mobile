@@ -34,8 +34,8 @@ const bellNotifImg = require('../../assets/Icons2/bell_clean.png');
 
 export default function TrainerDashboard({ navigation }: any) {
   const { currentTrainer, currentGym, currentUser } = useAppContext();
-  const trainerId = currentTrainer?.id || currentUser?.id || 't1';
-  const trainerName = currentTrainer?.name || currentUser?.name || 'Kunal Patil';
+  const trainerId = currentTrainer?.id || (currentTrainer as any)?._id || currentUser?.id || '';
+  const trainerName = currentTrainer?.name || currentUser?.name || 'Coach';
   const gymName = currentGym?.name || 'FitCore Gym';
 
   // ── Shift & Live Attendance State ──
@@ -137,11 +137,11 @@ export default function TrainerDashboard({ navigation }: any) {
 
       // Fetch dynamic unread notifications for trainer
       try {
-        const targetGymId = currentGym?.id || (currentUser as any)?.gymId;
-        const targetUserId = trainerId || currentUser?.id || 't1';
+        const targetGymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || '';
+        const targetUserId = trainerId || currentUser?.id || '';
         const notifKeys = [
           'fitcore_read_notifs_all',
-          `fitcore_read_notifs_${targetUserId}`,
+          targetUserId ? `fitcore_read_notifs_${targetUserId}` : null,
           currentUser?.id ? `fitcore_read_notifs_${currentUser.id}` : null,
           currentUser?.phone ? `fitcore_read_notifs_${currentUser.phone}` : null,
         ].filter(Boolean) as string[];
@@ -196,10 +196,11 @@ export default function TrainerDashboard({ navigation }: any) {
     }
     setSubmittingLeave(true);
     try {
+      const targetGymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || '';
       const res: any = await apiService.createTrainerLeaveRequest({
         trainerId,
         trainerName,
-        gymId: currentGym?.id || 'gym1',
+        gymId: targetGymId,
         startDate: leaveStartDate,
         endDate: leaveEndDate,
         reason: leaveReason.trim(),

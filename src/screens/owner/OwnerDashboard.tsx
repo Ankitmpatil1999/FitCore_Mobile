@@ -81,7 +81,7 @@ export default function OwnerDashboard({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const bottomTabBarPadding = (insets.bottom > 0 ? insets.bottom : (Platform.OS === 'android' ? 14 : 10)) + 80;
   const { currentUser, currentGym } = useAppContext();
-  const gymId = currentGym?.id || (currentUser as any)?.gymId || '6a934afd13a1b16c3767d90f';
+  const gymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || '';
   const gymName = currentGym?.name || 'Ayushi Gym';
   const ownerName = currentUser?.name || gymName + ' Owner';
 

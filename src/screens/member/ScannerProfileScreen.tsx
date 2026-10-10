@@ -156,8 +156,8 @@ export default function CheckInScreen({ navigation }: any) {
   const handleCheckIn = async () => {
     if (actionLoading) return;
     const memberName = currentUser?.name || currentMember?.name || 'Member';
-    const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1';
-    const gymId = currentUser?.gymId || currentGym?.id || '6a934afd13a1b16c3767d90f';
+    const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '';
+    const gymId = currentUser?.gymId || currentGym?.id || (currentGym as any)?._id || '';
     const memberPhone = currentUser?.phone || currentMember?.phone || '';
     const nowTimeFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
@@ -200,7 +200,7 @@ export default function CheckInScreen({ navigation }: any) {
   // ── Instant Optimistic Check-Out ──
   const handleCheckOut = async () => {
     if (actionLoading) return;
-    const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1';
+    const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '';
     const memberPhone = currentUser?.phone || currentMember?.phone || '';
     const nowTimeFormatted = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 

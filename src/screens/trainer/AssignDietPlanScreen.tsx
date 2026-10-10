@@ -80,9 +80,9 @@ import { useAppContext } from '../../context/AppContext';
 
 export default function AssignDietPlanScreen({ route, navigation }: any) {
   const { currentTrainer, currentGym, currentUser } = useAppContext();
-  const trainerId = currentTrainer?.id || currentUser?.id || 't1';
+  const trainerId = currentTrainer?.id || (currentTrainer as any)?._id || currentUser?.id || '';
   const trainerName = currentTrainer?.name || currentUser?.name || 'Coach';
-  const gymId = currentGym?.id || currentTrainer?.gymId;
+  const gymId = currentGym?.id || currentTrainer?.gymId || (currentUser as any)?.gymId || '';
 
   const { memberId: routeMemberId, memberName: routeMemberName } = route.params || {};
 

@@ -23,8 +23,8 @@ const leftArrowIcon = require('../../assets/Icons2/left-arrow.png');
 
 export default function TrainerAttendanceScreen({ navigation }: any) {
   const { currentTrainer, currentGym, currentUser } = useAppContext();
-  const trainerId = currentTrainer?.id || currentUser?.id || 't1';
-  const trainerName = currentTrainer?.name || currentUser?.name || 'Coach Kunal';
+  const trainerId = currentTrainer?.id || (currentTrainer as any)?._id || currentUser?.id || '';
+  const trainerName = currentTrainer?.name || currentUser?.name || 'Coach';
   const gymName = currentGym?.name || 'FitCore Gym';
 
   const [loading, setLoading] = useState(false);

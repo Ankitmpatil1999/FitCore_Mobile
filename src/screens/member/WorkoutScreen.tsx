@@ -37,7 +37,7 @@ const shouldersIcon = require('../../assets/muscle_icons/shoulders.png');
 const bicepsIcon = require('../../assets/muscle_icons/biceps.png');
 
 // ── Default Weekly Schedule ──
-const INITIAL_WORKOUT_SCHEDULE = [
+export const INITIAL_WORKOUT_SCHEDULE = [
   {
     day: 'Monday',
     title: 'Chest',
@@ -96,7 +96,7 @@ const INITIAL_WORKOUT_SCHEDULE = [
   },
 ];
 
-const PRESET_ROUTINE_OPTIONS = [
+export const PRESET_ROUTINE_OPTIONS = [
   { id: 'chest', title: 'Chest', icon: chestIcon, bg: '#FEE2E2', tint: '#EF4444', type: 'muscle_chest' },
   { id: 'back', title: 'Back', icon: backIcon, bg: '#DBEAFE', tint: '#3B82F6', type: 'muscle_back' },
   { id: 'biceps', title: 'Biceps', icon: bicepsIcon, bg: '#FFEDD5', tint: '#EA580C', type: 'muscle_biceps' },
@@ -112,9 +112,27 @@ const PRESET_ROUTINE_OPTIONS = [
 export default function WorkoutScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { currentMember, currentUser } = useAppContext();
-  const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+  const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '');
 
   const [schedule, setSchedule] = useState<any[]>(INITIAL_WORKOUT_SCHEDULE);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [planMeta, setPlanMeta] = useState<{
+    isTrainerAssigned: boolean;
+    isSelfCustom: boolean;
+    isGymMaster: boolean;
+    isStarterTemplate: boolean;
+    trainerName: string | null;
+    planTitle: string;
+  }>({
+    isTrainerAssigned: false,
+    isSelfCustom: false,
+    isGymMaster: false,
+    isStarterTemplate: true,
+    trainerName: null,
+    planTitle: 'Weekly Split Template',
+  });
+
   const [isEditing, setIsEditing] = useState(false);
   const [openDropdownDay, setOpenDropdownDay] = useState<number | null>(null);
   const [customTextInputs, setCustomTextInputs] = useState<{ [key: number]: string }>({});
@@ -157,40 +175,72 @@ export default function WorkoutScreen({ navigation }: any) {
     return cleaned || rawText;
   };
 
-  useEffect(() => {
-    const fetchPlan = async () => {
-      try {
-        const res: any = await apiService.getMemberWorkout(memberId);
-        if (res?.success && res?.data?.days && Array.isArray(res.data.days)) {
-          const updated = INITIAL_WORKOUT_SCHEDULE.map((item) => {
-            const match = res.data.days.find(
-              (d: any) =>
-                d?.day?.toLowerCase() === item.day.toLowerCase() ||
-                d?.dayName?.toLowerCase() === item.day.toLowerCase()
+  const fetchPlan = async () => {
+    if (!memberId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      setLoading(true);
+      setError(null);
+      const res: any = await apiService.getMemberWorkout(memberId);
+      if (res?.success && res?.data?.days && Array.isArray(res.data.days)) {
+        const updated = INITIAL_WORKOUT_SCHEDULE.map((item) => {
+          const match = res.data.days.find(
+            (d: any) =>
+              d?.day?.toLowerCase() === item.day.toLowerCase() ||
+              d?.dayName?.toLowerCase() === item.day.toLowerCase()
+          );
+          if (match?.focus) {
+            const cleanedTitle = cleanWorkoutTitle(match.focus);
+            const firstPart = cleanedTitle.split(/[+&,/]/)[0].trim().toLowerCase();
+            const preset = PRESET_ROUTINE_OPTIONS.find(
+              (p) => p.title.toLowerCase() === firstPart || p.id === firstPart
             );
-            if (match?.focus) {
-              const cleanedTitle = cleanWorkoutTitle(match.focus);
-              const firstPart = cleanedTitle.split(/[+&,/]/)[0].trim().toLowerCase();
-              const preset = PRESET_ROUTINE_OPTIONS.find(
-                (p) => p.title.toLowerCase() === firstPart || p.id === firstPart
-              );
-              return {
-                ...item,
-                title: cleanedTitle,
-                iconBg: preset?.bg || item.iconBg,
-                iconTint: preset?.tint || item.iconTint,
-                iconType: preset?.type || item.iconType,
-                customIcon: preset?.icon || item.customIcon,
-              };
-            }
-            return item;
-          });
-          setSchedule(updated);
-        }
-      } catch (err) {
-        console.log('Using cached workout routine');
+            return {
+              ...item,
+              title: cleanedTitle,
+              iconBg: preset?.bg || item.iconBg,
+              iconTint: preset?.tint || item.iconTint,
+              iconType: preset?.type || item.iconType,
+              customIcon: preset?.icon || item.customIcon,
+            };
+          }
+          return item;
+        });
+        setSchedule(updated);
+
+        const isTrainer = Boolean(res.isTrainerAssigned || res.activeTier === 'TRAINER');
+        const isCustom = Boolean(res.isSelfCustom || res.activeTier === 'SELF_CUSTOM');
+        const isMaster = Boolean(res.isGymMaster || res.activeTier === 'GYM_MASTER');
+
+        setPlanMeta({
+          isTrainerAssigned: isTrainer,
+          isSelfCustom: isCustom,
+          isGymMaster: isMaster,
+          isStarterTemplate: !isTrainer && !isCustom && !isMaster,
+          trainerName: res.trainerName || null,
+          planTitle: res.data?.title || (isTrainer ? 'Trainer Assigned Routine' : isCustom ? 'My Custom Routine' : isMaster ? 'Official Gym Split' : 'Starter Template'),
+        });
+      } else {
+        setPlanMeta({
+          isTrainerAssigned: false,
+          isSelfCustom: false,
+          isGymMaster: false,
+          isStarterTemplate: true,
+          trainerName: null,
+          planTitle: 'Weekly Split Template',
+        });
       }
-    };
+    } catch (err: any) {
+      console.log('Error fetching workout routine:', err);
+      setError(err?.message || 'Could not load workout plan. Please check connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchPlan();
   }, [memberId]);
 
@@ -351,6 +401,14 @@ export default function WorkoutScreen({ navigation }: any) {
         days: daysPayload,
       });
 
+      setPlanMeta({
+        isTrainerAssigned: false,
+        isSelfCustom: true,
+        isGymMaster: false,
+        isStarterTemplate: false,
+        trainerName: null,
+        planTitle: 'My Custom Weekly Workout Split',
+      });
       setShowSuccessModal(true);
       setIsEditing(false);
       setOpenDropdownDay(null);
@@ -380,6 +438,7 @@ export default function WorkoutScreen({ navigation }: any) {
     if (item?.iconType === 'barbell') source = barbellIcon;
     else if (item?.iconType === 'kettlebell') source = kettlebellIcon;
     else if (item?.iconType === 'clock') source = clockImg;
+    else if (item?.iconType === 'healthy') source = healthyIcon;
 
     return <Image source={source} style={[styles.dayIconImg, { tintColor: item?.iconTint || '#6C5CE7' }]} resizeMode="contain" />;
   };
@@ -440,36 +499,110 @@ export default function WorkoutScreen({ navigation }: any) {
               transform: [{ translateY: slideAnim }],
             }}
           >
-            {/* ── TOP HERO BANNER: 6 DAYS WORKOUT PLAN ── */}
-            <View style={styles.heroBannerCard}>
-              <View style={styles.heroLeftGroup}>
-                <View style={styles.heroIconCircle}>
-                  <Image source={dumbbellIcon} style={styles.heroDumbbellImg} resizeMode="contain" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.heroPlanTitle}>{activeDaysCount} Days Workout Plan</Text>
-                  <Text style={styles.heroPlanSubtitle}>A Healthier You, A Stronger Tomorrow</Text>
-                </View>
-              </View>
-
-              <View style={styles.heroRightStatus}>
-                <Image source={chartIcon} style={styles.chartMiniIcon} resizeMode="contain" />
-                <Text style={styles.keepGoingText}>Keep Going</Text>
-              </View>
-            </View>
-
-            {/* ── EDIT MODE BANNER ── */}
-            {isEditing && (
-              <View style={styles.editingInstructionBanner}>
-                <View style={styles.editingDot} />
-                <Text style={styles.editingInstructionText}>
-                  Editing Mode: Tap any day's card to select routine or type custom focus.
+            {loading ? (
+              <View style={{ paddingVertical: hp(8), alignItems: 'center', justifyContent: 'center' }}>
+                <ActivityIndicator size="large" color="#6C5CE7" />
+                <Text style={{ marginTop: 12, color: '#64748B', fontSize: fontScale(13), fontWeight: '600' }}>
+                  Loading workout routine...
                 </Text>
               </View>
-            )}
+            ) : error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorTitle}>Unable to Load Workout Plan</Text>
+                <Text style={styles.errorSubtitle}>{error}</Text>
+                <TouchableOpacity style={styles.retryBtn} onPress={fetchPlan} activeOpacity={0.8}>
+                  <Text style={styles.retryBtnText}>Retry Connection</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                {/* ── TOP HERO BANNER: 6 DAYS WORKOUT PLAN ── */}
+                <View style={styles.heroBannerCard}>
+                  <View style={styles.heroLeftGroup}>
+                    <View style={styles.heroIconCircle}>
+                      <Image source={dumbbellIcon} style={styles.heroDumbbellImg} resizeMode="contain" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(6), marginBottom: moderateScale(2) }}>
+                        <Text style={styles.heroPlanTitle}>{activeDaysCount} Days Workout Plan</Text>
+                        <View
+                          style={[
+                            styles.planTierBadge,
+                            planMeta.isTrainerAssigned
+                              ? styles.planTierBadgeTrainer
+                              : planMeta.isSelfCustom
+                              ? styles.planTierBadgeCustom
+                              : planMeta.isGymMaster
+                              ? styles.planTierBadgeMaster
+                              : styles.planTierBadgeTemplate,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.planTierBadgeText,
+                              planMeta.isTrainerAssigned
+                                ? styles.planTierBadgeTextTrainer
+                                : planMeta.isSelfCustom
+                                ? styles.planTierBadgeTextCustom
+                                : planMeta.isGymMaster
+                                ? styles.planTierBadgeTextMaster
+                                : styles.planTierBadgeTextTemplate,
+                            ]}
+                          >
+                            {planMeta.isTrainerAssigned
+                              ? `Coach • ${planMeta.trainerName || 'Assigned'}`
+                              : planMeta.isSelfCustom
+                              ? 'My Custom Split'
+                              : planMeta.isGymMaster
+                              ? 'Official Gym Split'
+                              : 'Starter Template'}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={styles.heroPlanSubtitle}>{planMeta.planTitle}</Text>
+                    </View>
+                  </View>
 
-            {/* ── WEEKLY WORKOUT TIMETABLE ── */}
-            <View style={styles.timetableContainer}>
+                  <View style={styles.heroRightStatus}>
+                    <Image source={chartIcon} style={styles.chartMiniIcon} resizeMode="contain" />
+                    <Text style={styles.keepGoingText}>Keep Going</Text>
+                  </View>
+                </View>
+
+                {/* ── STARTER TEMPLATE NOTICE BANNER ── */}
+                {planMeta.isStarterTemplate && !isEditing && (
+                  <View style={styles.starterTemplateBanner}>
+                    <View style={{ flex: 1, paddingRight: moderateScale(8) }}>
+                      <View style={styles.starterBadgeRow}>
+                        <View style={styles.starterDot} />
+                        <Text style={styles.starterBadgeTitle}>Starter Template — Not Assigned Yet</Text>
+                      </View>
+                      <Text style={styles.starterSubtitle}>
+                        No personal split has been assigned by a coach yet. You can customize this routine or request a personalized plan.
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.customizeSplitBtn}
+                      onPress={() => setIsEditing(true)}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.customizeSplitBtnText}>Customize</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {/* ── EDIT MODE BANNER ── */}
+                {isEditing && (
+                  <View style={styles.editingInstructionBanner}>
+                    <View style={styles.editingDot} />
+                    <Text style={styles.editingInstructionText}>
+                      Editing Mode: Tap any day's card to select routine or type custom focus.
+                    </Text>
+                  </View>
+                )}
+
+                {/* ── WEEKLY WORKOUT TIMETABLE ── */}
+                <View style={styles.timetableContainer}>
               <View style={styles.timetableHeaderRow}>
                 <View style={styles.timetableColDayWrap}>
                   <Text style={styles.timetableColDay}>DAY</Text>
@@ -618,23 +751,25 @@ export default function WorkoutScreen({ navigation }: any) {
               })}
             </View>
 
-            {/* ── SAVE BUTTON (Visible in Edit Mode) ── */}
-            {isEditing && (
-              <TouchableOpacity
-                style={styles.savePlanBtn}
-                onPress={handleSaveRoutine}
-                disabled={saving}
-                activeOpacity={0.85}
-              >
-                {saving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.savePlanBtnText}>Save Timetable Changes</Text>
+                {/* ── SAVE BUTTON (Visible in Edit Mode) ── */}
+                {isEditing && (
+                  <TouchableOpacity
+                    style={styles.savePlanBtn}
+                    onPress={handleSaveRoutine}
+                    disabled={saving}
+                    activeOpacity={0.85}
+                  >
+                    {saving ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Text style={styles.savePlanBtnText}>Save Timetable Changes</Text>
+                    )}
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
-            )}
 
-            <View style={{ height: hp(2) }} />
+                <View style={{ height: hp(2) }} />
+              </>
+            )}
           </Animated.View>
         </ScrollView>
 
@@ -1267,5 +1402,121 @@ const styles = StyleSheet.create({
     fontSize: fontScale(13),
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+
+  // Error Container & Retry
+  errorContainer: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.2,
+    borderColor: '#FECACA',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(18),
+    alignItems: 'center',
+    marginBottom: hp(2),
+  },
+  errorTitle: {
+    fontSize: fontScale(14),
+    fontWeight: '800',
+    color: '#DC2626',
+    marginBottom: 4,
+  },
+  errorSubtitle: {
+    fontSize: fontScale(12),
+    color: '#7F1D1D',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryBtn: {
+    backgroundColor: '#6C5CE7',
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(10),
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: fontScale(12),
+    fontWeight: '700',
+  },
+
+  // Plan Tier Badges
+  planTierBadge: {
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(8),
+  },
+  planTierBadgeTrainer: {
+    backgroundColor: '#DCFCE7',
+  },
+  planTierBadgeCustom: {
+    backgroundColor: '#EDE9FE',
+  },
+  planTierBadgeMaster: {
+    backgroundColor: '#E0F2FE',
+  },
+  planTierBadgeTemplate: {
+    backgroundColor: '#FEF3C7',
+  },
+  planTierBadgeText: {
+    fontSize: fontScale(9.5),
+    fontWeight: '800',
+  },
+  planTierBadgeTextTrainer: {
+    color: '#15803D',
+  },
+  planTierBadgeTextCustom: {
+    color: '#6D28D9',
+  },
+  planTierBadgeTextMaster: {
+    color: '#0369A1',
+  },
+  planTierBadgeTextTemplate: {
+    color: '#B45309',
+  },
+
+  // Starter Template Notice Banner
+  starterTemplateBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.2,
+    borderColor: '#FDE68A',
+    borderRadius: moderateScale(16),
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(12),
+    marginBottom: hp(1.6),
+  },
+  starterBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(3),
+  },
+  starterDot: {
+    width: moderateScale(7),
+    height: moderateScale(7),
+    borderRadius: moderateScale(3.5),
+    backgroundColor: '#D97706',
+    marginRight: moderateScale(6),
+  },
+  starterBadgeTitle: {
+    fontSize: fontScale(12),
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  starterSubtitle: {
+    fontSize: fontScale(11),
+    color: '#B45309',
+    lineHeight: fontScale(15),
+  },
+  customizeSplitBtn: {
+    backgroundColor: '#D97706',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(10),
+  },
+  customizeSplitBtnText: {
+    color: '#FFFFFF',
+    fontSize: fontScale(11),
+    fontWeight: '800',
   },
 });

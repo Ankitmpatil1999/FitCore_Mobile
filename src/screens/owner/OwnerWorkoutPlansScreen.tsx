@@ -12,6 +12,7 @@ import {
   Image,
   Animated,
   Easing,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -22,6 +23,8 @@ import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
 // ── Asset Icons ──
 const dumbbellIcon = require('../../assets/Icons/dumbbell.png');
 const editIcon = require('../../assets/Icons/edit.png');
+const clockImg = require('../../assets/Icons2/clock.png');
+const healthyIcon = require('../../assets/Icons2/healthy.png');
 const chestIcon = require('../../assets/muscle_icons/chest.png');
 const backIcon = require('../../assets/muscle_icons/back.png');
 const legsIcon = require('../../assets/muscle_icons/legs.png');
@@ -29,7 +32,7 @@ const shouldersIcon = require('../../assets/muscle_icons/shoulders.png');
 const bicepsIcon = require('../../assets/muscle_icons/biceps.png');
 
 // ── Default 7-Day Master Schedule ──
-const INITIAL_WORKOUT_SCHEDULE = [
+export const INITIAL_WORKOUT_SCHEDULE = [
   {
     day: 'Monday',
     title: 'Chest',
@@ -84,30 +87,32 @@ const INITIAL_WORKOUT_SCHEDULE = [
     iconBg: '#E0F2FE',
     iconTint: '#0284C7',
     iconType: 'clock',
-    customIcon: null,
+    customIcon: clockImg,
   },
 ];
 
-const PRESET_ROUTINE_OPTIONS = [
+export const PRESET_ROUTINE_OPTIONS = [
   { id: 'chest', title: 'Chest', icon: chestIcon, bg: '#FEE2E2', tint: '#EF4444', type: 'muscle_chest' },
   { id: 'back', title: 'Back', icon: backIcon, bg: '#DBEAFE', tint: '#3B82F6', type: 'muscle_back' },
   { id: 'biceps', title: 'Biceps', icon: bicepsIcon, bg: '#FFEDD5', tint: '#EA580C', type: 'muscle_biceps' },
   { id: 'triceps', title: 'Triceps', icon: dumbbellIcon, bg: '#F3E8FF', tint: '#9333EA', type: 'dumbbell' },
   { id: 'shoulders', title: 'Shoulders', icon: shouldersIcon, bg: '#FEF3C7', tint: '#F59E0B', type: 'muscle_shoulders' },
   { id: 'legs', title: 'Legs', icon: legsIcon, bg: '#DCFCE7', tint: '#10B981', type: 'muscle_legs' },
-  { id: 'abs', title: 'Abs & Core', icon: null, bg: '#EDE9FE', tint: '#7C3AED', type: 'flame' },
-  { id: 'cardio', title: 'Cardio', icon: null, bg: '#E0F2FE', tint: '#0284C7', type: 'heart' },
-  { id: 'rest', title: 'Rest & Recovery', icon: null, bg: '#F1F5F9', tint: '#64748B', type: 'bed' },
+  { id: 'abs', title: 'Abs & Core', icon: healthyIcon, bg: '#EDE9FE', tint: '#7C3AED', type: 'clock' },
+  { id: 'cardio', title: 'Cardio', icon: healthyIcon, bg: '#E0F2FE', tint: '#0284C7', type: 'clock' },
+  { id: 'rest', title: 'Rest & Recovery', icon: clockImg, bg: '#F1F5F9', tint: '#64748B', type: 'clock' },
   { id: 'other', title: 'Other (Custom)', icon: editIcon, bg: '#F8FAFC', tint: '#6B7280', type: 'custom' },
 ];
 
 export default function OwnerWorkoutPlansScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { currentGym, currentUser } = useAppContext();
-  const gymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || (currentUser as any)?.gym_id || '6a934afd13a1b16c3767d90f';
+  const gymId = currentGym?.id || (currentGym as any)?._id || (currentUser as any)?.gymId || (currentUser as any)?.gym_id || '';
 
   const [schedule, setSchedule] = useState<any[]>(INITIAL_WORKOUT_SCHEDULE);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isPublished, setIsPublished] = useState<boolean>(false);
   const [isEditing, setIsEditing] = useState(false);
   const [openDropdownDay, setOpenDropdownDay] = useState<number | null>(null);
   const [customTextInputs, setCustomTextInputs] = useState<{ [key: number]: string }>({});
@@ -151,8 +156,13 @@ export default function OwnerWorkoutPlansScreen({ navigation }: any) {
   };
 
   const loadMasterPlan = async () => {
+    if (!gymId) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
+      setError(null);
       const res: any = await apiService.getOwnerMasterWorkoutPlan(gymId);
       if (res?.success && res?.data?.days && Array.isArray(res.data.days)) {
         const updated = INITIAL_WORKOUT_SCHEDULE.map((item) => {
@@ -180,9 +190,13 @@ export default function OwnerWorkoutPlansScreen({ navigation }: any) {
           return item;
         });
         setSchedule(updated);
+        setIsPublished(Boolean(res.isCustomized));
+      } else {
+        setIsPublished(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.log('Error loading master plan:', err);
+      setError(err?.message || 'Failed to load gym master plan.');
     } finally {
       setLoading(false);
     }
@@ -355,42 +369,40 @@ export default function OwnerWorkoutPlansScreen({ navigation }: any) {
 
       const res: any = await apiService.saveOwnerMasterWorkoutPlan(payload);
       if (res?.success) {
+        setIsPublished(true);
         setIsEditing(false);
         setOpenDropdownDay(null);
         setShowSuccessModal(true);
       } else {
-        setIsEditing(false);
-        setShowSuccessModal(true);
+        Alert.alert('Publish Error', res?.message || 'Could not save master split.');
       }
     } catch (err: any) {
       console.log('Error publishing master split:', err);
-      setIsEditing(false);
-      setShowSuccessModal(true);
+      Alert.alert('Error', err?.message || 'Could not save master split.');
     } finally {
       setSaving(false);
     }
   };
 
   const renderIcon = (item: any) => {
-    if (item.customIcon) {
+    if (item?.customIcon) {
+      const isMuscle = item.iconType?.startsWith('muscle_');
       return (
         <Image
           source={item.customIcon}
           style={[
             styles.dayIconImg,
-            item.iconType?.startsWith('muscle_') ? null : { tintColor: item.iconTint },
+            isMuscle ? { width: moderateScale(24), height: moderateScale(24) } : { tintColor: item.iconTint },
           ]}
           resizeMode="contain"
         />
       );
     }
-    if (item.iconType === 'flame') {
-      return <Icon name="flame" size={moderateScale(17)} color={item.iconTint || '#7C3AED'} />;
-    }
-    if (item.iconType === 'heart') {
-      return <Icon name="heart" size={moderateScale(17)} color={item.iconTint || '#0284C7'} />;
-    }
-    return <Icon name="moon" size={moderateScale(17)} color={item.iconTint || '#64748B'} />;
+    let source = dumbbellIcon;
+    if (item?.iconType === 'clock') source = clockImg;
+    else if (item?.iconType === 'healthy') source = healthyIcon;
+
+    return <Image source={source} style={[styles.dayIconImg, { tintColor: item?.iconTint || '#6C5CE7' }]} resizeMode="contain" />;
   };
 
   const activeDaysCount = schedule.filter(
@@ -442,6 +454,14 @@ export default function OwnerWorkoutPlansScreen({ navigation }: any) {
             <ActivityIndicator size="large" color="#6C5CE7" />
             <Text style={styles.loadingText}>Loading Gym Master Timetable...</Text>
           </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorTitle}>Unable to Load Master Plan</Text>
+            <Text style={styles.errorSubtitle}>{error}</Text>
+            <TouchableOpacity style={styles.retryBtn} onPress={loadMasterPlan} activeOpacity={0.8}>
+              <Text style={styles.retryBtnText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <ScrollView
             contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + hp(4) }]}
@@ -460,8 +480,29 @@ export default function OwnerWorkoutPlansScreen({ navigation }: any) {
                     <Image source={dumbbellIcon} style={styles.heroDumbbellImg} resizeMode="contain" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.heroPlanTitle}>{activeDaysCount} Days Master Split</Text>
-                    <Text style={styles.heroPlanSubtitle}>Auto-assigned to all general members</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: moderateScale(6), marginBottom: moderateScale(2) }}>
+                      <Text style={styles.heroPlanTitle}>{activeDaysCount} Days Master Split</Text>
+                      <View
+                        style={[
+                          styles.publishedStatusBadge,
+                          isPublished ? styles.publishedBadgeActive : styles.publishedBadgeDraft,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.publishedStatusText,
+                            isPublished ? styles.publishedTextActive : styles.publishedTextDraft,
+                          ]}
+                        >
+                          {isPublished ? '✓ Published Master Split' : 'Default Template — Unpublished'}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.heroPlanSubtitle}>
+                      {isPublished
+                        ? 'Live schedule assigned to all enrolled members'
+                        : 'Unpublished starter split (members see read-only default until published)'}
+                    </Text>
                   </View>
                 </View>
 
@@ -469,6 +510,28 @@ export default function OwnerWorkoutPlansScreen({ navigation }: any) {
                   <Text style={styles.heroRightBadgeText}>OWNER</Text>
                 </View>
               </View>
+
+              {/* ── UNPUBLISHED TEMPLATE NOTICE BANNER ── */}
+              {!isPublished && !isEditing && (
+                <View style={styles.templateNoticeBanner}>
+                  <View style={{ flex: 1, paddingRight: moderateScale(8) }}>
+                    <View style={styles.templateNoticeBadgeRow}>
+                      <View style={styles.templateNoticeDot} />
+                      <Text style={styles.templateNoticeBadgeTitle}>Default Starter Template (Unpublished)</Text>
+                    </View>
+                    <Text style={styles.templateNoticeSubtitle}>
+                      This master timetable has not been published yet. Tap "Edit" to customize and publish the official schedule for members.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.editPromptBtn}
+                    onPress={() => setIsEditing(true)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.editPromptBtnText}>Edit Split</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               {/* ── EDIT MODE INSTRUCTION BANNER ── */}
               {isEditing && (
@@ -1307,5 +1370,110 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: fontScale(13),
     fontWeight: '900',
+  },
+
+  // Error Card
+  errorContainer: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1.2,
+    borderColor: '#FECACA',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(18),
+    alignItems: 'center',
+    marginHorizontal: wp(5),
+    marginVertical: hp(2),
+  },
+  errorTitle: {
+    fontSize: fontScale(14),
+    fontWeight: '800',
+    color: '#DC2626',
+    marginBottom: 4,
+  },
+  errorSubtitle: {
+    fontSize: fontScale(12),
+    color: '#7F1D1D',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  retryBtn: {
+    backgroundColor: '#6C5CE7',
+    paddingHorizontal: moderateScale(16),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(10),
+  },
+  retryBtnText: {
+    color: '#FFFFFF',
+    fontSize: fontScale(12),
+    fontWeight: '700',
+  },
+
+  // Published / Draft Badges
+  publishedStatusBadge: {
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(8),
+  },
+  publishedBadgeActive: {
+    backgroundColor: '#DCFCE7',
+  },
+  publishedBadgeDraft: {
+    backgroundColor: '#FEF3C7',
+  },
+  publishedStatusText: {
+    fontSize: fontScale(9.5),
+    fontWeight: '800',
+  },
+  publishedTextActive: {
+    color: '#15803D',
+  },
+  publishedTextDraft: {
+    color: '#B45309',
+  },
+
+  // Template Notice Banner
+  templateNoticeBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1.2,
+    borderColor: '#FDE68A',
+    borderRadius: moderateScale(16),
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(12),
+    marginBottom: hp(1.6),
+  },
+  templateNoticeBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: moderateScale(3),
+  },
+  templateNoticeDot: {
+    width: moderateScale(7),
+    height: moderateScale(7),
+    borderRadius: moderateScale(3.5),
+    backgroundColor: '#D97706',
+    marginRight: moderateScale(6),
+  },
+  templateNoticeBadgeTitle: {
+    fontSize: fontScale(12),
+    fontWeight: '800',
+    color: '#92400E',
+  },
+  templateNoticeSubtitle: {
+    fontSize: fontScale(11),
+    color: '#B45309',
+    lineHeight: fontScale(15),
+  },
+  editPromptBtn: {
+    backgroundColor: '#D97706',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(10),
+  },
+  editPromptBtnText: {
+    color: '#FFFFFF',
+    fontSize: fontScale(11),
+    fontWeight: '800',
   },
 });

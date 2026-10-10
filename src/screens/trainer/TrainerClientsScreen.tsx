@@ -67,8 +67,8 @@ function AnimatedPressable({
 
 export default function TrainerClientsScreen({ navigation }: any) {
   const { currentTrainer, currentGym, currentUser } = useAppContext();
-  const trainerId = currentTrainer?.id || currentUser?.id || 't1';
-  const gymId = currentGym?.id || currentTrainer?.gymId;
+  const trainerId = currentTrainer?.id || (currentTrainer as any)?._id || currentUser?.id || '';
+  const gymId = currentGym?.id || currentTrainer?.gymId || (currentUser as any)?.gymId || '';
 
   const [clients, setClients] = useState<Member[]>([]);
   const [loading, setLoading] = useState(false);

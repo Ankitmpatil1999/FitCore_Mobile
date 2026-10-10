@@ -267,7 +267,12 @@ export default function LoginScreen() {
         if (res?.userName) {
           setDiscoveredUserName(res.userName);
         }
-        setSuccessMessage(`Verification code sent to +91 ${cleanPhone}`);
+        if (res?.devOtp) {
+          setOtpCode(res.devOtp);
+          setSuccessMessage(`Code sent to +91 ${cleanPhone} (Test OTP: ${res.devOtp})`);
+        } else {
+          setSuccessMessage(`Verification code sent to +91 ${cleanPhone}`);
+        }
         setOtpStep('enter_otp');
         setResendTimer(60);
       } else {

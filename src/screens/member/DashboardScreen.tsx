@@ -375,7 +375,7 @@ export default function DashboardScreen({ navigation }: any) {
 
   const fetchLiveMemberData = async () => {
     try {
-      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1');
+      const memberId = String(currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '');
       if (!memberId) return;
 
       const [profileRes, workoutRes, attendanceRes, dietRes]: any[] = await Promise.all([
@@ -590,7 +590,7 @@ export default function DashboardScreen({ navigation }: any) {
   const secondsStr = seconds.toString().padStart(2, '0');
 
   const handleToggleCheckIn = async () => {
-    const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || 'm1';
+    const memberId = currentMember?.userId || currentMember?.id || currentUser?.id || currentUser?.phone || '';
     const gymId = currentUser?.gymId || currentGym?.id || liveData?.gym?.id || liveData?.member?.gymId;
     const memberName = currentUser?.name || currentMember?.name || liveData?.member?.name || 'Member';
     const memberPhone = currentUser?.phone || currentMember?.phone || liveData?.member?.phone || '';

@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import AppIcon from '../../components/common/AppIcon';
 import { Colors, Typography, Radii } from '../../theme';
 import { wp, hp, fontScale, moderateScale } from '../../theme/responsive';
-import { TRAINERS, MEMBERS, Trainer } from '../../data/mockData';
+import { MEMBERS, Trainer } from '../../data/mockData';
 import { useAppContext } from '../../context/AppContext';
 import apiService from '../../services/api';
 
@@ -67,12 +67,11 @@ function AnimatedPressable({
 
 export default function TrainersScreen() {
   const { currentGym } = useAppContext();
-  const gymId = currentGym?.id || 'g1';
+  const gymId = currentGym?.id || (currentGym as any)?._id || '';
 
-  const [trainers, setTrainers] = useState<Trainer[]>(() =>
-    TRAINERS.filter((t) => t.gymId === gymId || !t.gymId || t.gymId === 'gym1')
-  );
-  const [loadingTrainers, setLoadingTrainers] = useState(false);
+  const [trainers, setTrainers] = useState<Trainer[]>([]);
+  const [loadingTrainers, setLoadingTrainers] = useState(true);
+  const [trainersError, setTrainersError] = useState<string | null>(null);
   const [addModal, setAddModal] = useState(false);
   const [detailTrainer, setDetailTrainer] = useState<Trainer | null>(null);
 
@@ -94,8 +93,13 @@ export default function TrainersScreen() {
   const [ownerRejectNote, setOwnerRejectNote] = useState('');
 
   const fetchTrainers = async () => {
+    if (!gymId) {
+      setLoadingTrainers(false);
+      return;
+    }
     try {
       setLoadingTrainers(true);
+      setTrainersError(null);
       const res = await apiService.getOwnerTrainers(gymId);
       if (res.success && Array.isArray(res.data)) {
         if (res.data.length === 0) {
@@ -118,9 +122,12 @@ export default function TrainersScreen() {
           }));
           setTrainers(mapped);
         }
+      } else {
+        setTrainersError(res.error || 'Failed to load trainers.');
       }
     } catch (err) {
       console.log('Error fetching trainers:', err);
+      setTrainersError('Unable to connect to gym trainer service.');
     } finally {
       setLoadingTrainers(false);
     }
@@ -352,67 +359,92 @@ export default function TrainersScreen() {
             <Text style={styles.trainersListTitle}>Gym Coaches & Roster</Text>
           </View>
 
-          {trainers.map((trainer) => {
-            const assignedCount = MEMBERS.filter((m) => trainer.assignedMemberIds.includes(m.id)).length || 14;
-            const isLiveFloor = trainer.available;
+          {loadingTrainers ? (
+            <View style={{ paddingVertical: hp(8), alignItems: 'center' }}>
+              <Text style={{ color: '#64748B', fontSize: fontScale(14), fontWeight: '600' }}>Loading trainers roster...</Text>
+            </View>
+          ) : trainersError ? (
+            <View style={{ padding: wp(6), alignItems: 'center', backgroundColor: '#FEF2F2', borderRadius: 16, marginVertical: hp(2) }}>
+              <AppIcon name="alert-circle-outline" size={moderateScale(32)} color="#EF4444" />
+              <Text style={{ color: '#991B1B', fontWeight: '700', fontSize: fontScale(15), marginTop: 8 }}>{trainersError}</Text>
+              <TouchableOpacity onPress={fetchTrainers} style={{ marginTop: 12, backgroundColor: '#EF4444', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 }}>
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: fontScale(13) }}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : trainers.length === 0 ? (
+            <View style={{ paddingVertical: hp(8), alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: 20, marginVertical: hp(2), paddingHorizontal: wp(6) }}>
+              <AppIcon name="person-outline" size={moderateScale(40)} color="#94A3B8" />
+              <Text style={{ fontSize: fontScale(16), fontWeight: '800', color: '#0F172A', marginTop: 12 }}>No Trainers Found</Text>
+              <Text style={{ fontSize: fontScale(13), color: '#64748B', textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+                You haven't added any coaches or personal trainers to this gym branch yet.
+              </Text>
+              <TouchableOpacity onPress={() => setAddModal(true)} style={{ backgroundColor: '#6C5CE7', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 12 }}>
+                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: fontScale(13) }}>+ Add First Coach</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            trainers.map((trainer) => {
+              const assignedCount = Array.isArray(trainer.assignedMemberIds) ? trainer.assignedMemberIds.length : 0;
+              const isLiveFloor = trainer.available;
 
-            return (
-              <AnimatedPressable
-                key={trainer.id}
-                style={styles.trainerCard}
-                onPress={() => setDetailTrainer(trainer)}
-              >
-                <View style={styles.trainerAvatar}>
-                  <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
-                  {isLiveFloor && <View style={styles.onlineDot} />}
-                </View>
+              return (
+                <AnimatedPressable
+                  key={trainer.id}
+                  style={styles.trainerCard}
+                  onPress={() => setDetailTrainer(trainer)}
+                >
+                  <View style={styles.trainerAvatar}>
+                    <Text style={styles.trainerAvatarText}>{trainer.avatar}</Text>
+                    {isLiveFloor && <View style={styles.onlineDot} />}
+                  </View>
 
-                <View style={styles.trainerInfoCol}>
-                  <View style={styles.trainerTopRow}>
-                    <Text style={styles.trainerName}>{trainer.name}</Text>
-                    <View
-                      style={[
-                        styles.availBadge,
-                        { backgroundColor: isLiveFloor ? 'rgba(0, 196, 140, 0.12)' : 'rgba(148, 163, 184, 0.15)' },
-                      ]}
-                    >
-                      <View style={[styles.miniStatusDot, { backgroundColor: isLiveFloor ? '#00C48C' : '#94A3B8' }]} />
-                      <Text
+                  <View style={styles.trainerInfoCol}>
+                    <View style={styles.trainerTopRow}>
+                      <Text style={styles.trainerName}>{trainer.name}</Text>
+                      <View
                         style={[
-                          styles.availBadgeText,
-                          { color: isLiveFloor ? '#00C48C' : '#64748B' },
+                          styles.availBadge,
+                          { backgroundColor: isLiveFloor ? 'rgba(0, 196, 140, 0.12)' : 'rgba(148, 163, 184, 0.15)' },
                         ]}
                       >
-                        {isLiveFloor ? 'On Floor (06:15 AM)' : 'Off Duty'}
+                        <View style={[styles.miniStatusDot, { backgroundColor: isLiveFloor ? '#00C48C' : '#94A3B8' }]} />
+                        <Text
+                          style={[
+                            styles.availBadgeText,
+                            { color: isLiveFloor ? '#00C48C' : '#64748B' },
+                          ]}
+                        >
+                          {isLiveFloor ? 'On Floor (Active)' : 'Off Duty'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.trainerSpec}>{trainer.specialization}</Text>
+
+                    {/* Punch & Floor Hours summary */}
+                    <View style={styles.trainerPunchRow}>
+                      <Text style={styles.trainerPunchTime}>
+                        🕒 {isLiveFloor ? 'Shift In: 06:15 AM (Active)' : (trainer.timings || 'Off Duty')}
                       </Text>
+                      <Text style={styles.trainerHoursBadge}>
+                        {trainer.experience || '3+ yrs'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.trainerMetaRow}>
+                      <Text style={styles.trainerMetaText}>⭐ 4.9 Rating</Text>
+                      <Text style={styles.trainerMetaDivider}>•</Text>
+                      <Text style={styles.trainerMetaText}>🏋️ {assignedCount} Clients</Text>
+                      <Text style={styles.trainerMetaDivider}>•</Text>
+                      <Text style={styles.trainerMetaText}>📅 Active</Text>
                     </View>
                   </View>
 
-                  <Text style={styles.trainerSpec}>{trainer.specialization}</Text>
-
-                  {/* Punch & Floor Hours summary */}
-                  <View style={styles.trainerPunchRow}>
-                    <Text style={styles.trainerPunchTime}>
-                      🕒 {isLiveFloor ? 'Shift In: 06:15 AM (Active)' : 'Last Shift: 06:00 AM – 02:30 PM'}
-                    </Text>
-                    <Text style={styles.trainerHoursBadge}>
-                      {isLiveFloor ? 'Floor: 2.8 hrs' : '8h 30m'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.trainerMetaRow}>
-                    <Text style={styles.trainerMetaText}>⭐ 4.9 Rating</Text>
-                    <Text style={styles.trainerMetaDivider}>•</Text>
-                    <Text style={styles.trainerMetaText}>🏋️ {assignedCount} Clients</Text>
-                    <Text style={styles.trainerMetaDivider}>•</Text>
-                    <Text style={styles.trainerMetaText}>📅 22 Days Present</Text>
-                  </View>
-                </View>
-
-                <AppIcon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
-              </AnimatedPressable>
-            );
-          })}
+                  <AppIcon name="chevron-forward" size={moderateScale(18)} color="#94A3B8" />
+                </AnimatedPressable>
+              );
+            })
+          )}
 
           <View style={{ height: hp(12) }} />
         </ScrollView>

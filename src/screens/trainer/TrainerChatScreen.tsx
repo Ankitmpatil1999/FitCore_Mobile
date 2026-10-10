@@ -34,8 +34,8 @@ interface Message {
 
 export default function TrainerChatScreen({ route, navigation }: any) {
   const { currentTrainer, currentGym, currentUser } = useAppContext();
-  const trainerId = String(currentTrainer?.id || currentUser?.id || 't1');
-  const gymId = currentGym?.id || currentTrainer?.gymId;
+  const trainerId = String(currentTrainer?.id || (currentTrainer as any)?._id || currentUser?.id || '');
+  const gymId = currentGym?.id || currentTrainer?.gymId || (currentUser as any)?.gymId || '';
 
   // Current chat target — can be passed via nav params or selected from picker
   const [activeMemberId, setActiveMemberId] = useState<string>(route.params?.memberId || '');
