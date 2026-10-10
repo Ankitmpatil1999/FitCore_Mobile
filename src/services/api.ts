@@ -23,16 +23,16 @@ const getDynamicHost = (): string | null => {
 const dynamicHost = getDynamicHost();
 
 // Loaded securely from .env (hidden from source code repo)
-export const PRODUCTION_API_URL = ENV_API_URL || 'http://192.168.0.120:7000/api';
+export const PRODUCTION_API_URL = ENV_API_URL || 'https://fit-core-backend.vercel.app/api';
 
-// Candidate URLs: Prioritizes current active local backend and dynamic host first
+// Candidate URLs: Prioritizes configured production API URL first
 const CANDIDATE_URLS = [
   PRODUCTION_API_URL,
+  'https://fit-core-backend.vercel.app/api',
   ...(dynamicHost ? [`http://${dynamicHost}:7000/api`] : []),
   'http://192.168.0.120:7000/api',
   'http://localhost:7000/api',
   'http://10.0.2.2:7000/api',
-  'https://fit-core-backend.vercel.app/api',
 ];
 
 export let API_BASE_URL = CANDIDATE_URLS[0];
@@ -54,7 +54,7 @@ class ApiService {
     }).catch(() => {});
 
     AsyncStorage.getItem('@fitcore_active_base_url').then((cached) => {
-      if (cached && !cached.includes('192.168.88.28') && !cached.includes('192.168.0.104') && !cached.includes('10.0.0.17') && !cached.includes('vercel.app')) {
+      if (cached && !cached.includes('192.168.88.28') && !cached.includes('192.168.0.104') && !cached.includes('10.0.0.17')) {
         this.activeBaseUrl = cached;
         API_BASE_URL = cached;
       }
