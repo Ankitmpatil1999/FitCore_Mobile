@@ -52,12 +52,13 @@ class ApiService {
     }).catch(() => {});
 
     AsyncStorage.getItem('@fitcore_active_base_url').then((cached) => {
-      // Reject stale local LAN IPs saved from previous dev sessions
-      const staleIPs = ['192.168.88.28', '192.168.0.104', '192.168.0.120', '10.0.0.17', '10.0.2.2', 'localhost', '127.0.0.1'];
-      const isStale = cached && staleIPs.some(ip => cached.includes(ip));
-      if (cached && !isStale) {
+      // Reject local LAN/emulator IPs so phone always uses the real production cloud database
+      if (cached && !cached.startsWith('http://') && cached.startsWith('https://')) {
         this.activeBaseUrl = cached;
         API_BASE_URL = cached;
+      } else {
+        this.activeBaseUrl = PRODUCTION_API_URL;
+        API_BASE_URL = PRODUCTION_API_URL;
       }
     }).catch(() => {});
   }
@@ -100,8 +101,9 @@ class ApiService {
 
     const currentDynamicHost = getDynamicHost();
     const urlsToTry = Array.from(new Set([
-      ...(currentDynamicHost ? [`http://${currentDynamicHost}:7000/api`] : []),
+      PRODUCTION_API_URL,
       this.activeBaseUrl,
+      ...(currentDynamicHost ? [`http://${currentDynamicHost}:7000/api`] : []),
       ...CANDIDATE_URLS,
     ]));
 
