@@ -212,10 +212,14 @@ class ApiService {
     });
   }
 
-  async setupFirstTimePassword(phone: string, otp: string, password: string) {
+  async setupFirstTimePassword(phone: string, tokenOrOtp: string, password: string) {
+    const isIdToken = tokenOrOtp && tokenOrOtp.length > 25;
+    const payload = isIdToken
+      ? { phone, idToken: tokenOrOtp, password }
+      : { phone, otp: tokenOrOtp, password };
     const res = await this.request<any>('/auth/setup-first-time-password', {
       method: 'POST',
-      body: JSON.stringify({ phone, otp, password }),
+      body: JSON.stringify(payload),
     });
     if (res.success && res.data?.token) {
       this.setToken(res.data.token);
@@ -230,10 +234,14 @@ class ApiService {
     });
   }
 
-  async resetPassword(phone: string, otp: string, password: string) {
+  async resetPassword(phone: string, tokenOrOtp: string, password: string) {
+    const isIdToken = tokenOrOtp && tokenOrOtp.length > 25;
+    const payload = isIdToken
+      ? { phone, idToken: tokenOrOtp, password }
+      : { phone, otp: tokenOrOtp, password };
     return this.request<any>('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ phone, otp, password }),
+      body: JSON.stringify(payload),
     });
   }
 

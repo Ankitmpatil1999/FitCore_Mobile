@@ -41,6 +41,7 @@ export default function LoginScreen() {
   const [loginStep, setLoginStep] = useState<LoginStep>('enter_phone');
   const [otpStep, setOtpStep] = useState<OtpStep>('enter_phone');
   const [confirmResult, setConfirmResult] = useState<ConfirmationResult | null>(null);
+  const [firebaseIdToken, setFirebaseIdToken] = useState<string>('');
 
   // Input states
   const [mobileNumber, setMobileNumber] = useState('');
@@ -135,6 +136,8 @@ export default function LoginScreen() {
     setOtpCode('');
     setNewPassword('');
     setConfirmPassword('');
+    setFirebaseIdToken('');
+    setConfirmResult(null);
     setOtpStep('enter_phone');
     setLoginStep('enter_phone');
     setDiscoveredUserName('');
@@ -223,7 +226,7 @@ export default function LoginScreen() {
     }
   };
 
-  // ─── STEP 1: SEND OTP (Firebase 10k Free SMS + Server Fallback) ───
+  // ─── STEP 1: SEND OTP (Firebase Phone Authentication Only) ───
   const handleSendOtp = async (overrideMode?: ScreenMode, overridePhone?: string) => {
     setError('');
     setSuccessMessage('');
@@ -238,102 +241,79 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      let fbSuccess = false;
-
-      // 1. Send via Firebase Phone Auth (Google 10,000 Free SMS Quota)
-      try {
-        const confirmation = await signInWithPhoneNumber(getAuth(), '+91' + cleanPhone);
-        if (confirmation) {
-          setConfirmResult(confirmation);
-          fbSuccess = true;
-        }
-      } catch (fbErr: any) {
-        console.log('Firebase Phone Auth attempt:', fbErr?.message || fbErr);
+      // 1. Send SMS OTP strictly via Firebase Phone Auth
+      const confirmation = await signInWithPhoneNumber(getAuth(), '+91' + cleanPhone);
+      setConfirmResult(confirmation);
+      setSuccessMessage(`Verification code sent via SMS to +91 ${cleanPhone}`);
+      setOtpStep('enter_otp');
+      setResendTimer(60);
+    } catch (fbErr: any) {
+      const code = fbErr?.code || '';
+      let userMsg = 'Failed to send verification SMS. Please try again.';
+      if (code === 'auth/invalid-phone-number') {
+        userMsg = 'Invalid phone number format. Please enter a valid 10-digit number.';
+      } else if (code === 'auth/too-many-requests') {
+        userMsg = 'Too many requests. Please wait a few moments before requesting another OTP.';
+      } else if (code === 'auth/quota-exceeded') {
+        userMsg = 'SMS service quota exceeded. Please contact your gym administrator.';
+      } else if (code === 'auth/app-not-authorized' || code === 'auth/captcha-check-failed') {
+        userMsg = 'Device integrity verification failed. Please check your internet connection.';
+      } else if (fbErr?.message) {
+        userMsg = fbErr.message.replace(/\[.*?\]\s*/, '');
       }
-
-      // 2. Fetch User Name & trigger backend sync / fallback
-      let res: any = null;
-      try {
-        if (targetMode === 'first_time_otp') {
-          res = await apiService.sendFirstTimeOtp(cleanPhone);
-        } else {
-          res = await apiService.forgotPassword(cleanPhone);
-        }
-      } catch (srvErr) {
-        console.log('Server SMS sync fallback info:', srvErr);
-      }
-
-      if (fbSuccess || res?.success) {
-        if (res?.userName) {
-          setDiscoveredUserName(res.userName);
-        }
-        if (res?.devOtp) {
-          setOtpCode(res.devOtp);
-          setSuccessMessage(`Code sent to +91 ${cleanPhone} (Test OTP: ${res.devOtp})`);
-        } else {
-          setSuccessMessage(`Verification code sent to +91 ${cleanPhone}`);
-        }
-        setOtpStep('enter_otp');
-        setResendTimer(60);
-      } else {
-        setError(res?.error || res?.message || 'Failed to send OTP. Check if number is registered.');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Network error while sending OTP.');
+      setError(userMsg);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ─── STEP 2: VERIFY OTP ───
+  // ─── STEP 2: VERIFY OTP (Firebase Phone Authentication Only) ───
   const handleVerifyOtp = async () => {
     setError('');
     setSuccessMessage('');
 
     const cleanOtp = otpCode.trim();
-    if (!cleanOtp || cleanOtp.length < 4) {
-      setError('Please enter the verification code received on your phone.');
+    if (!cleanOtp || cleanOtp.length < 6) {
+      setError('Please enter the 6-digit verification code received via SMS.');
       return;
     }
 
-    const cleanPhone = mobileNumber.trim().replace(/[^0-9]/g, '').slice(-10);
+    if (!confirmResult) {
+      setError('No pending OTP request found. Please tap Resend Code.');
+      return;
+    }
+
     setIsLoading(true);
-
     try {
-      let isVerified = false;
-
-      // 1. Check Firebase Confirmation first
-      if (confirmResult) {
-        try {
-          await confirmResult.confirm(cleanOtp);
-          isVerified = true;
-        } catch (fbErr: any) {
-          console.log('Firebase OTP verify fallback:', fbErr?.message);
-        }
+      // 1. Confirm OTP with Firebase Auth
+      const userCredential = await confirmResult.confirm(cleanOtp);
+      if (!userCredential?.user) {
+        throw new Error('Firebase authentication failed. Please try again.');
       }
 
-      // 2. Check Backend OTP verify
-      if (!isVerified) {
-        const res = await apiService.verifyOtp(cleanPhone, cleanOtp);
-        if (res.success) {
-          isVerified = true;
-        }
-      }
+      // 2. Extract Firebase ID Token for backend verification
+      const idToken = await userCredential.user.getIdToken();
+      setFirebaseIdToken(idToken);
 
-      if (isVerified) {
-        setSuccessMessage('Code verified! Set your password now.');
-        setOtpStep('set_password');
-      } else {
-        setError('Invalid or expired OTP. Please check the code received on your phone.');
+      setSuccessMessage('Phone number verified! Please set your new password.');
+      setOtpStep('set_password');
+    } catch (fbErr: any) {
+      const code = fbErr?.code || '';
+      let userMsg = 'Invalid or expired OTP code. Please check the SMS received on your phone.';
+      if (code === 'auth/invalid-verification-code') {
+        userMsg = 'Incorrect OTP code. Please enter the 6-digit code sent to your phone.';
+      } else if (code === 'auth/session-expired') {
+        userMsg = 'Verification session expired. Please tap Resend Code to receive a new OTP.';
+      } else if (fbErr?.message) {
+        userMsg = fbErr.message.replace(/\[.*?\]\s*/, '');
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to verify OTP.');
+      setError(userMsg);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // ─── STEP 3: SET PASSWORD & AUTO LOGIN ───
+  // ─── STEP 3: SET PASSWORD & AUTO LOGIN (Secure Backend Token Verification) ───
   const handleSetPasswordAndLogin = async () => {
     setError('');
     setSuccessMessage('');
@@ -348,15 +328,15 @@ export default function LoginScreen() {
     }
 
     const cleanPhone = mobileNumber.trim().replace(/[^0-9]/g, '').slice(-10);
-    const cleanOtp = otpCode.trim();
+    const tokenPayload = firebaseIdToken || otpCode.trim();
 
     setIsLoading(true);
     try {
       let res: any;
       if (mode === 'first_time_otp') {
-        res = await apiService.setupFirstTimePassword(cleanPhone, cleanOtp, newPassword);
+        res = await apiService.setupFirstTimePassword(cleanPhone, tokenPayload, newPassword);
       } else {
-        res = await apiService.resetPassword(cleanPhone, cleanOtp, newPassword);
+        res = await apiService.resetPassword(cleanPhone, tokenPayload, newPassword);
       }
 
       if (res.success) {
